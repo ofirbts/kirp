@@ -64,3 +64,6 @@ sed -n '1,200p' app/services/pipeline.py
 
 📦 חבילות מותקנות (קריטי)
 pip freeze | egrep "langchain|openai|faiss|fastapi"
+
+git acsess
+ssh -T git@github.com
