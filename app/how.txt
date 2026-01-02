@@ -1,0 +1,66 @@
+🚀 חלק 1 — פעם אחת בלבד (התקנה ראשונית)
+1. להיכנס לתיקיית הפרויקט
+cd ~/projects/kirp
+source venv/bin/activate
+pip install -r requirements.txt
+
+    רק בדיקה:
+    config.py:
+from pydantic_settings import BaseSettings
+
+class Settings(BaseSettings):
+    ENV: str = "dev"
+    MONGO_URI: str = "mongodb://root:example@localhost:27017"
+    MONGO_DB_NAME: str = "kirp"
+
+    class Config:
+        env_file = ".env"
+        env_file_encoding = "utf-8"
+
+settings = Settings()
+
+    רק בדיקה:
+    mongo.py:
+from motor.motor_asyncio import AsyncIOMotorClient
+from app.core.config import settings
+
+client = AsyncIOMotorClient(settings.MONGO_URI)
+db = client[settings.MONGO_DB_NAME]
+
+messages_collection = db["messages"]
+
+
+🚀 חלק 2 — הרמת Docker (Mongo, Redis, Qdrant)
+כל פעם שאתה מפעיל את המחשב ורוצה להרים את המערכת:
+docker compose up -d
+docker compose ps
+docker exec -it kirp-mongodb mongosh -u root -p example
+
+🚀 חלק 3 — הרצת השרת FastAPI
+source venv/bin/activate
+pkill -f uvicorn
+uvicorn app.main:app --reload
+
+http://127.0.0.1:8000/health/
+                                    {"status": "ok"}
+http://127.0.0.1:8000/debug/jobs
+                                        []
+http://127.0.0.1:8000/docs
+
+🚀 חלק 4 — אם אי פעם יש בעיית Mongo (כמו שהיה עכשיו)
+docker compose down
+docker volume rm <volume1>
+docker volume rm <volume2>
+docker compose up -d
+
+📁 מבנה תיקיות
+tree -L 4 app
+
+📄 תוכן מלא של הקבצים האלו (בדיוק כך):
+sed -n '1,200p' app/rag/vector_store.py
+sed -n '1,200p' app/rag/qa_engine.py
+sed -n '1,200p' app/rag/embedder.py
+sed -n '1,200p' app/services/pipeline.py
+
+📦 חבילות מותקנות (קריטי)
+pip freeze | egrep "langchain|openai|faiss|fastapi"
