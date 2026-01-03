@@ -1,0 +1,65 @@
+🔁 פעם אחת בלבד (התקנה)
+cd ~/projects/kirp
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+
+🔁 כל פעם שמדליקים מחשב
+# Mongo
+docker compose up -d
+
+# Backend
+source venv/bin/activate
+pkill -f uvicorn || true
+uvicorn app.main:app --reload
+
+
+בדיקות:
+
+http://127.0.0.1:8000/health
+ → {"status":"ok"}
+
+http://127.0.0.1:8000/docs
+
+http://127.0.0.1:8000/debug/jobs
+
+🆘 אם Mongo נשבר
+docker compose down
+docker volume rm kirp_mongo_data
+docker compose up -d
+
+6️⃣ “בתכלס” — מה כל זה עושה 🧠
+
+FastAPI – ה־API שלך
+
+Mongo (Motor) – שומר:
+
+הודעות
+jobs
+metadata
+
+FAISS – זיכרון סמנטי (וקטורים)
+
+LangChain – glue:
+chunk
+embed
+retrieve
+
+RAG =
+👉 שאלה → חיפוש ידע → הקשר → LLM
+
+
+📁 מבנה תיקיות
+tree -L 4 app
+
+📄 תוכן מלא של הקבצים האלו (בדיוק כך):
+sed -n '1,200p' app/rag/vector_store.py
+sed -n '1,200p' app/rag/qa_engine.py
+sed -n '1,200p' app/rag/embedder.py
+sed -n '1,200p' app/services/pipeline.py
+
+📦 חבילות מותקנות (קריטי)
+pip freeze | egrep "langchain|openai|faiss|fastapi"
+
+git acsess
+ssh -T git@github.com

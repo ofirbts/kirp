@@ -3,18 +3,14 @@ uvicorn==0.29.0
 pydantic==1.10.13
 python-dotenv==1.0.1
 
-# LangChain ecosystem (גרסאות תואמות!)
 langchain==0.1.20
 langchain-community==0.0.38
 langchain-openai==0.1.6
 langchain-text-splitters==0.0.1
 
-# Vector stores
-faiss-cpu==1.7.4
-qdrant-client==1.7.0
-
-# Tokenizer
+openai>=1.24.0
 tiktoken==0.6.0
+faiss-cpu==1.7.4
 
-# OpenAI SDK החדש
-openai==1.12.0
+motor==3.3.2
+pymongo>=4.6,<4.10
