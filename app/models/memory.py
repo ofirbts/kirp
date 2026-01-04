@@ -1,17 +1,26 @@
+from datetime import datetime, timezone
 from enum import Enum
-from datetime import datetime
-from pydantic import BaseModel
+from typing import Optional
+
+from pydantic import BaseModel, Field
 
 
 class MemoryType(str, Enum):
     FACT = "fact"
     PREFERENCE = "preference"
     EVENT = "event"
+    SUMMARY = "summary"
     NOTE = "note"
 
 
 class MemoryRecord(BaseModel):
+    id: Optional[str] = None
+
     source: str
     content: str
     memory_type: MemoryType
-    created_at: datetime = datetime.utcnow()
+
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    last_updated: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+    strength: int = 1

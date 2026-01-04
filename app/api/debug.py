@@ -11,17 +11,16 @@ def vector_store_debug():
 
 
 @router.get("/memory")
-async def memory_debug():
-    total = await memory_collection.count_documents({})
-    by_type = {}
+async def debug_memory():
+    cursor = memory_collection.find()
+    items = []
 
-    async for doc in memory_collection.find():
-        t = doc.get("memory_type", "unknown")
-        by_type[t] = by_type.get(t, 0) + 1
+    async for doc in cursor:
+        doc["_id"] = str(doc["_id"])
+        items.append(doc)
 
     return {
-        "total_memories": total,
-        "by_type": by_type,
-        "vector_store": debug_info(),
-        "status": "memory system alive"
+        "total": len(items),
+        "items": items
     }
+
