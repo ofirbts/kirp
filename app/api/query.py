@@ -1,13 +1,15 @@
 from fastapi import APIRouter
 from pydantic import BaseModel
-from app.rag.qa_engine import ask_question
+
+from app.agent.router import agent_handle
 
 router = APIRouter()
 
-class QueryRequest(BaseModel):
-    question: str
+
+class AgentInput(BaseModel):
+    text: str
+
 
 @router.post("/")
-def query_knowledge(data: QueryRequest):
-    answer = ask_question(data.question)
-    return {"answer": answer}
+async def query(input: AgentInput):
+    return await agent_handle(input.text)

@@ -1,7 +1,5 @@
-# app/services/pipeline.py
-
 import asyncio
-
+from app.models.memory import MemoryRecord, MemoryType
 from app.rag.chunker import chunk_text
 from app.rag.vector_store import add_texts
 from app.rag.qa_engine import ask_question
@@ -11,19 +9,34 @@ from app.models.job import JobStatus
 
 
 # =========================
-# Regular ingestion (used by API jobs)
+# Core Memory Ingest
+# =========================
+
+async def ingest_memory(memory: MemoryRecord) -> None:
+    """
+    Core ingestion logic for ALL memory sources.
+    """
+    chunks = chunk_text(memory.content)
+    add_texts(chunks)
+
+
+# =========================
+# API / Job ingestion
 # =========================
 
 async def process_ingest_job(job_id: str, payload: dict):
     try:
         await update_job_status(job_id, JobStatus.IN_PROGRESS)
 
-        text = payload["content"]
-        chunks = chunk_text(text)
-        add_texts(chunks)
+        memory = MemoryRecord(
+            content=payload["content"],
+            source=payload.get("source", "api"),
+            memory_type=MemoryType.MESSAGE,
+        )
 
-        await asyncio.sleep(0.2)
+        await ingest_memory(memory)
 
+        await asyncio.sleep(0.1)
         await update_job_status(job_id, JobStatus.COMPLETED)
 
     except Exception:
@@ -36,8 +49,12 @@ async def process_ingest_job(job_id: str, payload: dict):
 # =========================
 
 async def ingest_text(text: str) -> None:
-    chunks = chunk_text(text)
-    add_texts(chunks)
+    memory = MemoryRecord(
+        content=text,
+        source="agent",
+        memory_type=MemoryType.MESSAGE,
+    )
+    await ingest_memory(memory)
 
 
 async def answer_question(question: str) -> str:

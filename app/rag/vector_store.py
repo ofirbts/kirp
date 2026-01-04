@@ -37,8 +37,7 @@ def load_vector_store() -> None:
     store_file = VECTOR_STORE_PATH / "index.pkl"
 
     if not index_file.exists() or not store_file.exists():
-        # No vector store yet – this is expected on first run
-        return
+        return  # no memory yet – totally fine
 
     embeddings = get_embeddings()
 
@@ -46,12 +45,10 @@ def load_vector_store() -> None:
         _vector_store = FAISS.load_local(
             str(VECTOR_STORE_PATH),
             embeddings,
-            allow_dangerous_deserialization=True,
+            allow_dangerous_deserialization=True
         )
     except Exception as e:
-        # Corrupted / incompatible index – ignore and rebuild later
-        print("⚠️ Failed to load vector store, will recreate on ingest.")
-        print(f"Reason: {e}")
+        print("⚠️ Failed to load vector store:", e)
         _vector_store = None
 
 
