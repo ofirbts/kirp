@@ -1,7 +1,6 @@
 from datetime import datetime, timezone
 from enum import Enum
 from typing import Optional
-
 from pydantic import BaseModel, Field
 
 
@@ -11,6 +10,8 @@ class MemoryType(str, Enum):
     EVENT = "event"
     SUMMARY = "summary"
     NOTE = "note"
+    MESSAGE = "message"   # chat / whatsapp / email
+    TASK = "task"
 
 
 class MemoryRecord(BaseModel):
