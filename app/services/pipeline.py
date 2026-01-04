@@ -1,27 +1,57 @@
-import asyncio
-from app.models.memory import MemoryRecord, MemoryType
+from app.models.memory import MemoryRecord
+from app.services.memory_classifier import classify_memory
+from app.storage.memory import save_memory
+
 from app.rag.chunker import chunk_text
 from app.rag.vector_store import add_texts
 from app.rag.qa_engine import ask_question
 
-from app.storage.jobs import update_job_status
+import asyncio
 from app.models.job import JobStatus
+from app.storage.jobs import update_job_status
+from app.models.memory import MemoryRecord
+
 
 
 # =========================
-# Core Memory Ingest
+# Core memory ingestion
 # =========================
 
 async def ingest_memory(memory: MemoryRecord) -> None:
     """
-    Core ingestion logic for ALL memory sources.
+    Single source of truth for memory ingestion.
     """
+    await save_memory(memory)
+
     chunks = chunk_text(memory.content)
     add_texts(chunks)
 
 
 # =========================
-# API / Job ingestion
+# Public API / Agent entry
+# =========================
+
+async def ingest_text(text: str, source: str = "agent") -> None:
+    memory_type = classify_memory(text)
+
+    memory = MemoryRecord(
+        source=source,
+        content=text,
+        memory_type=memory_type
+    )
+
+    await ingest_memory(memory)
+
+
+# =========================
+# Question answering
+# =========================
+
+async def answer_question(question: str) -> str:
+    return ask_question(question)
+
+# =========================
+# Job-based ingestion
 # =========================
 
 async def process_ingest_job(job_id: str, payload: dict):
@@ -31,7 +61,7 @@ async def process_ingest_job(job_id: str, payload: dict):
         memory = MemoryRecord(
             content=payload["content"],
             source=payload.get("source", "api"),
-            memory_type=MemoryType.MESSAGE,
+            memory_type=payload.get("memory_type", None)
         )
 
         await ingest_memory(memory)
@@ -42,20 +72,3 @@ async def process_ingest_job(job_id: str, payload: dict):
     except Exception:
         await update_job_status(job_id, JobStatus.FAILED)
         raise
-
-
-# =========================
-# Agent-facing API
-# =========================
-
-async def ingest_text(text: str) -> None:
-    memory = MemoryRecord(
-        content=text,
-        source="agent",
-        memory_type=MemoryType.MESSAGE,
-    )
-    await ingest_memory(memory)
-
-
-async def answer_question(question: str) -> str:
-    return ask_question(question)
