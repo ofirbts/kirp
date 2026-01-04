@@ -1,14 +1,20 @@
-from datetime import datetime
-from bson import ObjectId
-from app.storage.mongo import jobs_collection
+from datetime import datetime, timezone
+from app.models.job import Job
+from app.storage.mongo import db
 
-async def create_job(job: dict):
-    job["created_at"] = datetime.utcnow()
-    result = await jobs_collection.insert_one(job)
+jobs_collection = db["jobs"]
+
+async def create_job(job: Job):
+    result = await jobs_collection.insert_one(job.dict())  # ✅ Pydantic v1
     return str(result.inserted_id)
 
-async def update_job_status(job_id: str, status: str):
+async def update_job_status(job_id: str, status):
     await jobs_collection.update_one(
-        {"_id": ObjectId(job_id)},
-        {"$set": {"status": status}}
+        {"id": job_id},
+        {
+            "$set": {
+                "status": status,
+                "updated_at": datetime.now(timezone.utc)
+            }
+        }
     )

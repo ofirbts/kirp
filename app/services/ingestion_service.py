@@ -1,5 +1,5 @@
 from app.models.ingest import IngestRequest
-from app.storage.mongo import messages_collection
+from app.storage.messages import messages_collection
 from datetime import datetime
 
 async def ingest_message(data: IngestRequest) -> str:

@@ -2,10 +2,13 @@ from abc import ABC, abstractmethod
 from typing import Iterable
 
 
+from dataclasses import dataclass
+
+@dataclass
 class ImportChunk:
-    def __init__(self, content: str, source: str):
-        self.content = content
-        self.source = source
+    content: str
+    source: str
+
 
 
 class BaseImporter(ABC):

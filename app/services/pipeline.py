@@ -10,6 +10,8 @@ import asyncio
 from app.models.job import JobStatus
 from app.storage.jobs import update_job_status
 from app.models.memory import MemoryRecord
+from app.services.task_extractor import extract_task
+
 
 
 
@@ -21,7 +23,14 @@ async def ingest_memory(memory: MemoryRecord) -> None:
     """
     Single source of truth for memory ingestion.
     """
-    await save_memory(memory)
+    record = MemoryRecord(
+        source=memory.source,
+        content=memory.content,
+        memory_type=memory.memory_type
+    )
+    await save_memory(record)
+    await extract_task(record)
+
 
     chunks = chunk_text(memory.content)
     add_texts(chunks)
@@ -58,11 +67,16 @@ async def process_ingest_job(job_id: str, payload: dict):
     try:
         await update_job_status(job_id, JobStatus.IN_PROGRESS)
 
+        memory_type = payload.get("memory_type")
+        if memory_type is None:
+            memory_type = classify_memory(payload["content"])
+
         memory = MemoryRecord(
             content=payload["content"],
             source=payload.get("source", "api"),
-            memory_type=payload.get("memory_type", None)
+            memory_type=memory_type
         )
+
 
         await ingest_memory(memory)
 

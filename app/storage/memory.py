@@ -1,7 +1,8 @@
-from app.storage.mongo import db
-from app.models.memory import MemoryRecord
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
+from typing import List
 
+from app.models.memory import MemoryRecord
+from app.storage.mongo import db
 
 memory_collection = db["memories"]
 
@@ -22,3 +23,24 @@ async def save_memory(record: MemoryRecord):
         )
     else:
         await memory_collection.insert_one(record.dict())
+
+
+async def fetch_recent_memories(limit: int = 20) -> List[MemoryRecord]:
+    cursor = (
+        memory_collection
+        .find()
+        .sort("created_at", -1)
+        .limit(limit)
+    )
+
+    return [MemoryRecord(**doc) async for doc in cursor]
+
+
+async def fetch_memories_by_days(days: int) -> List[MemoryRecord]:
+    since = datetime.now(timezone.utc) - timedelta(days=days)
+
+    cursor = memory_collection.find({
+        "created_at": {"$gte": since}
+    })
+
+    return [MemoryRecord(**doc) async for doc in cursor]

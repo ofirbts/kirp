@@ -1,8 +1,7 @@
 from motor.motor_asyncio import AsyncIOMotorClient
-from app.core.config import settings
+import os
 
-client = AsyncIOMotorClient(settings.MONGO_URI)
-db = client[settings.MONGO_DB_NAME]
+MONGO_URI = os.getenv("MONGO_URI", "mongodb://localhost:27017")
 
-messages_collection = db["messages"]
-jobs_collection = db["jobs"]
+client = AsyncIOMotorClient(MONGO_URI)
+db = client["kirp"]
