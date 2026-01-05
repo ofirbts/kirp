@@ -1,5 +1,6 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 from app.services.memory_intelligence.summarize import summarize_cluster
+from app.services.memory_intelligence.weekly import generate_weekly_summary
 from app.storage.memory import fetch_recent_memories
 from app.models.memory import MemoryRecord, MemoryType
 from app.services.pipeline import ingest_memory
@@ -24,3 +25,15 @@ async def create_summary(limit: int = 20):
         "stored": True,
         "based_on": len(memories)
     }
+
+@router.post("/weekly-summary")
+async def create_weekly_summary(days: int = 7):
+    try:
+        memory = await generate_weekly_summary(days)
+        return {
+            "status": "ok",
+            "summary": memory.content,
+            "memory_id": memory.id
+        }
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))

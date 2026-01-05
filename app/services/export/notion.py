@@ -1,27 +1,30 @@
-import requests
-from app.models.memory import MemoryRecord
+import httpx
+import os
 
-def export_to_notion(memories: list[MemoryRecord], notion_token: str, database_id: str):
+NOTION_TOKEN = os.getenv("NOTION_TOKEN")
+DATABASE_ID = os.getenv("NOTION_DATABASE_ID")
+
+async def export_task_to_notion(task):
     headers = {
-        "Authorization": f"Bearer {notion_token}",
-        "Content-Type": "application/json",
-        "Notion-Version": "2022-06-28"
+        "Authorization": f"Bearer {NOTION_TOKEN}",
+        "Notion-Version": "2022-06-28",
+        "Content-Type": "application/json"
     }
 
-    for m in memories:
-        payload = {
-            "parent": {"database_id": database_id},
-            "properties": {
-                "Content": {
-                    "title": [{"text": {"content": m.content[:200]}}]
-                },
-                "Type": {
-                    "select": {"name": m.memory_type}
-                }
+    payload = {
+        "parent": {"database_id": DATABASE_ID},
+        "properties": {
+            "Name": {
+                "title": [{"text": {"content": task["title"]}}]
+            },
+            "Completed": {
+                "checkbox": task["completed"]
             }
         }
+    }
 
-        requests.post(
+    async with httpx.AsyncClient() as client:
+        await client.post(
             "https://api.notion.com/v1/pages",
             headers=headers,
             json=payload

@@ -16,6 +16,7 @@ class MemoryType(str, Enum):
 
 class MemoryRecord(BaseModel):
     id: Optional[str] = None
+    parent_id: Optional[str] = None
 
     source: str
     content: str
