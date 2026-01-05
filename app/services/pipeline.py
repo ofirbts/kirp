@@ -1,19 +1,13 @@
 from app.models.memory import MemoryRecord
 from app.services.memory_classifier import classify_memory
 from app.storage.memory import save_memory
-
 from app.rag.chunker import chunk_text
 from app.rag.vector_store import add_texts
-from app.rag.qa_engine import ask_question
-
 import asyncio
 from app.models.job import JobStatus
 from app.storage.jobs import update_job_status
-from app.models.memory import MemoryRecord
 from app.services.task_extractor import extract_task
-
-
-
+from app.rag.qa_engine import answer_with_rag  # ✅ החלפה נכונה
 
 # =========================
 # Core memory ingestion
@@ -31,10 +25,8 @@ async def ingest_memory(memory: MemoryRecord) -> None:
     await save_memory(record)
     await extract_task(record)
 
-
     chunks = chunk_text(memory.content)
     add_texts(chunks)
-
 
 # =========================
 # Public API / Agent entry
@@ -51,13 +43,12 @@ async def ingest_text(text: str, source: str = "agent") -> None:
 
     await ingest_memory(memory)
 
-
 # =========================
 # Question answering
 # =========================
 
 async def answer_question(question: str) -> str:
-    return ask_question(question)
+    return await answer_with_rag(question)  # ✅ החלפה ל-RAG חדש
 
 # =========================
 # Job-based ingestion
@@ -76,7 +67,6 @@ async def process_ingest_job(job_id: str, payload: dict):
             source=payload.get("source", "api"),
             memory_type=memory_type
         )
-
 
         await ingest_memory(memory)
 
