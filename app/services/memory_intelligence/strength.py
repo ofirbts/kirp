@@ -1,8 +1,8 @@
+# app/services/memory_intelligence/strength.py
 from datetime import datetime, timezone, timedelta
 from app.storage.memory import memory_collection
 
-
-async def decay_memory_strength(days: int = 30):
+async def decay_memory_strength(days: int = 30, amount: int = 1):
     """
     Reduce strength for memories not updated recently.
     """
@@ -10,7 +10,7 @@ async def decay_memory_strength(days: int = 30):
 
     await memory_collection.update_many(
         {"last_updated": {"$lt": cutoff}},
-        {"$inc": {"strength": -1}}
+        {"$inc": {"strength": -amount}}
     )
 
     await memory_collection.delete_many(
