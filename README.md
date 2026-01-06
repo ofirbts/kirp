@@ -105,3 +105,27 @@ http://127.0.0.1:8000/docs
 ## Author
 
 Ofir Betesh
+## 🎬 LIVE DEMO
+
+### 1. Ingest Memory
+```bash
+curl -X POST "http://127.0.0.1:8000/ingest/" -H "Content-Type: application/json" -d '{"text":"Buy milk tomorrow"}'
+# → {"memory_type":"task","chunks_added":1}
+2. Agent Discovery
+bash
+curl -X POST "http://127.0.0.1:8000/agent/" -H "Content-Type: application/json" -d '{"question":"What tasks?"}'
+# → "Found 1 tasks. Suggestion: create_notion_tasks"
+3. Execute Action
+bash
+curl -X POST "http://127.0.0.1:8000/agent/confirm/TRACE_ID" -H "Content-Type: application/json" -d '{"confirm":true}'
+# → Notion page created!
+📊 PRODUCTION FEATURES
+✅ Persistent FAISS vector store
+
+✅ memory_type classification (task/event/note)
+
+✅ Agentic workflow (suggest → confirm → execute)
+
+✅ Confidence scoring + trace_id observability
+
+✅ Notion integration (live tasks)
