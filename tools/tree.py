@@ -1,4 +1,4 @@
-#python3 tree.py
+# python3 tools/tree.py
 
 import os
 
