@@ -1,0 +1,10 @@
+# תיקון ObjectId + מגבלה
+async def fetch_open_tasks():
+    cursor = tasks_collection.find({"status": "open"})
+    tasks = []
+    async for doc in cursor:
+        task = doc.copy()
+        if '_id' in task:
+            task['id'] = str(task.pop('_id'))
+        tasks.append(task)
+    return tasks[:10]

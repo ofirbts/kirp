@@ -13,4 +13,14 @@ async def create_task(task: Task):
 
 async def fetch_open_tasks():
     cursor = tasks_collection.find({"status": "open"})
-    return [doc async for doc in cursor]
+    tasks = []
+    async for doc in cursor:
+        task = doc.copy()
+        if "_id" in task:
+            task["id"] = str(task.pop("_id"))
+        tasks.append(task)
+    return tasks[:10]
+
+
+
+

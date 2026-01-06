@@ -5,11 +5,14 @@ from app.services.memory_intelligence.summarize import summarize_cluster
 
 async def generate_weekly_summary(days: int = 7) -> MemoryRecord:
     memories = await fetch_memories_by_days(days)
-
+    
+    memories = sorted(memories, key=lambda m: getattr(m, 'created_at', 0), reverse=True)[:20]
+    
     if not memories:
-        raise ValueError("No memories found for weekly summary")
-
+        raise ValueError("No memories")
+    
     summary_text = await summarize_cluster(memories)
+
 
     summary_memory = MemoryRecord(
         source="intelligence.weekly",
