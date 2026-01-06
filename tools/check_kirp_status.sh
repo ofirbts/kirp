@@ -2,43 +2,20 @@
 echo "🔍 === KIRP FULL STATUS ($(date)) ==="
 echo "═══════════════════════════════════════"
 
-# SERVER STATUS
 echo "🟢 SERVER STATUS:"
-HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:8000/health/ 2>/dev/null || echo "000")
-TIME=$(curl -s -w "Time: %{time_total}s\n" -o /dev/null http://127.0.0.1:8000/health/ 2>/dev/null || echo "Time: N/A")
-echo "Status: $HTTP_CODE | $TIME"
+curl -s http://127.0.0.1:8000/health/ || echo "🔴 DOWN"
+echo
 
-echo -e "\n📋 ENDPOINTS TEST:"
-declare -A ENDPOINTS=(
-    ["Health"]="GET /health/"
-    ["Tasks"]="GET /tasks/" 
-    ["Query"]="POST /query/"
-    ["Ingest"]="POST /ingest/"
-    ["Agent"]="POST /agent/"
-)
+echo "📋 ENDPOINTS TEST:"
+echo "Health: $(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:8000/health/) → $(curl -s http://127.0.0.1:8000/health/ | head -c 50)"
+echo "Tasks:  $(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:8000/tasks/) → $(curl -s http://127.0.0.1:8000/tasks/ | head -c 50)"
+echo "Query:  $(curl -s -X POST -H 'Content-Type: application/json' -d '{"question":"test"}' -o /dev/null -w "%{http_code}" http://127.0.0.1:8000/query/) → $(curl -s -X POST -H 'Content-Type: application/json' -d '{"question":"test"}' http://127.0.0.1:8000/query/ | head -c 50)"
+echo "Ingest: $(curl -s -X POST -H 'Content-Type: application/json' -d '{"text":"test"}' -o /dev/null -w "%{http_code}" http://127.0.0.1:8000/ingest/) → $(curl -s -X POST -H 'Content-Type: application/json' -d '{"text":"test"}' http://127.0.0.1:8000/ingest/ | head -c 50)"
+echo
 
-for name in "${!ENDPOINTS[@]}"; do
-    url="http://127.0.0.1:8000${ENDPOINTS[$name]}"
-    if [[ $name == "Query" || $name == "Ingest" || $name == "Agent" ]]; then
-        code=$(curl -s -w "%{http_code}" -X POST "$url" \
-            -H "Content-Type: application/json" \
-            -d '{"text":"test"}' -o /dev/null 2>/dev/null || echo "000")
-    else
-        code=$(curl -s -w "%{http_code}" "$url" -o /dev/null 2>/dev/null || echo "000")
-    fi
-    
-    if [[ $code == "200" ]]; then
-        echo "$name : 🟢 $code"
-    else
-        echo "$name : 🔴 $code" 
-    fi
-done
+echo "🐳 DOCKER:"
+docker ps --filter "name=kirp" --format "table {{.Names}}\t{{.Status}}"
 
-# DOCKER STATUS
-echo -e "\n🐳 DOCKER:"
-docker ps --filter "name=kirp" --format "table {{.Names}}\t{{.Status}}" || echo "No containers"
+echo "💾 MONGODB: $(docker ps --filter "name=kirp-mongo" --format "{{.Status}}" || echo "DOWN")"
 
-# MONGODB
-echo -e "\n💾 MONGODB: $(docker ps --filter "name=kirp-mongo" --format "{{.Status}}" || echo "DOWN")"
-
-echo -e "\n✅ SUMMARY: $([[ $HTTP_CODE == "200" ]] && echo "🟢 LIVE" || echo "🔴 DOWN")"
+echo -e "\n✅ SUMMARY: $(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:8000/health/ | grep -o '200\|[45]..' || echo '🔴 DOWN') LIVE"

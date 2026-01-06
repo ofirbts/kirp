@@ -12,6 +12,8 @@ from app.api.ingest_batch import router as ingest_batch_router
 from app.api.query import router as query_router
 from app.api.debug import router as debug_router
 from app.api.tasks import router as tasks_router
+from app.rag.vector_store import load_vector_store
+
 
 print("✅ Core routers loaded")
 
@@ -22,7 +24,8 @@ async def lifespan(app: FastAPI):
     print("🔴 KIRP shutdown")
 
 app = FastAPI(title="KIRP AI Platform", lifespan=lifespan)
-
+load_vector_store()
+print("✅ Vector store loaded")
 # חיבור routers
 app.include_router(health_router, prefix="/health", tags=["Health"])
 app.include_router(ingest_router, prefix="/ingest", tags=["Ingest"])
