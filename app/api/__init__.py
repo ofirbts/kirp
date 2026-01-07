@@ -1,4 +1,5 @@
-# app/api/__init__.py - מייבא modules (לא routers!)
-from . import health, ingest, ingest_batch, debug, query, tasks
+from . import health, ingest, ingest_batch, debug, query
+from .agent import router as agent_router
 
-__all__ = ['health', 'ingest', 'ingest_batch', 'debug', 'query', 'tasks']
+# הערה: tasks הוסר זמנית עד שנבנה storage.tasks מלא
+print("✅ API modules loaded (tasks disabled temporarily)")

@@ -1,15 +1,26 @@
+# app/rag/retriever.py
+
 from typing import List
 from app.rag.vector_store import get_vector_store
-from datetime import datetime
+from app.rag.memory_ranker import rank_memories
 
-def retrieve_context(query: str, k: int = 4) -> List[str]:
+
+def retrieve_context(query: str, k: int = 5) -> List[str]:
     store = get_vector_store()
-    docs = store.similarity_search(query, k=k)
-    
+
+    docs_with_scores = store.similarity_search_with_score(query, k=k)
+
+    docs = [d for d, _ in docs_with_scores]
+    similarities = [1 - s for _, s in docs_with_scores]  # FAISS distance → similarity
+
+    ranked = rank_memories(docs, similarities)
+
+    # כרגע מחזירים טקסט, בהמשך גם trace
     formatted = []
-    for doc in docs:
-        meta = getattr(doc, 'metadata', {})
-        text = doc.page_content
-        meta_str = f"META: {meta}"
-        formatted.append(f"{text}\n\n{meta_str}")
+    for r in ranked:
+        meta = r["metadata"]
+        formatted.append(
+            f"{r['text']}\n\nMETA: {meta}\nSCORE: {r['score']}"
+        )
+
     return formatted

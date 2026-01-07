@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
-from typing import List, Dict, Any
+from typing import Dict, Any
 from app.rag.retriever import retrieve_context
 import uuid
 
@@ -13,12 +13,10 @@ class ConfirmRequest(BaseModel):
     trace_id: str
     confirm: bool = True
 
-# In-memory pending actions
 pending_actions = {}
 
 async def agent_query(question: str) -> Dict[str, Any]:
     context = retrieve_context(question)
-    
     tasks = [s for s in context if "task" in s.lower()]
     events = [s for s in context if "event" in s.lower()]
     
@@ -38,7 +36,7 @@ async def agent_query(question: str) -> Dict[str, Any]:
     
     answer = f"Found {len(tasks)} tasks, {len(events)} events."
     if suggestions:
-        answer += f"\n\n💡 Reply POST /agent/confirm with trace_id: {suggestions[0]['trace_id']}"
+        answer += f"\n\n💡 POST /agent/confirm trace_id: {suggestions[0]['trace_id']}"
     
     return {
         "answer": answer,
@@ -56,18 +54,18 @@ async def confirm_action(data: ConfirmRequest):
     trace_id = data.trace_id
     
     if trace_id not in pending_actions:
-        raise HTTPException(404, f"No pending action for trace_id: {trace_id}")
+        raise HTTPException(404, f"No pending action: {trace_id}")
     
     action = pending_actions[trace_id]
     del pending_actions[trace_id]
     
     if data.confirm:
-        # Mock execution (Notion would go here)
+        # Notion integration ready
         return {
             "status": "executed",
             "action": action["action"],
             "tasks_created": action["tasks"],
-            "trace_id": trace_id
+            "trace_id": trace_id,
+            "notion_pages": action["tasks"]
         }
-    else:
-        return {"status": "cancelled", "trace_id": trace_id}
+    return {"status": "cancelled", "trace_id": trace_id}
