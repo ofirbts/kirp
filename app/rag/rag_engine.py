@@ -2,23 +2,22 @@ from typing import List, Union, Dict, Any
 
 
 def format_context_for_answer(context: List[Union[str, Dict[str, Any]]]) -> str:
-    """
-    מייצר טקסט נח לקריאה מתוך רשימת זיכרונות.
-    """
     parts: List[str] = []
     for idx, item in enumerate(context, start=1):
         if isinstance(item, dict):
             text = str(item.get("text", "")).strip()
-            score = item.get("score")
-            explanation = item.get("explanation") or {}
-            concepts = explanation.get("matched_concepts") or []
-            overlap = explanation.get("query_overlap") or []
-            confidence = explanation.get("confidence")
-            source = explanation.get("source")
+            expl = item.get("explanation") or {}
 
-            header = f"[{idx}] score={score:.3f}" if isinstance(score, (int, float)) else f"[{idx}]"
-            if confidence is not None:
-                header += f" | confidence={confidence:.3f}"
+            score = expl.get("confidence") or item.get("score")
+            concepts = expl.get("matched_concepts") or []
+            overlap = expl.get("query_overlap") or []
+            source = expl.get("source")
+
+            header = (
+                f"[{idx}] score={score:.3f}"
+                if isinstance(score, (int, float))
+                else f"[{idx}]"
+            )
             if source:
                 header += f" | source={source}"
 
@@ -40,13 +39,9 @@ def format_context_for_answer(context: List[Union[str, Dict[str, Any]]]) -> str:
 
 def generate_answer(
     context: List[Union[str, Dict[str, Any]]],
-    question: str
+    question: str,
 ) -> str:
-    """
-    מייצר תשובה טקסטואלית, אבל מיועד גם לכך שה־API יחזיר את ה־sources כ־JSON.
-    """
     context_text = format_context_for_answer(context)
-
     return f"""📊 Ranked Memories (Similarity + Recency + Concepts):
 
 {context_text}

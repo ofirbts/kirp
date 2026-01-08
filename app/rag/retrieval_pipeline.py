@@ -1,37 +1,21 @@
 from typing import List, Dict, Any, Optional
 import math
 from datetime import datetime, timezone
-
+import hashlib
 
 # ======================
 # Utils
 # ======================
 
 def safe_cosine_similarity(v1: Optional[list], v2: Optional[list]) -> float:
-    """
-    גרסה בטוחה של cosine:
-    - אם אחד מהם None → 0.0
-    - אם אורך לא תואם → 0.0
-    - אם אחד הוא וקטור אפס → 0.0
-    """
-    if not v1 or not v2:
+    if not v1 or not v2 or len(v1) != len(v2):
         return 0.0
-    if len(v1) != len(v2):
+    dot = sum(a * b for a, b in zip(v1, v2))
+    norm1 = math.sqrt(sum(a * a for a in v1))
+    norm2 = math.sqrt(sum(b * b for b in v2))
+    if not norm1 or not norm2:
         return 0.0
-
-    dot = 0.0
-    norm1 = 0.0
-    norm2 = 0.0
-
-    for a, b in zip(v1, v2):
-        dot += a * b
-        norm1 += a * a
-        norm2 += b * b
-
-    if norm1 == 0 or norm2 == 0:
-        return 0.0
-
-    return dot / math.sqrt(norm1 * norm2)
+    return dot / (norm1 * norm2)
 
 
 def keyword_overlap(query: str, text: str) -> List[str]:
@@ -49,12 +33,12 @@ CONCEPTS = {
 
 
 def matched_concepts(text: str) -> List[str]:
-    found = []
     lower = text.lower()
-    for concept, keywords in CONCEPTS.items():
-        if any(k in lower for k in keywords):
-            found.append(concept)
-    return sorted(found)
+    return sorted([
+        concept
+        for concept, kws in CONCEPTS.items()
+        if any(k in lower for k in kws)
+    ])
 
 
 def parse_iso_datetime(dt_str: Optional[str]) -> Optional[datetime]:
@@ -67,20 +51,17 @@ def parse_iso_datetime(dt_str: Optional[str]) -> Optional[datetime]:
 
 
 def compute_recency_boost(meta: Dict[str, Any]) -> float:
-    """
-    אם יש created_at / updated_at במטאדאטה בפורמט ISO – נותן בוסט קל לחדשים.
-    אחרת: 0.0
-    """
     ts = meta.get("updated_at") or meta.get("created_at")
     dt = parse_iso_datetime(ts)
     if not dt:
         return 0.0
-
     now = datetime.now(timezone.utc)
     days = (now - dt).total_seconds() / 86400.0
-    # ככל שיותר חדש → בוסט קצת יותר גבוה, אבל מוגבל
-    boost = max(0.0, 1.0 - min(days / 30.0, 1.0))  # בין 0 ל־1 על פני חודש
-    return round(boost, 3)
+    return round(max(0.0, 1.0 - min(days / 30.0, 1.0)), 3)
+
+
+def text_hash(text: str) -> str:
+    return hashlib.md5(text.encode("utf-8")).hexdigest()
 
 
 # ======================
@@ -91,39 +72,39 @@ DEDUP_THRESHOLD = 0.92
 
 
 def semantic_dedup(memories: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-    """
-    Dedup על בסיס embedding, עם:
-    - הגנה מלאה על embedding חסר/לא תקין
-    - fallback אוטומטי אם אין בכלל embedding
-    """
-    if not memories:
+    if not memories or not any(m.get("embedding") for m in memories):
         return memories
-
-    # אם אין embedding באף אחד → דילוג
-    if not any(m.get("embedding") for m in memories):
-        return memories
-
     unique: List[Dict[str, Any]] = []
-
     for m in memories:
         emb = m.get("embedding")
         if not emb:
-            # אין embedding לפריט הזה – פשוט נוסיף אותו כמו שהוא
             unique.append(m)
             continue
-
-        duplicate = False
-        for u in unique:
-            u_emb = u.get("embedding")
-            sim = safe_cosine_similarity(emb, u_emb)
-            if sim > DEDUP_THRESHOLD:
-                duplicate = True
-                break
-
+        duplicate = any(
+            safe_cosine_similarity(emb, u.get("embedding")) > DEDUP_THRESHOLD
+            for u in unique
+            if u.get("embedding")
+        )
         if not duplicate:
             unique.append(m)
-
     return unique
+
+
+def logical_dedup(memories: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    seen_keys = set()
+    result: List[Dict[str, Any]] = []
+    for m in memories:
+        meta = m.get("meta") or {}
+        key_tuple = (
+            m.get("id"),
+            meta.get("source"),
+            text_hash(m.get("text", "")),
+        )
+        if key_tuple in seen_keys:
+            continue
+        seen_keys.add(key_tuple)
+        result.append(m)
+    return result
 
 
 # ======================
@@ -133,76 +114,44 @@ def semantic_dedup(memories: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
 def build_explanation(query: str, memory: Dict[str, Any]) -> Dict[str, Any]:
     text = memory.get("text", "")
     meta = memory.get("meta") or {}
-    recency_boost = compute_recency_boost(meta)
-
-    base_score = memory.get("score")  # similarity מה־vector store
-    # confidence משולב: similarity + recency
+    recency = compute_recency_boost(meta)
+    base_score = memory.get("score")
+    overlap = keyword_overlap(query, text)
+    concepts = matched_concepts(text)
     confidence = None
     if base_score is not None:
-        confidence = round(min(1.0, max(0.0, base_score + recency_boost * 0.2)), 3)
-
-    explanation = {
-        "similarity_score": base_score,
-        "recency_boost": recency_boost or 0.0,
-        "confidence": confidence,
-        "query_overlap": keyword_overlap(query, text),
-        "matched_concepts": matched_concepts(text),
-        "source": meta.get("source"),
-    }
-
-    # אם יש שדות מעניינים נוספים במטאדאטה – אפשר להעביר אותם תחת "meta"
+        overlap_factor = len(overlap) / max(1, len(query.split()))
+        concept_factor = len(concepts) / max(1, len(CONCEPTS))
+        raw_conf = (
+            (base_score or 0)
+            + 0.2 * recency
+            + 0.1 * overlap_factor
+            + 0.1 * concept_factor
+        )
+        confidence = round(min(1.0, max(0.0, raw_conf)), 3)
     important_meta_keys = ["id", "doc_type", "owner", "created_at", "updated_at"]
-    explanation["meta"] = {k: meta.get(k) for k in important_meta_keys if k in meta}
-
-    return explanation
+    return {
+        "similarity_score": base_score,
+        "recency_boost": recency,
+        "confidence": confidence,
+        "query_overlap": overlap,
+        "matched_concepts": concepts,
+        "source": meta.get("source"),
+        "meta": {k: meta.get(k) for k in important_meta_keys if k in meta},
+    }
 
 
 # ======================
 # Main Pipeline
 # ======================
 
-def logical_dedup(memories: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-    """
-    שלב לוגי עתידי (כפילויות לפי id, source וכו').
-    כרגע: passthrough.
-    """
-    return memories
-
-
 def retrieval_pipeline(
     query: str,
     raw_results: List[Dict[str, Any]],
     final_k: int = 6,
 ) -> List[Dict[str, Any]]:
-    """
-    raw_results – פלט גולמי מה־vector store, בפורמט:
-    [
-      {
-        "id": str | None,
-        "text": str,
-        "score": float,
-        "embedding": List[float] | None,
-        "meta": dict
-      }
-    ]
-    מחזיר:
-    [
-      {
-        "id": ...,
-        "text": ...,
-        "score": ...,
-        "explanation": { ... }
-      }
-    ]
-    """
-
-    # 1. Semantic dedup עם fallback
     step1 = semantic_dedup(raw_results)
-
-    # 2. Logical dedup
     step2 = logical_dedup(step1)
-
-    # 3. Explainability + JSON קריא
     enriched: List[Dict[str, Any]] = []
     for m in step2:
         enriched.append({
@@ -211,6 +160,4 @@ def retrieval_pipeline(
             "score": m.get("score"),
             "explanation": build_explanation(query, m),
         })
-
-    # 4. Final cut (כבר אחרי explainability)
     return enriched[:final_k]
