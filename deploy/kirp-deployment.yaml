@@ -1,0 +1,19 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kirp
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: kirp
+  template:
+    metadata:
+      labels:
+        app: kirp
+    spec:
+      containers:
+      - name: kirp
+        image: kirp:latest
+        ports:
+        - containerPort: 8000

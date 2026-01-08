@@ -8,18 +8,21 @@ from app.core.metadata_schema import ensure_metadata
 
 
 class UnifiedKnowledgeStore:
-    def add(self, content: str, source: str, replaying: bool = False) -> None:
-        # NEW: metadata creation using ensure_metadata
+    # הוספתי את user_id כפרמטר לפונקציה (עם ערך ברירת מחדל "default_user" ליתר ביטחון)
+    def add(self, content: str, source: str, user_id: str = "default_user", replaying: bool = False) -> None:
+        # עכשיו user_id מוגדר ו-Pylance יהיה מרוצה
         meta = ensure_metadata(
-            {},
+            {"user_id": user_id},
             plane="knowledge",
             source=source,
         )
+        
         # Write into vector store
         add_texts_with_metadata(
             texts=[content],
             metadatas=[meta],
         )
+        
         # Log event (unless replaying)
         if not replaying:
             PersistenceManager.append_event(
@@ -27,6 +30,7 @@ class UnifiedKnowledgeStore:
                 {
                     "content": content,
                     "source": source,
+                    "user_id": user_id, # מומלץ להוסיף גם ללוג של ה-Persistence
                 },
             )
 

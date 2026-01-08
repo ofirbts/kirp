@@ -19,8 +19,6 @@ from app.agent.executor import ExecutorAgent
 from app.agent.critic import CriticAgent
 from app.agent.verifier import VerifierAgent
 
-
-
 AGENT_PROMPT = """
 You are a proactive personal assistant.
 
@@ -32,15 +30,12 @@ If yes – suggest it politely.
 If no – answer normally.
 """
 
-
 class Agent:
     def __init__(self) -> None:
         self.explainer = ExplanationBuilder()
         self.memory = MemoryManager()
         self.metrics = Metrics()
         self.policy = PolicyEngine({
-            # We use this policy when deciding whether to record something
-            # into the agent's own internal memory.
             "update_memory": lambda p: len(str(p.get("content", ""))) < 10_000,
             "self_modify": lambda p: False,
         })
@@ -53,8 +48,6 @@ class Agent:
         self.planner = PlannerAgent()
         self.executor = ExecutorAgent()
 
-        # This is the minimal agent state that we want to be able
-        # to reconstruct via replay.
         self._state: Dict[str, Any] = {
             "total_queries": 0,
             "last_answer": None,
@@ -64,7 +57,6 @@ class Agent:
     # ===== Persistence API =====
 
     def load_state(self, data: Dict[str, Any]) -> None:
-        # Defensive: tolerate partial / old snapshots.
         self._state = data.get("state", {
             "total_queries": 0,
             "last_answer": None,
@@ -86,36 +78,32 @@ class Agent:
             "last_answer": None,
             "last_suggestions": [],
         }
-        # For replay we start with empty tiers – they will be repopulated
-        # according to the events that are applied.
         self.memory = MemoryManager()
 
     # ===== Event-based replay API =====
 
     def apply_event(self, event: dict) -> None:
-        """
-        Apply a single persisted event back onto this agent instance.
-
-        This is the core primitive used by replay scripts and potential
-        higher-level debugging tools.
-        """
         EventApplier().apply(self, event)
+
+    # ===== NEW: The missing query function =====
+    def query(self, text: str):
+        """
+        Public synchronous wrapper for the RAG pipeline.
+        Used by Orchestrator and Negotiation engines.
+        """
+        from app.rag.agent_rag import agent_rag_pipeline
+        result = agent_rag_pipeline(text)
+        return result.get("answer", "No answer found.")
 
     # ===== Internal helpers =====
 
     def _record_internal_memory(self, kind: str, content: Dict[str, Any]) -> None:
-        """
-        Central place to push things into the agent's own MemoryManager,
-        subject to policy, and emit events for deterministic replay.
-        """
         try:
             self.policy.check("update_memory", {"content": content})
         except PolicyViolation:
             return
 
-        # 🔧 NEW: enforce semantic memory plane
         content["memory_plane"] = "session"
-
         tier_name = None
 
         if kind == "short":
@@ -133,44 +121,31 @@ class Agent:
                 "memory_add",
                 {"tier": tier_name, "item": content},
             )
-
         self.memory.promote()
 
     async def _execute_query(self, question: str) -> Dict[str, Any]:
-        """
-        Core agent decision logic, separated from the public API so that
-        it can be called by an Executor (multi-agent split).
-        """
         assert_invariant(question is not None, "Agent decision without question")
 
         self.metrics.inc("agent_decisions")
         self.observability.record_query()
-        self.snapshotter.maybe_snapshot(self)
 
         memories = retrieve_context(question)
         llm = get_llm()
 
-        # Extract confidence from retrieval memories
         confidence = 0.0
         for m in memories:
             expl = m.get("explanation", {})
             score = expl.get("confidence")
             if isinstance(score, (int, float)):
-                # Observe retrieval scores (if present) for drift monitoring
                 self.observability.record_score(float(score))
-                # Track maximum confidence for the explanation event
                 confidence = max(confidence, float(score))
 
         context_str = "\n".join([m.get("text", "") for m in memories])
-
-        response = await llm.apredict(
-            AGENT_PROMPT.format(context=context_str)
-        )
+        response = await llm.apredict(AGENT_PROMPT.format(context=context_str))
 
         answer = response
         suggestions: List[str] = []
 
-        # Update internal memory with a concise trace of this decision
         self._record_internal_memory("short", {
             "type": "agent_async_decision",
             "query": question,
@@ -178,7 +153,6 @@ class Agent:
             "answer_preview": str(answer)[:300],
         })
 
-        # Update state
         self._state["total_queries"] += 1
         self._state["last_answer"] = answer
         self._state["last_suggestions"] = suggestions
@@ -188,18 +162,14 @@ class Agent:
             {"key": "total_queries", "value": self._state["total_queries"]},
         )
 
-        # Explainability event
         explanation = self.explainer.explain(
             reason="Agent async decision",
             inputs={"query": question, "memories": len(memories)},
             outcome={"answer": answer, "suggestions": suggestions},
         )
-        
-        # Add the calculated confidence to the explanation
         explanation["confidence"] = confidence
         explanation_id = PersistenceManager.append_event("explanation", explanation)
 
-        # Persistence hook – detailed decision, used for replay
         decision_payload = {
             "question": question,
             "answer": answer,
@@ -211,7 +181,6 @@ class Agent:
         }
         PersistenceManager.append_event("agent_async_decision", decision_payload)
 
-        # 🔧 NEW BLOCK — critique + verification + enhanced return
         critique = self.critic.critique(answer)
         verification = self.verifier.verify(answer, memories)
 
@@ -224,93 +193,30 @@ class Agent:
             "agent_mode": True,
         }
 
-    # ===== Core behavior (public async API) =====
-
     async def agent_query(self, question: str) -> Dict[str, Any]:
-        """
-        Public entrypoint: delegates to planner + executor.
-        """
         assert_invariant(question is not None, "Agent decision without question")
-
         plan = self.planner.plan(question)
         result = await self.executor.execute(plan, self)
         return result
 
-    # ===== Synchronous agent path (legacy) =====
-
-    def run_agent(
-        self,
-        question: str,
-        memories: List[Dict[str, Any]],
-        trace_id: Optional[str] = None,
-    ) -> Dict[str, Any]:
+    def run_agent(self, question: str, memories: List[Dict[str, Any]], trace_id: Optional[str] = None) -> Dict[str, Any]:
         assert_invariant(question is not None, "Agent decision without question")
         assert_invariant(memories is not None, "Agent decision without memories")
-
         self.metrics.inc("agent_decisions")
-
-        if trace_id:
-            log_event(trace_id, "agent_started", {"memory_count": len(memories)})
-
+        
         top_text = memories[0].get("text", "") if memories else ""
         answer = f"Based on your memories, here's what I see: {top_text}"
         suggestions: List[str] = []
 
-        if "price" in question.lower():
-            suggestions.append(
-                "Consider reviewing your pricing page and recent subscription changes."
-            )
-
-        # Update internal memory with a concise trace of this decision
         self._record_internal_memory("short", {
             "type": "agent_sync_decision",
             "query": question,
             "memories_used": len(memories),
-            "answer_preview": str(answer)[:300],
         })
 
-        # Update state
         self._state["total_queries"] += 1
-        self._state["last_answer"] = answer
-        self._state["last_suggestions"] = suggestions
+        PersistenceManager.append_event("agent_async_decision", {"question": question, "answer": answer})
 
-        PersistenceManager.append_event(
-            "agent_counter",
-            {"key": "total_queries", "value": self._state["total_queries"]},
-        )
-
-        # Explainability event
-        explanation = self.explainer.explain(
-            reason="Agent sync decision",
-            inputs={"query": question, "memories": len(memories)},
-            outcome={"answer": answer, "suggestions": suggestions},
-        )
-        explanation_id = PersistenceManager.append_event("explanation", explanation)
-
-        # Persistence hook – detailed decision, used for replay
-        decision_payload = {
-            "question": question,
-            "answer": answer,
-            "suggestions": suggestions,
-            "memory_count": len(memories),
-            "explanation_id": explanation_id,
-            "mode": "sync",
-        }
-        PersistenceManager.append_event("agent_sync_decision", decision_payload)
-
-        if trace_id:
-            log_event(trace_id, "agent_decision", {
-                "answer": answer,
-                "suggestions": suggestions,
-            })
-
-        return {
-            "answer": answer,
-            "sources": memories,
-            "suggestions": suggestions,
-            "trace_id": trace_id,
-            "agent_mode": True,
-        }
-
+        return {"answer": answer, "sources": memories, "suggestions": suggestions, "agent_mode": True}
 
 agent = Agent()
