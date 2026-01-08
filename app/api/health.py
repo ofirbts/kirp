@@ -1,6 +1,5 @@
 from fastapi import APIRouter
-from app.registry.agent_registry import get_versions
-
+from app.core.versions import VERSIONS
 
 router = APIRouter()
 
@@ -10,4 +9,4 @@ def health():
 
 @router.get("/versions")
 def versions():
-    return get_versions()
+    return VERSIONS

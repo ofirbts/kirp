@@ -16,7 +16,6 @@ from app.core.events import EventApplier
 from app.core.observability import Observability
 from app.agent.planner import PlannerAgent
 from app.agent.executor import ExecutorAgent
-from app.core.state_snapshot import StateSnapshotter
 from app.agent.critic import CriticAgent
 from app.agent.verifier import VerifierAgent
 
@@ -39,7 +38,6 @@ class Agent:
         self.explainer = ExplanationBuilder()
         self.memory = MemoryManager()
         self.metrics = Metrics()
-        self.snapshotter = StateSnapshotter(every_n_events=50)
         self.policy = PolicyEngine({
             # We use this policy when deciding whether to record something
             # into the agent's own internal memory.
@@ -113,8 +111,10 @@ class Agent:
         try:
             self.policy.check("update_memory", {"content": content})
         except PolicyViolation:
-            # If policy blocks the update – we simply skip.
             return
+
+        # 🔧 NEW: enforce semantic memory plane
+        content["memory_plane"] = "session"
 
         tier_name = None
 
@@ -134,7 +134,6 @@ class Agent:
                 {"tier": tier_name, "item": content},
             )
 
-        # Let the tiers self-balance a bit.
         self.memory.promote()
 
     async def _execute_query(self, question: str) -> Dict[str, Any]:

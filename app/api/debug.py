@@ -46,3 +46,13 @@ def observability():
         "drift": agent.observability.drift(),
         "alerts": agent.observability.check_alerts(),
     }
+
+@router.get("/health/full")
+def full_health():
+    return {
+        "qps": agent.observability.qps(),
+        "drift": agent.observability.drift(),
+        "total_queries": agent.dump_state()["state"]["total_queries"],
+        "memory_snapshot": agent.dump_state()["memory"],
+    }
+

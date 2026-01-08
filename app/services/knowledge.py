@@ -1,31 +1,30 @@
 import uuid
 from typing import List, Any, Dict
 
-from app.rag.sharded_store import ShardedVectorStore
-from app.rag.vector_store import get_vector_store
+from app.core.metadata import normalize_metadata
+from app.rag.vector_store import add_texts_with_metadata, get_vector_store
 from app.core.persistence import PersistenceManager
+from app.core.metadata_schema import ensure_metadata
 
 
 class UnifiedKnowledgeStore:
     def add(self, content: str, source: str, replaying: bool = False) -> None:
-        kid = str(uuid.uuid4())
-
-        metadata = {
-            "id": kid,
-            "source": source,
-            "memory_type": "knowledge",
-        }
-
-        # NEW: write into sharded vector store
-        store = ShardedVectorStore()
-        store.add("knowledge", content, metadata)
-
+        # NEW: metadata creation using ensure_metadata
+        meta = ensure_metadata(
+            {},
+            plane="knowledge",
+            source=source,
+        )
+        # Write into vector store
+        add_texts_with_metadata(
+            texts=[content],
+            metadatas=[meta],
+        )
         # Log event (unless replaying)
         if not replaying:
             PersistenceManager.append_event(
                 "knowledge_add",
                 {
-                    "id": kid,
                     "content": content,
                     "source": source,
                 },

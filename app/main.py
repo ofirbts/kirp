@@ -17,11 +17,13 @@ from app.ui.ui import router as ui_router
 from app.api.agent_query import router as agent_query_router
 from app.api.debug_memory import router as debug_memory_router
 
-
-
 from app.rag.vector_store import load_vector_store, debug_info
 from app.core.persistence import PersistenceManager
 from app.agent.agent import agent
+
+# NEW — snapshot support
+from app.core.state_snapshot import save_snapshot, load_snapshot
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -32,7 +34,18 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         print("⚠️ Vector store load failed:", e)
 
-    # Load agent state at startup
+    # --- NEW: Load snapshot at startup ---
+    try:
+        snapshot = load_snapshot()
+        if snapshot:
+            agent.load_state(snapshot)
+            print("🔄 Agent state restored from snapshot")
+        else:
+            print("ℹ️ No snapshot found, continuing normally")
+    except Exception as e:
+        print("⚠️ Failed to load snapshot:", e)
+
+    # Load agent state from persistence (existing logic)
     try:
         state = PersistenceManager.load_agent_state()
         if state:
@@ -57,12 +70,19 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         print("⚠️ Self-evaluation failed:", e)
 
-    # Save agent state at shutdown
+    # Save agent state at shutdown (existing logic)
     try:
         PersistenceManager.save_agent_state(agent.dump_state())
         print("💾 Agent state persisted on shutdown")
     except Exception as e:
         print("⚠️ Failed to save agent state:", e)
+
+    # --- NEW: Save snapshot at shutdown ---
+    try:
+        save_snapshot(agent.dump_state())
+        print("📸 Snapshot saved on shutdown")
+    except Exception as e:
+        print("⚠️ Failed to save snapshot:", e)
 
 
 app = FastAPI(
@@ -82,9 +102,8 @@ app.include_router(debug_router, prefix="/debug", tags=["Debug"])
 app.include_router(status_router, prefix="/status", tags=["Status"])
 app.include_router(ui_router, prefix="/ui", tags=["UI"])
 app.include_router(agent_query_router, prefix="/agent/query", tags=["Agent Query"])
-app.include_router(debug_memory_router) 
+app.include_router(debug_memory_router)
 app.include_router(status_router, prefix="/system")
-
 
 # Tasks & Intelligence
 tasks_router = APIRouter(tags=["tasks"], prefix="/tasks")

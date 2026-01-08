@@ -1,131 +1,105 @@
-# KIRP – Retrieval-Augmented Generation Backend
+# KIRP — Autonomous Knowledge Agent Platform
 
-KIRP is a modular backend system implementing a full **Retrieval-Augmented Generation (RAG)** pipeline.
-It is designed as a foundation for personal knowledge management systems that transform unstructured data into queryable intelligence.
+KIRP is a research-grade autonomous agent system designed to ingest knowledge,
+reason over it, explain its decisions, and deterministically replay its behavior.
 
----
-
-## Project Overview
-
-The system ingests raw text data, embeds it into a vector space, stores it in a FAISS vector database, and enables natural-language querying via a Large Language Model (LLM) using retrieved context.
-
-This project focuses on **clarity of architecture**, **observability**, and **extensibility**, rather than a single demo script.
+This is not a chatbot demo.
+It is an agent architecture with guarantees.
 
 ---
 
-## Core RAG Flow
+## What KIRP Is
 
-1. **Ingest** unstructured text data via API  
-2. **Chunk & Embed** text using an embedding model  
-3. **Store** embeddings in a FAISS vector store  
-4. **Retrieve** relevant chunks based on user questions  
-5. **Generate** grounded answers using an LLM  
+KIRP is a backend AI system that combines:
 
----
-
-## Architecture
-
-app/
-├── api/
-│ ├── ingest.py # Data ingestion endpoints
-│ ├── query.py # RAG query endpoint
-│ ├── debug.py # Observability & diagnostics
-│ └── health.py # Health checks
-│
-├── rag/
-│ ├── embedder.py # Embedding model logic
-│ ├── vector_store.py # FAISS vector store handling
-│ └── qa_engine.py # Retrieval + LLM answering
-│
-├── storage/
-│ └── jobs.py # (Optional) background job tracking
-│
-├── main.py # FastAPI application entry point
-
+- Retrieval-Augmented Generation (RAG)
+- Multi-plane memory (knowledge / session / events)
+- Self-improving confidence estimation
+- Explainable agent decisions
+- Deterministic replay for audit and trust
 
 ---
 
-## Observability & Debugging
+## Core Capabilities
 
-The system includes dedicated debug endpoints to inspect internal state:
+### 🔍 Retrieval & Knowledge
+- FAISS-backed vector store
+- Semantic + logical deduplication
+- Metadata-normalized memories
 
-- Vector store initialization status
-- Number of indexed vectors
+### 🧠 Agent Architecture
+- Planner / Executor split
+- Intent detection and reasoning
+- Policy-guarded execution
 
-This makes the system explainable, testable, and production-oriented.
+### 🧾 Explainability
+Every decision produces:
+- Why specific memories were retrieved
+- What the agent decided
+- Confidence estimation
 
----
+### 🔁 Deterministic Replay
+- All mutations are event-driven
+- Agent state can be reconstructed exactly
+- Replay certification script included
 
-## API Endpoints
-
-| Endpoint | Method | Description |
-|-------|------|-----------|
-| `/ingest/` | POST | Ingest new knowledge |
-| `/query/` | POST | Ask questions over stored knowledge |
-| `/debug/vector-store` | GET | Inspect vector store state |
-| `/health/` | GET | Health check |
-
----
-
-## Tech Stack
-
-- **FastAPI** – Backend framework  
-- **LangChain** – RAG orchestration  
-- **FAISS** – Vector similarity search  
-- **Python 3.10+**
-
----
-
-## Current Status
-
-✅ End-to-end RAG pipeline operational  
-✅ Modular, extensible architecture  
-🔜 Persisted vector store  
-🔜 Metadata enrichment & evaluation  
-🔜 Multi-source ingestion (email, notes, documents)
+### 📊 Observability
+- Query rate (QPS)
+- Confidence drift
+- Memory growth
+- Debug endpoints
 
 ---
 
-## Vision
+## Architecture (Conceptual)
 
-KIRP is designed to evolve into a personal knowledge intelligence system that:
-- Synchronizes data from multiple sources
-- Categorizes and connects ideas
-- Exports structured knowledge to tools like Notion or Obsidian
+User Query
+   ↓
+Planner Agent
+   ↓
+Executor Agent
+   ↓
+Retrieval (RAG)
+   ↓
+Memory Planes
+   ├─ Knowledge (vector)
+   ├─ Session (ephemeral)
+   └─ Events (replay)
+   ↓
+Explainability + Observability
 
 ---
 
-## Running the Project
+## Example Flow
 
-uvicorn app.main:app --reload
+1. Ingest knowledge via `/ingest`
+2. Query agent via `/agent/query`
+3. Agent retrieves, reasons, answers
+4. Decision is explained and persisted
+5. Full behavior can be replayed offline
 
-Then open:
-http://127.0.0.1:8000/docs
+---
 
-## Author
+## System Guarantees
 
-Ofir Betesh
-## 🎬 LIVE DEMO
+- Deterministic replay
+- Explainable decisions
+- Memory growth control
+- Extensible agent design
 
-### 1. Ingest Memory
-```bash
-curl -X POST "http://127.0.0.1:8000/ingest/" -H "Content-Type: application/json" -d '{"text":"Buy milk tomorrow"}'
-# → {"memory_type":"task","chunks_added":1}
-2. Agent Discovery
-bash
-curl -X POST "http://127.0.0.1:8000/agent/" -H "Content-Type: application/json" -d '{"question":"What tasks?"}'
-# → "Found 1 tasks. Suggestion: create_notion_tasks"
-3. Execute Action
-bash
-curl -X POST "http://127.0.0.1:8000/agent/confirm/TRACE_ID" -H "Content-Type: application/json" -d '{"confirm":true}'
-# → Notion page created!
-📊 PRODUCTION FEATURES
-✅ Persistent FAISS vector store
+---
 
-✅ memory_type classification (task/event/note)
+## Status
 
-✅ Agentic workflow (suggest → confirm → execute)
+Feature-complete research-grade backend system.
 
-✅ Confidence scoring + trace_id observability
+Suitable for:
+- Advanced AI engineering roles
+- Research prototypes
+- Agent-based product foundations
 
-✅ Notion integration (live tasks)
+---
+
+## License
+
+MIT
