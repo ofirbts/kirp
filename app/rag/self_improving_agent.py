@@ -1,5 +1,6 @@
 from typing import Optional, Dict, Any
 from app.rag.long_term_memory import session_rag_pipeline
+from app.observability.alerts import check_confidence   # ← חדש
 
 
 def self_improving_query(
@@ -18,5 +19,9 @@ def self_improving_query(
                 min(1.0, conf * 0.5 + feedback * 0.5),
                 3,
             )
+
+    # 🔔 NEW: trigger alert if confidence is low
+    confidence = result.get("explain_summary", {}).get("confidence_overall")
+    check_confidence(confidence)
 
     return result

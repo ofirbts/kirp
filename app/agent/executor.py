@@ -1,5 +1,6 @@
 # app/agent/executor.py
 from typing import Dict, Any
+from app.runtime.sandbox import run_with_timeout
 
 
 class ExecutorAgent:
@@ -15,7 +16,16 @@ class ExecutorAgent:
 
         if action == "answer":
             query = plan.get("query", "")
-            return await agent._execute_query(query)
+
+            # Wrap the execution inside sandbox timeout
+            def step():
+                # This is the synchronous wrapper that run_with_timeout expects
+                # It calls the async agent method using asyncio.run or loop.run_until_complete
+                import asyncio
+                return asyncio.run(agent._execute_query(query))
+
+            result = run_with_timeout(step)
+            return result
 
         # Future actions (e.g. "search_only", "update_memory") can go here.
         return {

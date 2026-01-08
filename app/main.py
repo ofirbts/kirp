@@ -18,6 +18,7 @@ from app.api.agent_query import router as agent_query_router
 from app.api.debug_memory import router as debug_memory_router
 
 
+
 from app.rag.vector_store import load_vector_store, debug_info
 from app.core.persistence import PersistenceManager
 from app.agent.agent import agent
@@ -82,6 +83,7 @@ app.include_router(status_router, prefix="/status", tags=["Status"])
 app.include_router(ui_router, prefix="/ui", tags=["UI"])
 app.include_router(agent_query_router, prefix="/agent/query", tags=["Agent Query"])
 app.include_router(debug_memory_router) 
+app.include_router(status_router, prefix="/system")
 
 
 # Tasks & Intelligence

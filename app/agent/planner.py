@@ -1,5 +1,5 @@
-# app/agent/planner.py
 from typing import Dict
+from app.policies.policy_engine import enforce_policy, PolicyViolation
 
 
 class PlannerAgent:
@@ -12,7 +12,12 @@ class PlannerAgent:
     """
 
     def plan(self, question: str) -> Dict[str, str]:
-        return {
+        plan = {
             "action": "answer",
             "query": question,
         }
+
+        # Enforce policy before returning the plan
+        enforce_policy(plan)
+
+        return plan

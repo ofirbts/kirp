@@ -2,8 +2,9 @@ from fastapi import APIRouter
 from time import time
 from app.rag.vector_store import debug_info
 import requests
-from typing import Optional 
-from datetime import datetime
+from typing import Optional
+from datetime import datetime, timezone
+from app.observability.alerts import get_alerts
 
 router = APIRouter(tags=["Status"])
 
@@ -12,9 +13,9 @@ START_TIME = time()
 STATE = {
     "last_ingest": None,
     "last_query": None,
+    "last_error": None,
     "ingest_count": 0,
     "query_count": 0,
-    "last_error": None,
 }
 
 def uptime():
@@ -60,7 +61,15 @@ async def system_status():
         # Errors
         "last_error": STATE["last_error"],
     }
-from datetime import datetime, timezone
+
+# --- STAGE 50 Snapshot ---
+@router.get("/snapshot")
+def product_snapshot():
+    return {
+        "system": "KIRP",
+        "stage": 50,
+        "alerts": get_alerts(),
+    }
 
 def mark_ingest():
     STATE["ingest_count"] += 1
