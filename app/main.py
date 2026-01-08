@@ -15,6 +15,7 @@ from app.api.status import router as status_router
 from app.api.self_improving import router as self_improving_router
 from app.ui.ui import router as ui_router
 from app.api.agent_query import router as agent_query_router
+from app.api.debug_memory import router as debug_memory_router
 
 
 from app.rag.vector_store import load_vector_store, debug_info
@@ -80,6 +81,7 @@ app.include_router(debug_router, prefix="/debug", tags=["Debug"])
 app.include_router(status_router, prefix="/status", tags=["Status"])
 app.include_router(ui_router, prefix="/ui", tags=["UI"])
 app.include_router(agent_query_router, prefix="/agent/query", tags=["Agent Query"])
+app.include_router(debug_memory_router) 
 
 
 # Tasks & Intelligence

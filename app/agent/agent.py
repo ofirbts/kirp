@@ -1,3 +1,4 @@
+# app/agent/agent.py
 from typing import Any, Dict, List, Optional
 
 from app.rag.retriever import retrieve_context
@@ -8,9 +9,13 @@ from app.core.persistence import PersistenceManager
 from app.core.explainability import ExplanationBuilder
 from app.core.metrics import Metrics
 from app.core.policy import PolicyEngine, PolicyViolation
-from app.services.knowledge import KnowledgeStore
+from app.services.knowledge import UnifiedKnowledgeStore
 from app.core.self_eval import SelfEvaluator
 from app.core.invariants import assert_invariant
+from app.core.events import EventApplier
+from app.core.observability import Observability
+from app.agent.planner import PlannerAgent
+from app.agent.executor import ExecutorAgent
 
 
 AGENT_PROMPT = """
@@ -37,8 +42,11 @@ class Agent:
             "self_modify": lambda p: False,
         })
 
-        self.knowledge = KnowledgeStore()
+        self.knowledge = UnifiedKnowledgeStore()
         self.self_eval = SelfEvaluator()
+        self.observability = Observability()
+        self.planner = PlannerAgent()
+        self.executor = ExecutorAgent()
 
         # This is the minimal agent state that we want to be able
         # to reconstruct via replay.
@@ -50,7 +58,7 @@ class Agent:
 
     # ===== Persistence API =====
 
-    def load_state(self, data: Dict[str, Any]):
+    def load_state(self, data: Dict[str, Any]) -> None:
         # Defensive: tolerate partial / old snapshots.
         self._state = data.get("state", {
             "total_queries": 0,
@@ -67,7 +75,7 @@ class Agent:
 
     # ===== Reset (for replay) =====
 
-    def reset(self):
+    def reset(self) -> None:
         self._state = {
             "total_queries": 0,
             "last_answer": None,
@@ -77,38 +85,23 @@ class Agent:
         # according to the events that are applied.
         self.memory = MemoryManager()
 
-    # ===== Apply decision (for replay) =====
+    # ===== Event-based replay API =====
 
-    def apply_decision(self, payload: dict):
+    def apply_event(self, event: dict) -> None:
         """
-        Re-apply an agent decision from a persisted event.
+        Apply a single persisted event back onto this agent instance.
 
-        Supports both:
-        - "agent_sync_decision"/"agent_async_decision" payloads
-          (with answer / suggestions / memory_count)
-        - older "agent_decision" style payloads that may only contain
-          query / intents / confidence / memories_used
+        This is the core primitive used by replay scripts and potential
+        higher-level debugging tools.
         """
-        self._state["total_queries"] += 1
-
-        answer = payload.get("answer")
-        if answer is not None:
-            self._state["last_answer"] = answer
-
-        suggestions = payload.get("suggestions")
-        if suggestions is not None:
-            self._state["last_suggestions"] = suggestions
-
-        # We intentionally do not rebuild the full MemoryManager tiers here,
-        # because the replay pipeline focuses on agent observable state,
-        # not every intermediate retrieval result.
+        EventApplier().apply(self, event)
 
     # ===== Internal helpers =====
 
     def _record_internal_memory(self, kind: str, content: Dict[str, Any]) -> None:
         """
         Central place to push things into the agent's own MemoryManager,
-        subject to policy.
+        subject to policy, and emit events for deterministic replay.
         """
         try:
             self.policy.check("update_memory", {"content": content})
@@ -116,25 +109,46 @@ class Agent:
             # If policy blocks the update – we simply skip.
             return
 
+        tier_name = None
+
         if kind == "short":
             self.memory.short_term.add(content)
+            tier_name = "short_term"
         elif kind == "mid":
             self.memory.mid_term.add(content)
+            tier_name = "mid_term"
         elif kind == "long":
             self.memory.long_term.add(content)
+            tier_name = "long_term"
+
+        if tier_name is not None:
+            PersistenceManager.append_event(
+                "memory_add",
+                {"tier": tier_name, "item": content},
+            )
 
         # Let the tiers self-balance a bit.
         self.memory.promote()
 
-    # ===== Core behavior =====
-
-    async def agent_query(self, question: str) -> Dict[str, Any]:
+    async def _execute_query(self, question: str) -> Dict[str, Any]:
+        """
+        Core agent decision logic, separated from the public API so that
+        it can be called by an Executor (multi-agent split).
+        """
         assert_invariant(question is not None, "Agent decision without question")
 
         self.metrics.inc("agent_decisions")
+        self.observability.record_query()
 
         memories = retrieve_context(question)
         llm = get_llm()
+
+        # Observe retrieval scores (if present) for drift monitoring
+        for m in memories:
+            expl = m.get("explanation", {})
+            score = expl.get("confidence")
+            if isinstance(score, (int, float)):
+                self.observability.record_score(float(score))
 
         context_str = "\n".join([m.get("text", "") for m in memories])
 
@@ -157,6 +171,11 @@ class Agent:
         self._state["total_queries"] += 1
         self._state["last_answer"] = answer
         self._state["last_suggestions"] = suggestions
+
+        PersistenceManager.append_event(
+            "agent_counter",
+            {"key": "total_queries", "value": self._state["total_queries"]},
+        )
 
         # Explainability event
         explanation = self.explainer.explain(
@@ -183,6 +202,20 @@ class Agent:
             "suggestions": suggestions,
             "agent_mode": True,
         }
+
+    # ===== Core behavior (public async API) =====
+
+    async def agent_query(self, question: str) -> Dict[str, Any]:
+        """
+        Public entrypoint: delegates to planner + executor.
+        """
+        assert_invariant(question is not None, "Agent decision without question")
+
+        plan = self.planner.plan(question)
+        result = await self.executor.execute(plan, self)
+        return result
+
+    # ===== Synchronous agent path (legacy) =====
 
     def run_agent(
         self,
@@ -219,6 +252,11 @@ class Agent:
         self._state["total_queries"] += 1
         self._state["last_answer"] = answer
         self._state["last_suggestions"] = suggestions
+
+        PersistenceManager.append_event(
+            "agent_counter",
+            {"key": "total_queries", "value": self._state["total_queries"]},
+        )
 
         # Explainability event
         explanation = self.explainer.explain(

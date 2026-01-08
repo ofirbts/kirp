@@ -1,17 +1,20 @@
+# app/api/debug.py
 from fastapi import APIRouter, HTTPException
 from app.core.persistence import PersistenceManager
 from app.agent.agent import agent
 
-router = APIRouter(prefix="/debug", tags=["debug"])
+router = APIRouter(tags=["debug"])
 
 
 @router.get("/sessions")
 def list_sessions():
     return PersistenceManager.list_sessions()
 
+
 @router.get("/metrics")
 def metrics():
     return agent.metrics.snapshot()
+
 
 @router.get("/sessions/{session_id}")
 def get_session(session_id: str):
@@ -35,3 +38,11 @@ def reset_agent():
 @router.get("/events")
 def get_events(limit: int = 100):
     return PersistenceManager.read_events(limit)
+
+
+@router.get("/observability")
+def observability():
+    return {
+        "qps": agent.observability.qps(),
+        "drift": agent.observability.drift(),
+    }

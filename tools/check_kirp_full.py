@@ -46,6 +46,24 @@ def module_exists(module):
 def check_functions(module, func_names):
     return {name: hasattr(module, name) for name in func_names}
 
+def test_replay_is_deterministic():
+    from app.agent.agent import agent
+    from app.core.persistence import PersistenceManager
+
+    events = PersistenceManager.read_events(limit=100_000)
+
+    agent.reset()
+    for e in events:
+        agent.apply_event(e)
+    state1 = agent.dump_state()
+
+    agent.reset()
+    for e in events:
+        agent.apply_event(e)
+    state2 = agent.dump_state()
+
+    assert state1 == state2
+
 
 def check_imports():
     print_header("MODULE IMPORT CHECK")
