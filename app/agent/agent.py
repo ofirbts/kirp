@@ -17,6 +17,9 @@ from app.core.observability import Observability
 from app.agent.planner import PlannerAgent
 from app.agent.executor import ExecutorAgent
 from app.core.state_snapshot import StateSnapshotter
+from app.agent.critic import CriticAgent
+from app.agent.verifier import VerifierAgent
+
 
 
 AGENT_PROMPT = """
@@ -43,6 +46,8 @@ class Agent:
             "update_memory": lambda p: len(str(p.get("content", ""))) < 10_000,
             "self_modify": lambda p: False,
         })
+        self.critic = CriticAgent()
+        self.verifier = VerifierAgent()
 
         self.knowledge = UnifiedKnowledgeStore()
         self.self_eval = SelfEvaluator()
@@ -143,16 +148,19 @@ class Agent:
         self.observability.record_query()
         self.snapshotter.maybe_snapshot(self)
 
-
         memories = retrieve_context(question)
         llm = get_llm()
 
-        # Observe retrieval scores (if present) for drift monitoring
+        # Extract confidence from retrieval memories
+        confidence = 0.0
         for m in memories:
             expl = m.get("explanation", {})
             score = expl.get("confidence")
             if isinstance(score, (int, float)):
+                # Observe retrieval scores (if present) for drift monitoring
                 self.observability.record_score(float(score))
+                # Track maximum confidence for the explanation event
+                confidence = max(confidence, float(score))
 
         context_str = "\n".join([m.get("text", "") for m in memories])
 
@@ -187,6 +195,9 @@ class Agent:
             inputs={"query": question, "memories": len(memories)},
             outcome={"answer": answer, "suggestions": suggestions},
         )
+        
+        # Add the calculated confidence to the explanation
+        explanation["confidence"] = confidence
         explanation_id = PersistenceManager.append_event("explanation", explanation)
 
         # Persistence hook – detailed decision, used for replay
@@ -197,13 +208,20 @@ class Agent:
             "memory_count": len(memories),
             "explanation_id": explanation_id,
             "mode": "async",
+            "confidence": confidence,
         }
         PersistenceManager.append_event("agent_async_decision", decision_payload)
+
+        # 🔧 NEW BLOCK — critique + verification + enhanced return
+        critique = self.critic.critique(answer)
+        verification = self.verifier.verify(answer, memories)
 
         return {
             "answer": answer,
             "sources": memories,
             "suggestions": suggestions,
+            "critique": critique,
+            "verification": verification,
             "agent_mode": True,
         }
 

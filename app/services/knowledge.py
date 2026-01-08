@@ -1,7 +1,8 @@
 import uuid
 from typing import List, Any, Dict
 
-from app.rag.vector_store import add_texts_with_metadata, get_vector_store
+from app.rag.sharded_store import ShardedVectorStore
+from app.rag.vector_store import get_vector_store
 from app.core.persistence import PersistenceManager
 
 
@@ -15,11 +16,11 @@ class UnifiedKnowledgeStore:
             "memory_type": "knowledge",
         }
 
-        add_texts_with_metadata(
-            texts=[content],
-            metadatas=[metadata],
-        )
+        # NEW: write into sharded vector store
+        store = ShardedVectorStore()
+        store.add("knowledge", content, metadata)
 
+        # Log event (unless replaying)
         if not replaying:
             PersistenceManager.append_event(
                 "knowledge_add",
