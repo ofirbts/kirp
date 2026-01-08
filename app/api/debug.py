@@ -1,4 +1,3 @@
-# app/api/debug.py
 from fastapi import APIRouter, HTTPException
 from app.core.persistence import PersistenceManager
 from app.agent.agent import agent
@@ -45,4 +44,5 @@ def observability():
     return {
         "qps": agent.observability.qps(),
         "drift": agent.observability.drift(),
+        "alerts": agent.observability.check_alerts(),
     }

@@ -18,6 +18,10 @@ import json
 import requests
 from datetime import datetime
 
+from app.agent.agent import Agent
+from app.core.persistence import PersistenceManager
+from app.core.observability import Observability
+from app.services.knowledge import UnifiedKnowledgeStore
 from app.rag.self_improving_agent import self_improving_query
 
 # טעינת מודולים פנימיים
@@ -63,6 +67,35 @@ def test_replay_is_deterministic():
     state2 = agent.dump_state()
 
     assert state1 == state2
+
+def test_replay_deterministic():
+    agent = Agent()
+    agent.agent_query("hello")
+
+    events = PersistenceManager.read_events(limit=1000)
+
+    agent.reset()
+    for e in events:
+        agent.apply_event(e)
+
+    state = agent.dump_state()
+    assert state["state"]["total_queries"] >= 1
+
+def test_observability_alerts():
+    obs = Observability()
+
+    for _ in range(400):
+        obs.record_query()
+
+    alerts = obs.check_alerts()
+    assert isinstance(alerts, list)
+
+def test_knowledge_add_and_search():
+    ks = UnifiedKnowledgeStore()
+    ks.add("Berlin is the capital of Germany", "test")
+
+    results = ks.search("capital of Germany")
+    assert len(results) >= 0
 
 
 def check_imports():

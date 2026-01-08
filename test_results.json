@@ -1,13 +1,6 @@
 
-tools/check_kirp_advanced.py|FAIL|LOW|.182847610
-tools/check_kirp_chaos.py|PASS|HIGH|28.122588306
-tools/check_kirp_explainability.py|FAIL|MEDIUM|.021014898
-tools/check_kirp_full.py|PASS|LOW|7.515099511
-tools/check_kirp_knowledge.py|PASS|LOW|.037378762
-tools/check_kirp_load.py|PASS|HIGH|392.149195880
-tools/check_kirp_memory_growth.py|FAIL|HIGH|.153021302
-tools/check_kirp_policy.py|PASS|MEDIUM|4.707852589
-tools/check_kirp_replay.py|FAIL|LOW|.028892437
-tools/check_kirp_rag_status.sh|PASS|LOW|3.880636861
-tools/check_kirp_status.sh|PASS|LOW|2.739689255
-junk_check|WARN|MEDIUM|0
+tools/check_kirp_advanced.py|FAIL|LOW|.197798174
+tools/check_kirp_chaos.py|PASS|HIGH|15.474465766
+tools/check_kirp_explainability.py|FAIL|MEDIUM|.019191383
+tools/check_kirp_full.py|PASS|LOW|6.019888880
+tools/check_kirp_knowledge.py|PASS|LOW|.034879347

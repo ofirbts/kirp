@@ -16,6 +16,7 @@ from app.core.events import EventApplier
 from app.core.observability import Observability
 from app.agent.planner import PlannerAgent
 from app.agent.executor import ExecutorAgent
+from app.core.state_snapshot import StateSnapshotter
 
 
 AGENT_PROMPT = """
@@ -35,6 +36,7 @@ class Agent:
         self.explainer = ExplanationBuilder()
         self.memory = MemoryManager()
         self.metrics = Metrics()
+        self.snapshotter = StateSnapshotter(every_n_events=50)
         self.policy = PolicyEngine({
             # We use this policy when deciding whether to record something
             # into the agent's own internal memory.
@@ -139,6 +141,8 @@ class Agent:
 
         self.metrics.inc("agent_decisions")
         self.observability.record_query()
+        self.snapshotter.maybe_snapshot(self)
+
 
         memories = retrieve_context(question)
         llm = get_llm()

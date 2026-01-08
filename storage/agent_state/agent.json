@@ -1,6 +1,6 @@
 {
   "state": {
-    "total_queries": 1218,
+    "total_queries": 1450,
     "last_answer": "note",
     "last_suggestions": []
   },
@@ -14174,6 +14174,2310 @@
           "content": {
             "type": "agent_async_decision",
             "query": "test 990",
+            "memories_used": 2,
+            "answer_preview": "note"
+          }
+        }
+      },
+      {
+        "timestamp": "2026-01-08T19:16:05.615147",
+        "content": {
+          "timestamp": "2026-01-08T19:16:01.284312",
+          "content": {
+            "type": "agent_async_decision",
+            "query": "test 0",
+            "memories_used": 2,
+            "answer_preview": "note"
+          }
+        }
+      },
+      {
+        "timestamp": "2026-01-08T19:16:06.008695",
+        "content": {
+          "timestamp": "2026-01-08T19:16:01.714395",
+          "content": {
+            "type": "agent_async_decision",
+            "query": "test 1",
+            "memories_used": 2,
+            "answer_preview": "note"
+          }
+        }
+      },
+      {
+        "timestamp": "2026-01-08T19:16:06.362104",
+        "content": {
+          "timestamp": "2026-01-08T19:16:02.076950",
+          "content": {
+            "type": "agent_async_decision",
+            "query": "test 2",
+            "memories_used": 2,
+            "answer_preview": "note"
+          }
+        }
+      },
+      {
+        "timestamp": "2026-01-08T19:16:06.682458",
+        "content": {
+          "timestamp": "2026-01-08T19:16:02.480736",
+          "content": {
+            "type": "agent_async_decision",
+            "query": "test 3",
+            "memories_used": 2,
+            "answer_preview": "note"
+          }
+        }
+      },
+      {
+        "timestamp": "2026-01-08T19:16:07.038086",
+        "content": {
+          "timestamp": "2026-01-08T19:16:02.909477",
+          "content": {
+            "type": "agent_async_decision",
+            "query": "test 4",
+            "memories_used": 2,
+            "answer_preview": "note"
+          }
+        }
+      },
+      {
+        "timestamp": "2026-01-08T19:16:07.401283",
+        "content": {
+          "timestamp": "2026-01-08T19:16:03.292772",
+          "content": {
+            "type": "agent_async_decision",
+            "query": "test 5",
+            "memories_used": 2,
+            "answer_preview": "note"
+          }
+        }
+      },
+      {
+        "timestamp": "2026-01-08T19:16:07.716850",
+        "content": {
+          "timestamp": "2026-01-08T19:16:03.658388",
+          "content": {
+            "type": "agent_async_decision",
+            "query": "test 6",
+            "memories_used": 2,
+            "answer_preview": "note"
+          }
+        }
+      },
+      {
+        "timestamp": "2026-01-08T19:16:08.054128",
+        "content": {
+          "timestamp": "2026-01-08T19:16:04.059483",
+          "content": {
+            "type": "agent_async_decision",
+            "query": "test 7",
+            "memories_used": 2,
+            "answer_preview": "note"
+          }
+        }
+      },
+      {
+        "timestamp": "2026-01-08T19:16:08.391231",
+        "content": {
+          "timestamp": "2026-01-08T19:16:04.685518",
+          "content": {
+            "type": "agent_async_decision",
+            "query": "test 8",
+            "memories_used": 4,
+            "answer_preview": "note"
+          }
+        }
+      },
+      {
+        "timestamp": "2026-01-08T19:16:08.747723",
+        "content": {
+          "timestamp": "2026-01-08T19:16:05.058839",
+          "content": {
+            "type": "agent_async_decision",
+            "query": "test 9",
+            "memories_used": 2,
+            "answer_preview": "note"
+          }
+        }
+      },
+      {
+        "timestamp": "2026-01-08T19:16:09.049684",
+        "content": {
+          "timestamp": "2026-01-08T19:16:05.614991",
+          "content": {
+            "type": "agent_async_decision",
+            "query": "test 10",
+            "memories_used": 2,
+            "answer_preview": "note"
+          }
+        }
+      },
+      {
+        "timestamp": "2026-01-08T19:16:09.508361",
+        "content": {
+          "timestamp": "2026-01-08T19:16:06.008553",
+          "content": {
+            "type": "agent_async_decision",
+            "query": "test 11",
+            "memories_used": 2,
+            "answer_preview": "note"
+          }
+        }
+      },
+      {
+        "timestamp": "2026-01-08T19:16:09.855412",
+        "content": {
+          "timestamp": "2026-01-08T19:16:06.361801",
+          "content": {
+            "type": "agent_async_decision",
+            "query": "test 12",
+            "memories_used": 2,
+            "answer_preview": "note"
+          }
+        }
+      },
+      {
+        "timestamp": "2026-01-08T19:16:10.226576",
+        "content": {
+          "timestamp": "2026-01-08T19:16:06.682318",
+          "content": {
+            "type": "agent_async_decision",
+            "query": "test 13",
+            "memories_used": 2,
+            "answer_preview": "note"
+          }
+        }
+      },
+      {
+        "timestamp": "2026-01-08T19:16:10.624489",
+        "content": {
+          "timestamp": "2026-01-08T19:16:07.037939",
+          "content": {
+            "type": "agent_async_decision",
+            "query": "test 14",
+            "memories_used": 2,
+            "answer_preview": "note"
+          }
+        }
+      },
+      {
+        "timestamp": "2026-01-08T19:16:10.932855",
+        "content": {
+          "timestamp": "2026-01-08T19:16:07.400934",
+          "content": {
+            "type": "agent_async_decision",
+            "query": "test 15",
+            "memories_used": 2,
+            "answer_preview": "note"
+          }
+        }
+      },
+      {
+        "timestamp": "2026-01-08T19:16:11.270599",
+        "content": {
+          "timestamp": "2026-01-08T19:16:07.716640",
+          "content": {
+            "type": "agent_async_decision",
+            "query": "test 16",
+            "memories_used": 2,
+            "answer_preview": "note"
+          }
+        }
+      },
+      {
+        "timestamp": "2026-01-08T19:16:11.647092",
+        "content": {
+          "timestamp": "2026-01-08T19:16:08.053959",
+          "content": {
+            "type": "agent_async_decision",
+            "query": "test 17",
+            "memories_used": 2,
+            "answer_preview": "note"
+          }
+        }
+      },
+      {
+        "timestamp": "2026-01-08T19:16:12.038766",
+        "content": {
+          "timestamp": "2026-01-08T19:16:08.391095",
+          "content": {
+            "type": "agent_async_decision",
+            "query": "test 18",
+            "memories_used": 2,
+            "answer_preview": "note"
+          }
+        }
+      },
+      {
+        "timestamp": "2026-01-08T19:16:12.346640",
+        "content": {
+          "timestamp": "2026-01-08T19:16:08.747253",
+          "content": {
+            "type": "agent_async_decision",
+            "query": "test 19",
+            "memories_used": 2,
+            "answer_preview": "note"
+          }
+        }
+      },
+      {
+        "timestamp": "2026-01-08T19:16:12.799560",
+        "content": {
+          "timestamp": "2026-01-08T19:16:09.049551",
+          "content": {
+            "type": "agent_async_decision",
+            "query": "test 20",
+            "memories_used": 2,
+            "answer_preview": "note"
+          }
+        }
+      },
+      {
+        "timestamp": "2026-01-08T19:16:13.190141",
+        "content": {
+          "timestamp": "2026-01-08T19:16:09.508218",
+          "content": {
+            "type": "agent_async_decision",
+            "query": "test 21",
+            "memories_used": 2,
+            "answer_preview": "note"
+          }
+        }
+      },
+      {
+        "timestamp": "2026-01-08T19:16:13.578364",
+        "content": {
+          "timestamp": "2026-01-08T19:16:09.855268",
+          "content": {
+            "type": "agent_async_decision",
+            "query": "test 22",
+            "memories_used": 2,
+            "answer_preview": "note"
+          }
+        }
+      },
+      {
+        "timestamp": "2026-01-08T19:16:13.906154",
+        "content": {
+          "timestamp": "2026-01-08T19:16:10.226444",
+          "content": {
+            "type": "agent_async_decision",
+            "query": "test 23",
+            "memories_used": 2,
+            "answer_preview": "note"
+          }
+        }
+      },
+      {
+        "timestamp": "2026-01-08T19:16:14.265749",
+        "content": {
+          "timestamp": "2026-01-08T19:16:10.624276",
+          "content": {
+            "type": "agent_async_decision",
+            "query": "test 24",
+            "memories_used": 2,
+            "answer_preview": "note"
+          }
+        }
+      },
+      {
+        "timestamp": "2026-01-08T19:16:14.578315",
+        "content": {
+          "timestamp": "2026-01-08T19:16:10.932726",
+          "content": {
+            "type": "agent_async_decision",
+            "query": "test 25",
+            "memories_used": 2,
+            "answer_preview": "note"
+          }
+        }
+      },
+      {
+        "timestamp": "2026-01-08T19:16:14.941378",
+        "content": {
+          "timestamp": "2026-01-08T19:16:11.270455",
+          "content": {
+            "type": "agent_async_decision",
+            "query": "test 26",
+            "memories_used": 2,
+            "answer_preview": "note"
+          }
+        }
+      },
+      {
+        "timestamp": "2026-01-08T19:16:15.340485",
+        "content": {
+          "timestamp": "2026-01-08T19:16:11.646945",
+          "content": {
+            "type": "agent_async_decision",
+            "query": "test 27",
+            "memories_used": 2,
+            "answer_preview": "note"
+          }
+        }
+      },
+      {
+        "timestamp": "2026-01-08T19:16:15.670113",
+        "content": {
+          "timestamp": "2026-01-08T19:16:12.038471",
+          "content": {
+            "type": "agent_async_decision",
+            "query": "test 28",
+            "memories_used": 2,
+            "answer_preview": "note"
+          }
+        }
+      },
+      {
+        "timestamp": "2026-01-08T19:16:16.073027",
+        "content": {
+          "timestamp": "2026-01-08T19:16:12.346490",
+          "content": {
+            "type": "agent_async_decision",
+            "query": "test 29",
+            "memories_used": 2,
+            "answer_preview": "note"
+          }
+        }
+      },
+      {
+        "timestamp": "2026-01-08T19:16:16.453095",
+        "content": {
+          "timestamp": "2026-01-08T19:16:12.799333",
+          "content": {
+            "type": "agent_async_decision",
+            "query": "test 30",
+            "memories_used": 2,
+            "answer_preview": "note"
+          }
+        }
+      },
+      {
+        "timestamp": "2026-01-08T19:16:16.792285",
+        "content": {
+          "timestamp": "2026-01-08T19:16:13.189914",
+          "content": {
+            "type": "agent_async_decision",
+            "query": "test 31",
+            "memories_used": 2,
+            "answer_preview": "note"
+          }
+        }
+      },
+      {
+        "timestamp": "2026-01-08T19:16:17.208199",
+        "content": {
+          "timestamp": "2026-01-08T19:16:13.578230",
+          "content": {
+            "type": "agent_async_decision",
+            "query": "test 32",
+            "memories_used": 2,
+            "answer_preview": "note"
+          }
+        }
+      },
+      {
+        "timestamp": "2026-01-08T19:16:17.621398",
+        "content": {
+          "timestamp": "2026-01-08T19:16:13.906002",
+          "content": {
+            "type": "agent_async_decision",
+            "query": "test 33",
+            "memories_used": 2,
+            "answer_preview": "note"
+          }
+        }
+      },
+      {
+        "timestamp": "2026-01-08T19:16:17.948686",
+        "content": {
+          "timestamp": "2026-01-08T19:16:14.265423",
+          "content": {
+            "type": "agent_async_decision",
+            "query": "test 34",
+            "memories_used": 2,
+            "answer_preview": "note"
+          }
+        }
+      },
+      {
+        "timestamp": "2026-01-08T19:16:18.345840",
+        "content": {
+          "timestamp": "2026-01-08T19:16:14.578182",
+          "content": {
+            "type": "agent_async_decision",
+            "query": "test 35",
+            "memories_used": 2,
+            "answer_preview": "note"
+          }
+        }
+      },
+      {
+        "timestamp": "2026-01-08T19:16:18.717897",
+        "content": {
+          "timestamp": "2026-01-08T19:16:14.941193",
+          "content": {
+            "type": "agent_async_decision",
+            "query": "test 36",
+            "memories_used": 2,
+            "answer_preview": "note"
+          }
+        }
+      },
+      {
+        "timestamp": "2026-01-08T19:16:19.073711",
+        "content": {
+          "timestamp": "2026-01-08T19:16:15.340343",
+          "content": {
+            "type": "agent_async_decision",
+            "query": "test 37",
+            "memories_used": 2,
+            "answer_preview": "note"
+          }
+        }
+      },
+      {
+        "timestamp": "2026-01-08T19:16:19.410881",
+        "content": {
+          "timestamp": "2026-01-08T19:16:15.669975",
+          "content": {
+            "type": "agent_async_decision",
+            "query": "test 38",
+            "memories_used": 2,
+            "answer_preview": "note"
+          }
+        }
+      },
+      {
+        "timestamp": "2026-01-08T19:16:19.855536",
+        "content": {
+          "timestamp": "2026-01-08T19:16:16.072875",
+          "content": {
+            "type": "agent_async_decision",
+            "query": "test 39",
+            "memories_used": 2,
+            "answer_preview": "note"
+          }
+        }
+      },
+      {
+        "timestamp": "2026-01-08T19:16:20.292353",
+        "content": {
+          "timestamp": "2026-01-08T19:16:16.452942",
+          "content": {
+            "type": "agent_async_decision",
+            "query": "test 40",
+            "memories_used": 2,
+            "answer_preview": "note"
+          }
+        }
+      },
+      {
+        "timestamp": "2026-01-08T19:16:20.764693",
+        "content": {
+          "timestamp": "2026-01-08T19:16:16.792000",
+          "content": {
+            "type": "agent_async_decision",
+            "query": "test 41",
+            "memories_used": 2,
+            "answer_preview": "note"
+          }
+        }
+      },
+      {
+        "timestamp": "2026-01-08T19:16:21.118189",
+        "content": {
+          "timestamp": "2026-01-08T19:16:17.208064",
+          "content": {
+            "type": "agent_async_decision",
+            "query": "test 42",
+            "memories_used": 2,
+            "answer_preview": "note"
+          }
+        }
+      },
+      {
+        "timestamp": "2026-01-08T19:16:21.537070",
+        "content": {
+          "timestamp": "2026-01-08T19:16:17.621250",
+          "content": {
+            "type": "agent_async_decision",
+            "query": "test 43",
+            "memories_used": 2,
+            "answer_preview": "note"
+          }
+        }
+      },
+      {
+        "timestamp": "2026-01-08T19:16:21.849991",
+        "content": {
+          "timestamp": "2026-01-08T19:16:17.948525",
+          "content": {
+            "type": "agent_async_decision",
+            "query": "test 44",
+            "memories_used": 2,
+            "answer_preview": "note"
+          }
+        }
+      },
+      {
+        "timestamp": "2026-01-08T19:16:22.267626",
+        "content": {
+          "timestamp": "2026-01-08T19:16:18.345689",
+          "content": {
+            "type": "agent_async_decision",
+            "query": "test 45",
+            "memories_used": 2,
+            "answer_preview": "note"
+          }
+        }
+      },
+      {
+        "timestamp": "2026-01-08T19:16:22.698957",
+        "content": {
+          "timestamp": "2026-01-08T19:16:18.717766",
+          "content": {
+            "type": "agent_async_decision",
+            "query": "test 46",
+            "memories_used": 2,
+            "answer_preview": "note"
+          }
+        }
+      },
+      {
+        "timestamp": "2026-01-08T19:16:23.049391",
+        "content": {
+          "timestamp": "2026-01-08T19:16:19.073507",
+          "content": {
+            "type": "agent_async_decision",
+            "query": "test 47",
+            "memories_used": 2,
+            "answer_preview": "note"
+          }
+        }
+      },
+      {
+        "timestamp": "2026-01-08T19:16:23.407173",
+        "content": {
+          "timestamp": "2026-01-08T19:16:19.410738",
+          "content": {
+            "type": "agent_async_decision",
+            "query": "test 48",
+            "memories_used": 2,
+            "answer_preview": "note"
+          }
+        }
+      },
+      {
+        "timestamp": "2026-01-08T19:16:23.784723",
+        "content": {
+          "timestamp": "2026-01-08T19:16:19.855380",
+          "content": {
+            "type": "agent_async_decision",
+            "query": "test 49",
+            "memories_used": 2,
+            "answer_preview": "note"
+          }
+        }
+      },
+      {
+        "timestamp": "2026-01-08T19:16:24.223549",
+        "content": {
+          "timestamp": "2026-01-08T19:16:20.292203",
+          "content": {
+            "type": "agent_async_decision",
+            "query": "test 50",
+            "memories_used": 2,
+            "answer_preview": "note"
+          }
+        }
+      },
+      {
+        "timestamp": "2026-01-08T19:16:24.653210",
+        "content": {
+          "timestamp": "2026-01-08T19:16:20.764545",
+          "content": {
+            "type": "agent_async_decision",
+            "query": "test 51",
+            "memories_used": 2,
+            "answer_preview": "note"
+          }
+        }
+      },
+      {
+        "timestamp": "2026-01-08T19:16:25.017010",
+        "content": {
+          "timestamp": "2026-01-08T19:16:21.118046",
+          "content": {
+            "type": "agent_async_decision",
+            "query": "test 52",
+            "memories_used": 2,
+            "answer_preview": "note"
+          }
+        }
+      },
+      {
+        "timestamp": "2026-01-08T19:16:25.388873",
+        "content": {
+          "timestamp": "2026-01-08T19:16:21.536825",
+          "content": {
+            "type": "agent_async_decision",
+            "query": "test 53",
+            "memories_used": 2,
+            "answer_preview": "note"
+          }
+        }
+      },
+      {
+        "timestamp": "2026-01-08T19:16:25.758045",
+        "content": {
+          "timestamp": "2026-01-08T19:16:21.849852",
+          "content": {
+            "type": "agent_async_decision",
+            "query": "test 54",
+            "memories_used": 2,
+            "answer_preview": "note"
+          }
+        }
+      },
+      {
+        "timestamp": "2026-01-08T19:16:26.071099",
+        "content": {
+          "timestamp": "2026-01-08T19:16:22.267490",
+          "content": {
+            "type": "agent_async_decision",
+            "query": "test 55",
+            "memories_used": 2,
+            "answer_preview": "note"
+          }
+        }
+      },
+      {
+        "timestamp": "2026-01-08T19:16:26.404429",
+        "content": {
+          "timestamp": "2026-01-08T19:16:22.698802",
+          "content": {
+            "type": "agent_async_decision",
+            "query": "test 56",
+            "memories_used": 2,
+            "answer_preview": "note"
+          }
+        }
+      },
+      {
+        "timestamp": "2026-01-08T19:16:26.762721",
+        "content": {
+          "timestamp": "2026-01-08T19:16:23.049255",
+          "content": {
+            "type": "agent_async_decision",
+            "query": "test 57",
+            "memories_used": 2,
+            "answer_preview": "note"
+          }
+        }
+      },
+      {
+        "timestamp": "2026-01-08T19:16:27.189770",
+        "content": {
+          "timestamp": "2026-01-08T19:16:23.407008",
+          "content": {
+            "type": "agent_async_decision",
+            "query": "test 58",
+            "memories_used": 2,
+            "answer_preview": "note"
+          }
+        }
+      },
+      {
+        "timestamp": "2026-01-08T19:16:27.511089",
+        "content": {
+          "timestamp": "2026-01-08T19:16:23.784289",
+          "content": {
+            "type": "agent_async_decision",
+            "query": "test 59",
+            "memories_used": 2,
+            "answer_preview": "note"
+          }
+        }
+      },
+      {
+        "timestamp": "2026-01-08T19:16:27.917049",
+        "content": {
+          "timestamp": "2026-01-08T19:16:24.223393",
+          "content": {
+            "type": "agent_async_decision",
+            "query": "test 60",
+            "memories_used": 2,
+            "answer_preview": "note"
+          }
+        }
+      },
+      {
+        "timestamp": "2026-01-08T19:16:28.329007",
+        "content": {
+          "timestamp": "2026-01-08T19:16:24.653074",
+          "content": {
+            "type": "agent_async_decision",
+            "query": "test 61",
+            "memories_used": 2,
+            "answer_preview": "note"
+          }
+        }
+      },
+      {
+        "timestamp": "2026-01-08T19:16:28.694680",
+        "content": {
+          "timestamp": "2026-01-08T19:16:25.016875",
+          "content": {
+            "type": "agent_async_decision",
+            "query": "test 62",
+            "memories_used": 2,
+            "answer_preview": "note"
+          }
+        }
+      },
+      {
+        "timestamp": "2026-01-08T19:16:29.399273",
+        "content": {
+          "timestamp": "2026-01-08T19:16:25.388738",
+          "content": {
+            "type": "agent_async_decision",
+            "query": "test 63",
+            "memories_used": 2,
+            "answer_preview": "note"
+          }
+        }
+      },
+      {
+        "timestamp": "2026-01-08T19:16:29.797531",
+        "content": {
+          "timestamp": "2026-01-08T19:16:25.757894",
+          "content": {
+            "type": "agent_async_decision",
+            "query": "test 64",
+            "memories_used": 2,
+            "answer_preview": "note"
+          }
+        }
+      },
+      {
+        "timestamp": "2026-01-08T19:16:30.161467",
+        "content": {
+          "timestamp": "2026-01-08T19:16:26.070811",
+          "content": {
+            "type": "agent_async_decision",
+            "query": "test 65",
+            "memories_used": 2,
+            "answer_preview": "note"
+          }
+        }
+      },
+      {
+        "timestamp": "2026-01-08T19:16:30.528638",
+        "content": {
+          "timestamp": "2026-01-08T19:16:26.404260",
+          "content": {
+            "type": "agent_async_decision",
+            "query": "test 66",
+            "memories_used": 2,
+            "answer_preview": "note"
+          }
+        }
+      },
+      {
+        "timestamp": "2026-01-08T19:16:30.836964",
+        "content": {
+          "timestamp": "2026-01-08T19:16:26.762559",
+          "content": {
+            "type": "agent_async_decision",
+            "query": "test 67",
+            "memories_used": 2,
+            "answer_preview": "note"
+          }
+        }
+      },
+      {
+        "timestamp": "2026-01-08T19:16:31.189849",
+        "content": {
+          "timestamp": "2026-01-08T19:16:27.189594",
+          "content": {
+            "type": "agent_async_decision",
+            "query": "test 68",
+            "memories_used": 2,
+            "answer_preview": "note"
+          }
+        }
+      },
+      {
+        "timestamp": "2026-01-08T19:16:31.560947",
+        "content": {
+          "timestamp": "2026-01-08T19:16:27.510948",
+          "content": {
+            "type": "agent_async_decision",
+            "query": "test 69",
+            "memories_used": 2,
+            "answer_preview": "note"
+          }
+        }
+      },
+      {
+        "timestamp": "2026-01-08T19:16:39.026570",
+        "content": {
+          "timestamp": "2026-01-08T19:16:35.213412",
+          "content": {
+            "type": "agent_async_decision",
+            "query": "test 80",
+            "memories_used": 2,
+            "answer_preview": "note"
+          }
+        }
+      },
+      {
+        "timestamp": "2026-01-08T19:16:39.455032",
+        "content": {
+          "timestamp": "2026-01-08T19:16:35.566877",
+          "content": {
+            "type": "agent_async_decision",
+            "query": "test 81",
+            "memories_used": 2,
+            "answer_preview": "note"
+          }
+        }
+      },
+      {
+        "timestamp": "2026-01-08T19:16:39.888418",
+        "content": {
+          "timestamp": "2026-01-08T19:16:35.908539",
+          "content": {
+            "type": "agent_async_decision",
+            "query": "test 82",
+            "memories_used": 2,
+            "answer_preview": "note"
+          }
+        }
+      },
+      {
+        "timestamp": "2026-01-08T19:16:40.219289",
+        "content": {
+          "timestamp": "2026-01-08T19:16:36.289721",
+          "content": {
+            "type": "agent_async_decision",
+            "query": "test 83",
+            "memories_used": 2,
+            "answer_preview": "note"
+          }
+        }
+      },
+      {
+        "timestamp": "2026-01-08T19:16:40.567053",
+        "content": {
+          "timestamp": "2026-01-08T19:16:36.641322",
+          "content": {
+            "type": "agent_async_decision",
+            "query": "test 84",
+            "memories_used": 2,
+            "answer_preview": "note"
+          }
+        }
+      },
+      {
+        "timestamp": "2026-01-08T19:16:40.939443",
+        "content": {
+          "timestamp": "2026-01-08T19:16:37.010787",
+          "content": {
+            "type": "agent_async_decision",
+            "query": "test 85",
+            "memories_used": 2,
+            "answer_preview": "note"
+          }
+        }
+      },
+      {
+        "timestamp": "2026-01-08T19:16:41.260647",
+        "content": {
+          "timestamp": "2026-01-08T19:16:37.413401",
+          "content": {
+            "type": "agent_async_decision",
+            "query": "test 86",
+            "memories_used": 2,
+            "answer_preview": "note"
+          }
+        }
+      },
+      {
+        "timestamp": "2026-01-08T19:16:41.578678",
+        "content": {
+          "timestamp": "2026-01-08T19:16:37.718039",
+          "content": {
+            "type": "agent_async_decision",
+            "query": "test 87",
+            "memories_used": 2,
+            "answer_preview": "note"
+          }
+        }
+      },
+      {
+        "timestamp": "2026-01-08T19:16:41.908126",
+        "content": {
+          "timestamp": "2026-01-08T19:16:38.134166",
+          "content": {
+            "type": "agent_async_decision",
+            "query": "test 88",
+            "memories_used": 2,
+            "answer_preview": "note"
+          }
+        }
+      },
+      {
+        "timestamp": "2026-01-08T19:16:42.342162",
+        "content": {
+          "timestamp": "2026-01-08T19:16:38.561640",
+          "content": {
+            "type": "agent_async_decision",
+            "query": "test 89",
+            "memories_used": 2,
+            "answer_preview": "note"
+          }
+        }
+      },
+      {
+        "timestamp": "2026-01-08T19:16:42.667168",
+        "content": {
+          "timestamp": "2026-01-08T19:16:39.026424",
+          "content": {
+            "type": "agent_async_decision",
+            "query": "test 90",
+            "memories_used": 2,
+            "answer_preview": "note"
+          }
+        }
+      },
+      {
+        "timestamp": "2026-01-08T19:16:42.994937",
+        "content": {
+          "timestamp": "2026-01-08T19:16:39.454844",
+          "content": {
+            "type": "agent_async_decision",
+            "query": "test 91",
+            "memories_used": 2,
+            "answer_preview": "note"
+          }
+        }
+      },
+      {
+        "timestamp": "2026-01-08T19:16:43.310856",
+        "content": {
+          "timestamp": "2026-01-08T19:16:39.888282",
+          "content": {
+            "type": "agent_async_decision",
+            "query": "test 92",
+            "memories_used": 2,
+            "answer_preview": "note"
+          }
+        }
+      },
+      {
+        "timestamp": "2026-01-08T19:16:43.641950",
+        "content": {
+          "timestamp": "2026-01-08T19:16:40.219105",
+          "content": {
+            "type": "agent_async_decision",
+            "query": "test 93",
+            "memories_used": 2,
+            "answer_preview": "note"
+          }
+        }
+      },
+      {
+        "timestamp": "2026-01-08T19:16:44.056332",
+        "content": {
+          "timestamp": "2026-01-08T19:16:40.566853",
+          "content": {
+            "type": "agent_async_decision",
+            "query": "test 94",
+            "memories_used": 2,
+            "answer_preview": "note"
+          }
+        }
+      },
+      {
+        "timestamp": "2026-01-08T19:16:44.407046",
+        "content": {
+          "timestamp": "2026-01-08T19:16:40.939226",
+          "content": {
+            "type": "agent_async_decision",
+            "query": "test 95",
+            "memories_used": 2,
+            "answer_preview": "note"
+          }
+        }
+      },
+      {
+        "timestamp": "2026-01-08T19:16:44.829517",
+        "content": {
+          "timestamp": "2026-01-08T19:16:41.260512",
+          "content": {
+            "type": "agent_async_decision",
+            "query": "test 96",
+            "memories_used": 2,
+            "answer_preview": "note"
+          }
+        }
+      },
+      {
+        "timestamp": "2026-01-08T19:16:45.403513",
+        "content": {
+          "timestamp": "2026-01-08T19:16:41.578516",
+          "content": {
+            "type": "agent_async_decision",
+            "query": "test 97",
+            "memories_used": 2,
+            "answer_preview": "note"
+          }
+        }
+      },
+      {
+        "timestamp": "2026-01-08T19:16:46.550342",
+        "content": {
+          "timestamp": "2026-01-08T19:16:41.907977",
+          "content": {
+            "type": "agent_async_decision",
+            "query": "test 98",
+            "memories_used": 2,
+            "answer_preview": "note"
+          }
+        }
+      },
+      {
+        "timestamp": "2026-01-08T19:16:46.909835",
+        "content": {
+          "timestamp": "2026-01-08T19:16:42.342019",
+          "content": {
+            "type": "agent_async_decision",
+            "query": "test 99",
+            "memories_used": 2,
+            "answer_preview": "note"
+          }
+        }
+      },
+      {
+        "timestamp": "2026-01-08T19:16:47.367452",
+        "content": {
+          "timestamp": "2026-01-08T19:16:42.667026",
+          "content": {
+            "type": "agent_async_decision",
+            "query": "test 100",
+            "memories_used": 2,
+            "answer_preview": "note"
+          }
+        }
+      },
+      {
+        "timestamp": "2026-01-08T19:16:47.706558",
+        "content": {
+          "timestamp": "2026-01-08T19:16:42.994794",
+          "content": {
+            "type": "agent_async_decision",
+            "query": "test 101",
+            "memories_used": 2,
+            "answer_preview": "note"
+          }
+        }
+      },
+      {
+        "timestamp": "2026-01-08T19:16:48.054299",
+        "content": {
+          "timestamp": "2026-01-08T19:16:43.310685",
+          "content": {
+            "type": "agent_async_decision",
+            "query": "test 102",
+            "memories_used": 2,
+            "answer_preview": "note"
+          }
+        }
+      },
+      {
+        "timestamp": "2026-01-08T19:16:48.385063",
+        "content": {
+          "timestamp": "2026-01-08T19:16:43.641797",
+          "content": {
+            "type": "agent_async_decision",
+            "query": "test 103",
+            "memories_used": 2,
+            "answer_preview": "note"
+          }
+        }
+      },
+      {
+        "timestamp": "2026-01-08T19:16:48.709521",
+        "content": {
+          "timestamp": "2026-01-08T19:16:44.056184",
+          "content": {
+            "type": "agent_async_decision",
+            "query": "test 104",
+            "memories_used": 2,
+            "answer_preview": "note"
+          }
+        }
+      },
+      {
+        "timestamp": "2026-01-08T19:16:49.104623",
+        "content": {
+          "timestamp": "2026-01-08T19:16:44.406903",
+          "content": {
+            "type": "agent_async_decision",
+            "query": "test 105",
+            "memories_used": 2,
+            "answer_preview": "note"
+          }
+        }
+      },
+      {
+        "timestamp": "2026-01-08T19:16:49.519392",
+        "content": {
+          "timestamp": "2026-01-08T19:16:44.829378",
+          "content": {
+            "type": "agent_async_decision",
+            "query": "test 106",
+            "memories_used": 2,
+            "answer_preview": "note"
+          }
+        }
+      },
+      {
+        "timestamp": "2026-01-08T19:16:49.842394",
+        "content": {
+          "timestamp": "2026-01-08T19:16:45.403362",
+          "content": {
+            "type": "agent_async_decision",
+            "query": "test 107",
+            "memories_used": 2,
+            "answer_preview": "note"
+          }
+        }
+      },
+      {
+        "timestamp": "2026-01-08T19:16:50.239694",
+        "content": {
+          "timestamp": "2026-01-08T19:16:46.550207",
+          "content": {
+            "type": "agent_async_decision",
+            "query": "test 108",
+            "memories_used": 2,
+            "answer_preview": "note"
+          }
+        }
+      },
+      {
+        "timestamp": "2026-01-08T19:16:51.123343",
+        "content": {
+          "timestamp": "2026-01-08T19:16:46.909664",
+          "content": {
+            "type": "agent_async_decision",
+            "query": "test 109",
+            "memories_used": 2,
+            "answer_preview": "note"
+          }
+        }
+      },
+      {
+        "timestamp": "2026-01-08T19:16:51.510527",
+        "content": {
+          "timestamp": "2026-01-08T19:16:47.367268",
+          "content": {
+            "type": "agent_async_decision",
+            "query": "test 110",
+            "memories_used": 2,
+            "answer_preview": "note"
+          }
+        }
+      },
+      {
+        "timestamp": "2026-01-08T19:16:52.063682",
+        "content": {
+          "timestamp": "2026-01-08T19:16:47.706395",
+          "content": {
+            "type": "agent_async_decision",
+            "query": "test 111",
+            "memories_used": 2,
+            "answer_preview": "note"
+          }
+        }
+      },
+      {
+        "timestamp": "2026-01-08T19:16:52.439443",
+        "content": {
+          "timestamp": "2026-01-08T19:16:48.054118",
+          "content": {
+            "type": "agent_async_decision",
+            "query": "test 112",
+            "memories_used": 2,
+            "answer_preview": "note"
+          }
+        }
+      },
+      {
+        "timestamp": "2026-01-08T19:17:01.092124",
+        "content": {
+          "timestamp": "2026-01-08T19:16:55.435233",
+          "content": {
+            "type": "agent_async_decision",
+            "query": "test 123",
+            "memories_used": 2,
+            "answer_preview": "note"
+          }
+        }
+      },
+      {
+        "timestamp": "2026-01-08T19:17:01.546951",
+        "content": {
+          "timestamp": "2026-01-08T19:16:55.800537",
+          "content": {
+            "type": "agent_async_decision",
+            "query": "test 124",
+            "memories_used": 2,
+            "answer_preview": "note"
+          }
+        }
+      },
+      {
+        "timestamp": "2026-01-08T19:17:01.913037",
+        "content": {
+          "timestamp": "2026-01-08T19:16:56.228489",
+          "content": {
+            "type": "agent_async_decision",
+            "query": "test 125",
+            "memories_used": 2,
+            "answer_preview": "note"
+          }
+        }
+      },
+      {
+        "timestamp": "2026-01-08T19:17:02.244685",
+        "content": {
+          "timestamp": "2026-01-08T19:16:56.574480",
+          "content": {
+            "type": "agent_async_decision",
+            "query": "test 126",
+            "memories_used": 2,
+            "answer_preview": "note"
+          }
+        }
+      },
+      {
+        "timestamp": "2026-01-08T19:17:02.635998",
+        "content": {
+          "timestamp": "2026-01-08T19:16:56.930054",
+          "content": {
+            "type": "agent_async_decision",
+            "query": "test 127",
+            "memories_used": 2,
+            "answer_preview": "note"
+          }
+        }
+      },
+      {
+        "timestamp": "2026-01-08T19:17:02.950553",
+        "content": {
+          "timestamp": "2026-01-08T19:16:57.346600",
+          "content": {
+            "type": "agent_async_decision",
+            "query": "test 128",
+            "memories_used": 2,
+            "answer_preview": "note"
+          }
+        }
+      },
+      {
+        "timestamp": "2026-01-08T19:17:03.308719",
+        "content": {
+          "timestamp": "2026-01-08T19:16:57.692182",
+          "content": {
+            "type": "agent_async_decision",
+            "query": "test 129",
+            "memories_used": 5,
+            "answer_preview": "note"
+          }
+        }
+      },
+      {
+        "timestamp": "2026-01-08T19:17:03.788020",
+        "content": {
+          "timestamp": "2026-01-08T19:16:59.869661",
+          "content": {
+            "type": "agent_async_decision",
+            "query": "test 130",
+            "memories_used": 2,
+            "answer_preview": "note"
+          }
+        }
+      },
+      {
+        "timestamp": "2026-01-08T19:17:04.176413",
+        "content": {
+          "timestamp": "2026-01-08T19:17:00.317372",
+          "content": {
+            "type": "agent_async_decision",
+            "query": "test 131",
+            "memories_used": 2,
+            "answer_preview": "note"
+          }
+        }
+      },
+      {
+        "timestamp": "2026-01-08T19:17:04.503237",
+        "content": {
+          "timestamp": "2026-01-08T19:17:00.648947",
+          "content": {
+            "type": "agent_async_decision",
+            "query": "test 132",
+            "memories_used": 5,
+            "answer_preview": "note"
+          }
+        }
+      },
+      {
+        "timestamp": "2026-01-08T19:17:05.207764",
+        "content": {
+          "timestamp": "2026-01-08T19:17:01.091992",
+          "content": {
+            "type": "agent_async_decision",
+            "query": "test 133",
+            "memories_used": 5,
+            "answer_preview": "note"
+          }
+        }
+      },
+      {
+        "timestamp": "2026-01-08T19:17:05.538845",
+        "content": {
+          "timestamp": "2026-01-08T19:17:01.546766",
+          "content": {
+            "type": "agent_async_decision",
+            "query": "test 134",
+            "memories_used": 2,
+            "answer_preview": "note"
+          }
+        }
+      },
+      {
+        "timestamp": "2026-01-08T19:17:05.886813",
+        "content": {
+          "timestamp": "2026-01-08T19:17:01.912885",
+          "content": {
+            "type": "agent_async_decision",
+            "query": "test 135",
+            "memories_used": 2,
+            "answer_preview": "note"
+          }
+        }
+      },
+      {
+        "timestamp": "2026-01-08T19:17:06.191882",
+        "content": {
+          "timestamp": "2026-01-08T19:17:02.244532",
+          "content": {
+            "type": "agent_async_decision",
+            "query": "test 136",
+            "memories_used": 2,
+            "answer_preview": "note"
+          }
+        }
+      },
+      {
+        "timestamp": "2026-01-08T19:17:06.604984",
+        "content": {
+          "timestamp": "2026-01-08T19:17:02.635855",
+          "content": {
+            "type": "agent_async_decision",
+            "query": "test 137",
+            "memories_used": 2,
+            "answer_preview": "note"
+          }
+        }
+      },
+      {
+        "timestamp": "2026-01-08T19:17:07.001172",
+        "content": {
+          "timestamp": "2026-01-08T19:17:02.950394",
+          "content": {
+            "type": "agent_async_decision",
+            "query": "test 138",
+            "memories_used": 2,
+            "answer_preview": "note"
+          }
+        }
+      },
+      {
+        "timestamp": "2026-01-08T19:17:07.396851",
+        "content": {
+          "timestamp": "2026-01-08T19:17:03.308548",
+          "content": {
+            "type": "agent_async_decision",
+            "query": "test 139",
+            "memories_used": 2,
+            "answer_preview": "note"
+          }
+        }
+      },
+      {
+        "timestamp": "2026-01-08T19:17:08.005396",
+        "content": {
+          "timestamp": "2026-01-08T19:17:03.787859",
+          "content": {
+            "type": "agent_async_decision",
+            "query": "test 140",
+            "memories_used": 2,
+            "answer_preview": "note"
+          }
+        }
+      },
+      {
+        "timestamp": "2026-01-08T19:17:08.342204",
+        "content": {
+          "timestamp": "2026-01-08T19:17:04.176267",
+          "content": {
+            "type": "agent_async_decision",
+            "query": "test 141",
+            "memories_used": 2,
+            "answer_preview": "note"
+          }
+        }
+      },
+      {
+        "timestamp": "2026-01-08T19:17:08.729651",
+        "content": {
+          "timestamp": "2026-01-08T19:17:04.503077",
+          "content": {
+            "type": "agent_async_decision",
+            "query": "test 142",
+            "memories_used": 2,
+            "answer_preview": "note"
+          }
+        }
+      },
+      {
+        "timestamp": "2026-01-08T19:17:09.120807",
+        "content": {
+          "timestamp": "2026-01-08T19:17:05.207610",
+          "content": {
+            "type": "agent_async_decision",
+            "query": "test 143",
+            "memories_used": 2,
+            "answer_preview": "note"
+          }
+        }
+      },
+      {
+        "timestamp": "2026-01-08T19:17:09.440973",
+        "content": {
+          "timestamp": "2026-01-08T19:17:05.538570",
+          "content": {
+            "type": "agent_async_decision",
+            "query": "test 144",
+            "memories_used": 2,
+            "answer_preview": "note"
+          }
+        }
+      },
+      {
+        "timestamp": "2026-01-08T19:17:09.795973",
+        "content": {
+          "timestamp": "2026-01-08T19:17:05.886671",
+          "content": {
+            "type": "agent_async_decision",
+            "query": "test 145",
+            "memories_used": 2,
+            "answer_preview": "note"
+          }
+        }
+      },
+      {
+        "timestamp": "2026-01-08T19:17:10.165902",
+        "content": {
+          "timestamp": "2026-01-08T19:17:06.191715",
+          "content": {
+            "type": "agent_async_decision",
+            "query": "test 146",
+            "memories_used": 2,
+            "answer_preview": "note"
+          }
+        }
+      },
+      {
+        "timestamp": "2026-01-08T19:17:10.576674",
+        "content": {
+          "timestamp": "2026-01-08T19:17:06.604840",
+          "content": {
+            "type": "agent_async_decision",
+            "query": "test 147",
+            "memories_used": 2,
+            "answer_preview": "note"
+          }
+        }
+      },
+      {
+        "timestamp": "2026-01-08T19:17:11.081355",
+        "content": {
+          "timestamp": "2026-01-08T19:17:07.001039",
+          "content": {
+            "type": "agent_async_decision",
+            "query": "test 148",
+            "memories_used": 2,
+            "answer_preview": "note"
+          }
+        }
+      },
+      {
+        "timestamp": "2026-01-08T19:17:11.439325",
+        "content": {
+          "timestamp": "2026-01-08T19:17:07.396721",
+          "content": {
+            "type": "agent_async_decision",
+            "query": "test 149",
+            "memories_used": 2,
+            "answer_preview": "note"
+          }
+        }
+      },
+      {
+        "timestamp": "2026-01-08T19:17:11.812563",
+        "content": {
+          "timestamp": "2026-01-08T19:17:08.005243",
+          "content": {
+            "type": "agent_async_decision",
+            "query": "test 150",
+            "memories_used": 2,
+            "answer_preview": "note"
+          }
+        }
+      },
+      {
+        "timestamp": "2026-01-08T19:17:12.212676",
+        "content": {
+          "timestamp": "2026-01-08T19:17:08.342074",
+          "content": {
+            "type": "agent_async_decision",
+            "query": "test 151",
+            "memories_used": 2,
+            "answer_preview": "note"
+          }
+        }
+      },
+      {
+        "timestamp": "2026-01-08T19:17:12.522469",
+        "content": {
+          "timestamp": "2026-01-08T19:17:08.729500",
+          "content": {
+            "type": "agent_async_decision",
+            "query": "test 152",
+            "memories_used": 2,
+            "answer_preview": "note"
+          }
+        }
+      },
+      {
+        "timestamp": "2026-01-08T19:17:12.907624",
+        "content": {
+          "timestamp": "2026-01-08T19:17:09.120667",
+          "content": {
+            "type": "agent_async_decision",
+            "query": "test 153",
+            "memories_used": 2,
+            "answer_preview": "note"
+          }
+        }
+      },
+      {
+        "timestamp": "2026-01-08T19:17:13.336457",
+        "content": {
+          "timestamp": "2026-01-08T19:17:09.440834",
+          "content": {
+            "type": "agent_async_decision",
+            "query": "test 154",
+            "memories_used": 2,
+            "answer_preview": "note"
+          }
+        }
+      },
+      {
+        "timestamp": "2026-01-08T19:17:13.759404",
+        "content": {
+          "timestamp": "2026-01-08T19:17:09.795840",
+          "content": {
+            "type": "agent_async_decision",
+            "query": "test 155",
+            "memories_used": 2,
+            "answer_preview": "note"
+          }
+        }
+      },
+      {
+        "timestamp": "2026-01-08T19:17:14.119408",
+        "content": {
+          "timestamp": "2026-01-08T19:17:10.165766",
+          "content": {
+            "type": "agent_async_decision",
+            "query": "test 156",
+            "memories_used": 2,
+            "answer_preview": "note"
+          }
+        }
+      },
+      {
+        "timestamp": "2026-01-08T19:17:14.463966",
+        "content": {
+          "timestamp": "2026-01-08T19:17:10.576540",
+          "content": {
+            "type": "agent_async_decision",
+            "query": "test 157",
+            "memories_used": 2,
+            "answer_preview": "note"
+          }
+        }
+      },
+      {
+        "timestamp": "2026-01-08T19:17:14.814686",
+        "content": {
+          "timestamp": "2026-01-08T19:17:11.081229",
+          "content": {
+            "type": "agent_async_decision",
+            "query": "test 158",
+            "memories_used": 2,
+            "answer_preview": "note"
+          }
+        }
+      },
+      {
+        "timestamp": "2026-01-08T19:17:15.178884",
+        "content": {
+          "timestamp": "2026-01-08T19:17:11.439194",
+          "content": {
+            "type": "agent_async_decision",
+            "query": "test 159",
+            "memories_used": 2,
+            "answer_preview": "note"
+          }
+        }
+      },
+      {
+        "timestamp": "2026-01-08T19:17:15.545124",
+        "content": {
+          "timestamp": "2026-01-08T19:17:11.812420",
+          "content": {
+            "type": "agent_async_decision",
+            "query": "test 160",
+            "memories_used": 2,
+            "answer_preview": "note"
+          }
+        }
+      },
+      {
+        "timestamp": "2026-01-08T19:17:15.861172",
+        "content": {
+          "timestamp": "2026-01-08T19:17:12.212542",
+          "content": {
+            "type": "agent_async_decision",
+            "query": "test 161",
+            "memories_used": 2,
+            "answer_preview": "note"
+          }
+        }
+      },
+      {
+        "timestamp": "2026-01-08T19:17:16.223983",
+        "content": {
+          "timestamp": "2026-01-08T19:17:12.522340",
+          "content": {
+            "type": "agent_async_decision",
+            "query": "test 162",
+            "memories_used": 2,
+            "answer_preview": "note"
+          }
+        }
+      },
+      {
+        "timestamp": "2026-01-08T19:17:16.604077",
+        "content": {
+          "timestamp": "2026-01-08T19:17:12.907456",
+          "content": {
+            "type": "agent_async_decision",
+            "query": "test 163",
+            "memories_used": 2,
+            "answer_preview": "note"
+          }
+        }
+      },
+      {
+        "timestamp": "2026-01-08T19:17:17.014099",
+        "content": {
+          "timestamp": "2026-01-08T19:17:13.336294",
+          "content": {
+            "type": "agent_async_decision",
+            "query": "test 164",
+            "memories_used": 2,
+            "answer_preview": "note"
+          }
+        }
+      },
+      {
+        "timestamp": "2026-01-08T19:17:17.386307",
+        "content": {
+          "timestamp": "2026-01-08T19:17:13.759232",
+          "content": {
+            "type": "agent_async_decision",
+            "query": "test 165",
+            "memories_used": 2,
+            "answer_preview": "note"
+          }
+        }
+      },
+      {
+        "timestamp": "2026-01-08T19:17:17.740469",
+        "content": {
+          "timestamp": "2026-01-08T19:17:14.119262",
+          "content": {
+            "type": "agent_async_decision",
+            "query": "test 166",
+            "memories_used": 2,
+            "answer_preview": "note"
+          }
+        }
+      },
+      {
+        "timestamp": "2026-01-08T19:17:18.066134",
+        "content": {
+          "timestamp": "2026-01-08T19:17:14.463760",
+          "content": {
+            "type": "agent_async_decision",
+            "query": "test 167",
+            "memories_used": 2,
+            "answer_preview": "note"
+          }
+        }
+      },
+      {
+        "timestamp": "2026-01-08T19:17:18.381713",
+        "content": {
+          "timestamp": "2026-01-08T19:17:14.814513",
+          "content": {
+            "type": "agent_async_decision",
+            "query": "test 168",
+            "memories_used": 2,
+            "answer_preview": "note"
+          }
+        }
+      },
+      {
+        "timestamp": "2026-01-08T19:17:18.682760",
+        "content": {
+          "timestamp": "2026-01-08T19:17:15.178693",
+          "content": {
+            "type": "agent_async_decision",
+            "query": "test 169",
+            "memories_used": 2,
+            "answer_preview": "note"
+          }
+        }
+      },
+      {
+        "timestamp": "2026-01-08T19:17:19.063499",
+        "content": {
+          "timestamp": "2026-01-08T19:17:15.544992",
+          "content": {
+            "type": "agent_async_decision",
+            "query": "test 170",
+            "memories_used": 2,
+            "answer_preview": "note"
+          }
+        }
+      },
+      {
+        "timestamp": "2026-01-08T19:17:19.449982",
+        "content": {
+          "timestamp": "2026-01-08T19:17:15.860990",
+          "content": {
+            "type": "agent_async_decision",
+            "query": "test 171",
+            "memories_used": 2,
+            "answer_preview": "note"
+          }
+        }
+      },
+      {
+        "timestamp": "2026-01-08T19:17:19.922251",
+        "content": {
+          "timestamp": "2026-01-08T19:17:16.223828",
+          "content": {
+            "type": "agent_async_decision",
+            "query": "test 172",
+            "memories_used": 2,
+            "answer_preview": "note"
+          }
+        }
+      },
+      {
+        "timestamp": "2026-01-08T19:17:20.274071",
+        "content": {
+          "timestamp": "2026-01-08T19:17:16.603699",
+          "content": {
+            "type": "agent_async_decision",
+            "query": "test 173",
+            "memories_used": 2,
+            "answer_preview": "note"
+          }
+        }
+      },
+      {
+        "timestamp": "2026-01-08T19:17:20.613718",
+        "content": {
+          "timestamp": "2026-01-08T19:17:17.013949",
+          "content": {
+            "type": "agent_async_decision",
+            "query": "test 174",
+            "memories_used": 2,
+            "answer_preview": "note"
+          }
+        }
+      },
+      {
+        "timestamp": "2026-01-08T19:17:21.154562",
+        "content": {
+          "timestamp": "2026-01-08T19:17:17.386170",
+          "content": {
+            "type": "agent_async_decision",
+            "query": "test 175",
+            "memories_used": 2,
+            "answer_preview": "note"
+          }
+        }
+      },
+      {
+        "timestamp": "2026-01-08T19:17:21.529752",
+        "content": {
+          "timestamp": "2026-01-08T19:17:17.740174",
+          "content": {
+            "type": "agent_async_decision",
+            "query": "test 176",
+            "memories_used": 2,
+            "answer_preview": "note"
+          }
+        }
+      },
+      {
+        "timestamp": "2026-01-08T19:17:21.962719",
+        "content": {
+          "timestamp": "2026-01-08T19:17:18.066004",
+          "content": {
+            "type": "agent_async_decision",
+            "query": "test 177",
+            "memories_used": 2,
+            "answer_preview": "note"
+          }
+        }
+      },
+      {
+        "timestamp": "2026-01-08T19:17:22.362503",
+        "content": {
+          "timestamp": "2026-01-08T19:17:18.381566",
+          "content": {
+            "type": "agent_async_decision",
+            "query": "test 178",
+            "memories_used": 2,
+            "answer_preview": "note"
+          }
+        }
+      },
+      {
+        "timestamp": "2026-01-08T19:17:22.775932",
+        "content": {
+          "timestamp": "2026-01-08T19:17:18.682629",
+          "content": {
+            "type": "agent_async_decision",
+            "query": "test 179",
+            "memories_used": 2,
+            "answer_preview": "note"
+          }
+        }
+      },
+      {
+        "timestamp": "2026-01-08T19:17:23.264786",
+        "content": {
+          "timestamp": "2026-01-08T19:17:19.063370",
+          "content": {
+            "type": "agent_async_decision",
+            "query": "test 180",
+            "memories_used": 2,
+            "answer_preview": "note"
+          }
+        }
+      },
+      {
+        "timestamp": "2026-01-08T19:17:23.648289",
+        "content": {
+          "timestamp": "2026-01-08T19:17:19.449850",
+          "content": {
+            "type": "agent_async_decision",
+            "query": "test 181",
+            "memories_used": 2,
+            "answer_preview": "note"
+          }
+        }
+      },
+      {
+        "timestamp": "2026-01-08T19:17:24.056137",
+        "content": {
+          "timestamp": "2026-01-08T19:17:19.922078",
+          "content": {
+            "type": "agent_async_decision",
+            "query": "test 182",
+            "memories_used": 2,
+            "answer_preview": "note"
+          }
+        }
+      },
+      {
+        "timestamp": "2026-01-08T19:17:24.480200",
+        "content": {
+          "timestamp": "2026-01-08T19:17:20.273924",
+          "content": {
+            "type": "agent_async_decision",
+            "query": "test 183",
+            "memories_used": 2,
+            "answer_preview": "note"
+          }
+        }
+      },
+      {
+        "timestamp": "2026-01-08T19:17:31.595128",
+        "content": {
+          "timestamp": "2026-01-08T19:17:27.806422",
+          "content": {
+            "type": "agent_async_decision",
+            "query": "test 194",
+            "memories_used": 2,
+            "answer_preview": "note"
+          }
+        }
+      },
+      {
+        "timestamp": "2026-01-08T19:17:31.981666",
+        "content": {
+          "timestamp": "2026-01-08T19:17:28.119770",
+          "content": {
+            "type": "agent_async_decision",
+            "query": "test 195",
+            "memories_used": 2,
+            "answer_preview": "note"
+          }
+        }
+      },
+      {
+        "timestamp": "2026-01-08T19:17:34.505196",
+        "content": {
+          "timestamp": "2026-01-08T19:17:28.538839",
+          "content": {
+            "type": "agent_async_decision",
+            "query": "test 196",
+            "memories_used": 2,
+            "answer_preview": "note"
+          }
+        }
+      },
+      {
+        "timestamp": "2026-01-08T19:17:34.813868",
+        "content": {
+          "timestamp": "2026-01-08T19:17:28.853475",
+          "content": {
+            "type": "agent_async_decision",
+            "query": "test 197",
+            "memories_used": 2,
+            "answer_preview": "note"
+          }
+        }
+      },
+      {
+        "timestamp": "2026-01-08T19:17:35.190247",
+        "content": {
+          "timestamp": "2026-01-08T19:17:29.239888",
+          "content": {
+            "type": "agent_async_decision",
+            "query": "test 198",
+            "memories_used": 2,
+            "answer_preview": "note"
+          }
+        }
+      },
+      {
+        "timestamp": "2026-01-08T19:17:35.554198",
+        "content": {
+          "timestamp": "2026-01-08T19:17:29.594470",
+          "content": {
+            "type": "agent_async_decision",
+            "query": "test 199",
+            "memories_used": 2,
+            "answer_preview": "note"
+          }
+        }
+      },
+      {
+        "timestamp": "2026-01-08T19:17:35.883319",
+        "content": {
+          "timestamp": "2026-01-08T19:17:29.975723",
+          "content": {
+            "type": "agent_async_decision",
+            "query": "test 200",
+            "memories_used": 2,
+            "answer_preview": "note"
+          }
+        }
+      },
+      {
+        "timestamp": "2026-01-08T19:17:36.229967",
+        "content": {
+          "timestamp": "2026-01-08T19:17:30.487117",
+          "content": {
+            "type": "agent_async_decision",
+            "query": "test 201",
+            "memories_used": 2,
+            "answer_preview": "note"
+          }
+        }
+      },
+      {
+        "timestamp": "2026-01-08T19:17:36.657066",
+        "content": {
+          "timestamp": "2026-01-08T19:17:30.814881",
+          "content": {
+            "type": "agent_async_decision",
+            "query": "test 202",
+            "memories_used": 2,
+            "answer_preview": "note"
+          }
+        }
+      },
+      {
+        "timestamp": "2026-01-08T19:17:37.030185",
+        "content": {
+          "timestamp": "2026-01-08T19:17:31.280694",
+          "content": {
+            "type": "agent_async_decision",
+            "query": "test 203",
+            "memories_used": 2,
+            "answer_preview": "note"
+          }
+        }
+      },
+      {
+        "timestamp": "2026-01-08T19:17:37.425215",
+        "content": {
+          "timestamp": "2026-01-08T19:17:31.594986",
+          "content": {
+            "type": "agent_async_decision",
+            "query": "test 204",
+            "memories_used": 2,
+            "answer_preview": "note"
+          }
+        }
+      },
+      {
+        "timestamp": "2026-01-08T19:17:37.863794",
+        "content": {
+          "timestamp": "2026-01-08T19:17:31.981458",
+          "content": {
+            "type": "agent_async_decision",
+            "query": "test 205",
+            "memories_used": 2,
+            "answer_preview": "note"
+          }
+        }
+      },
+      {
+        "timestamp": "2026-01-08T19:17:38.171418",
+        "content": {
+          "timestamp": "2026-01-08T19:17:34.504979",
+          "content": {
+            "type": "agent_async_decision",
+            "query": "test 206",
+            "memories_used": 2,
+            "answer_preview": "note"
+          }
+        }
+      },
+      {
+        "timestamp": "2026-01-08T19:17:38.532819",
+        "content": {
+          "timestamp": "2026-01-08T19:17:34.813722",
+          "content": {
+            "type": "agent_async_decision",
+            "query": "test 207",
+            "memories_used": 2,
+            "answer_preview": "note"
+          }
+        }
+      },
+      {
+        "timestamp": "2026-01-08T19:17:38.924868",
+        "content": {
+          "timestamp": "2026-01-08T19:17:35.190109",
+          "content": {
+            "type": "agent_async_decision",
+            "query": "test 208",
+            "memories_used": 2,
+            "answer_preview": "note"
+          }
+        }
+      },
+      {
+        "timestamp": "2026-01-08T19:17:39.234290",
+        "content": {
+          "timestamp": "2026-01-08T19:17:35.553995",
+          "content": {
+            "type": "agent_async_decision",
+            "query": "test 209",
+            "memories_used": 2,
+            "answer_preview": "note"
+          }
+        }
+      },
+      {
+        "timestamp": "2026-01-08T19:17:39.600253",
+        "content": {
+          "timestamp": "2026-01-08T19:17:35.883152",
+          "content": {
+            "type": "agent_async_decision",
+            "query": "test 210",
+            "memories_used": 2,
+            "answer_preview": "note"
+          }
+        }
+      },
+      {
+        "timestamp": "2026-01-08T19:17:39.959971",
+        "content": {
+          "timestamp": "2026-01-08T19:17:36.229784",
+          "content": {
+            "type": "agent_async_decision",
+            "query": "test 211",
+            "memories_used": 2,
+            "answer_preview": "note"
+          }
+        }
+      },
+      {
+        "timestamp": "2026-01-08T19:17:40.311315",
+        "content": {
+          "timestamp": "2026-01-08T19:17:36.656901",
+          "content": {
+            "type": "agent_async_decision",
+            "query": "test 212",
+            "memories_used": 2,
+            "answer_preview": "note"
+          }
+        }
+      },
+      {
+        "timestamp": "2026-01-08T19:17:40.659965",
+        "content": {
+          "timestamp": "2026-01-08T19:17:37.030020",
+          "content": {
+            "type": "agent_async_decision",
+            "query": "test 213",
+            "memories_used": 2,
+            "answer_preview": "note"
+          }
+        }
+      },
+      {
+        "timestamp": "2026-01-08T19:17:40.993433",
+        "content": {
+          "timestamp": "2026-01-08T19:17:37.425071",
+          "content": {
+            "type": "agent_async_decision",
+            "query": "test 214",
+            "memories_used": 2,
+            "answer_preview": "note"
+          }
+        }
+      },
+      {
+        "timestamp": "2026-01-08T19:17:42.371171",
+        "content": {
+          "timestamp": "2026-01-08T19:17:37.862799",
+          "content": {
+            "type": "agent_async_decision",
+            "query": "test 215",
+            "memories_used": 2,
+            "answer_preview": "note"
+          }
+        }
+      },
+      {
+        "timestamp": "2026-01-08T19:17:42.691418",
+        "content": {
+          "timestamp": "2026-01-08T19:17:38.171282",
+          "content": {
+            "type": "agent_async_decision",
+            "query": "test 216",
+            "memories_used": 2,
+            "answer_preview": "note"
+          }
+        }
+      },
+      {
+        "timestamp": "2026-01-08T19:17:43.175520",
+        "content": {
+          "timestamp": "2026-01-08T19:17:38.532676",
+          "content": {
+            "type": "agent_async_decision",
+            "query": "test 217",
+            "memories_used": 2,
+            "answer_preview": "note"
+          }
+        }
+      },
+      {
+        "timestamp": "2026-01-08T19:17:43.551596",
+        "content": {
+          "timestamp": "2026-01-08T19:17:38.924734",
+          "content": {
+            "type": "agent_async_decision",
+            "query": "test 218",
+            "memories_used": 2,
+            "answer_preview": "note"
+          }
+        }
+      },
+      {
+        "timestamp": "2026-01-08T19:17:43.921757",
+        "content": {
+          "timestamp": "2026-01-08T19:17:39.234147",
+          "content": {
+            "type": "agent_async_decision",
+            "query": "test 219",
+            "memories_used": 2,
+            "answer_preview": "note"
+          }
+        }
+      },
+      {
+        "timestamp": "2026-01-08T19:17:44.244981",
+        "content": {
+          "timestamp": "2026-01-08T19:17:39.600120",
+          "content": {
+            "type": "agent_async_decision",
+            "query": "test 220",
+            "memories_used": 2,
+            "answer_preview": "note"
+          }
+        }
+      },
+      {
+        "timestamp": "2026-01-08T19:17:44.621140",
+        "content": {
+          "timestamp": "2026-01-08T19:17:39.959824",
+          "content": {
+            "type": "agent_async_decision",
+            "query": "test 221",
             "memories_used": 2,
             "answer_preview": "note"
           }
