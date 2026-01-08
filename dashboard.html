@@ -264,14 +264,26 @@ cat > dashboard.html << 'EOF'
     }
 
     async function loadSystemStats() {
-        try {
-            const r = await fetch("http://127.0.0.1:8000/status");
-            const data = await r.json();
-            document.getElementById("memory-count").innerText = data.memories_loaded;
-        } catch {
-            document.getElementById("memory-count").innerText = "❌";
-        }
+    try {
+        const r = await fetch("http://127.0.0.1:8000/status");
+        const data = await r.json();
+
+        // Memories
+        document.getElementById("memory-count").innerText = data.vector_store.vectors_count;
+
+        // Task text lines
+        document.getElementById("task-api").innerText = `API → ${data.api === "live" ? "✅ LIVE" : "❌ DOWN"}`;
+        document.getElementById("task-ui").innerText = `UI → ${data.ui_live ? "✅ LIVE" : "❌ DOWN"}`;
+        document.getElementById("task-bot").innerText = `Bot → ${data.bot_live ? "✅ LIVE" : "❌ DOWN"}`;
+
+    } catch (e) {
+        document.getElementById("memory-count").innerText = "❌";
+        document.getElementById("task-api").innerText = "API → ❌ ERROR";
+        document.getElementById("task-ui").innerText = "UI → ❌ ERROR";
+        document.getElementById("task-bot").innerText = "Bot → ❌ ERROR";
     }
+}
+
 
     async function refreshAll() {
         await checkHealth("http://127.0.0.1:8000", "api-status", "api-status-panel", "task-api", "API");
