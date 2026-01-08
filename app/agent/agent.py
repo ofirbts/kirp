@@ -24,3 +24,27 @@ async def agent_query(question: str):
         "answer": response,
         "agent_mode": True
     }
+
+from app.services.trace_logger import log_event
+
+def run_agent(question: str, memories: list, trace_id: str = None):
+    if trace_id:
+        log_event(trace_id, "agent_started", {"memory_count": len(memories)})
+    
+    # קוד קיים שלך...
+    # (אל תשנה כלום פה)
+    
+    if trace_id:
+        log_event(trace_id, "agent_decision", {
+            "answer": answer,
+            "suggestions": suggestions
+        })
+    
+    return {
+        "answer": answer,
+        "sources": memories,
+        "suggestions": suggestions,
+        "trace_id": trace_id,
+        "agent_mode": True
+    }
+

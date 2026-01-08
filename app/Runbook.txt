@@ -1,6 +1,6 @@
 🔁 פעם אחת בלבד (התקנה)
-cd ~/projects/kirp
 python3 -m venv venv
+cd ~/projects/kirp
 source venv/bin/activate
 pip install -r requirements.txt
 
@@ -63,3 +63,58 @@ pip freeze | egrep "langchain|openai|faiss|fastapi"
 
 git acsess
 ssh -T git@github.com
+
+
+--------------------------------------- 3 טרמינלים:
+🚦 טרמינל 1 — KIRP API (הלב)
+text
+פקודה מדויקת:
+cd ~/projects/kirp && source venv/bin/activate && uvicorn app.main:app --host 127.0.0.1 --port 8000
+תפקיד: API + Memory Ranking + Notion
+צפוי: "🚀 KIRP API fully ready!"
+פורט: 8000 ✅ אל תסגור!
+
+🚦 טרמינל 2 — Streamlit UI (המסך)
+text
+פקודה מדויקת:
+cd ~/projects/kirp/ui && streamlit run app.py --server.port 8501 --server.address 0.0.0.0
+תפקיד: ממשק משתמש + Ask KIRP
+צפוי: http://localhost:8501
+פורט: 8501 ✅ אל תסגור!
+
+🚦 טרמינל 3 — WhatsApp Bot (השער)
+text
+פקודה מדויקת:
+cd ~/projects/kirp && source venv/bin/activate && python whatsapp-bot.py
+תפקיד: WhatsApp → Agent → Notion
+צפוי: "💬 WhatsApp Bot @ localhost:5000"
+פורט: 5000 ✅ אל תסגור!
+
+🧪 בדיקות סופיות (טרמינל 4 — העתק בדיוק):
+text
+בדיקה 1 — API:
+curl http://127.0.0.1:8000/health
+
+בדיקה 2 — WhatsApp Health:  
+curl http://127.0.0.1:5000/health
+
+בדיקה 3 — Full WhatsApp Flow:
+curl -X POST http://127.0.0.1:5000/webhook -H "Content-Type: application/json" -d '{"message":"schedule gym"}'
+
+עם דוקר:
+הפעלה: docker-compose -f docker-compose.prod.yml up -d
+תוצאה: 3 פורטים זמינים בפקודה אחת!
+
+
+# 1. הפעל הכל (פקודה אחת!)
+cd ~/projects/kirp
+./start-kirp.sh
+
+# 2. גש ל-Dashboard (file:///home/ofir/projects/kirp/app/static/dashboard.html)
+# 3. צור משימות:
+curl -X POST "http://127.0.0.1:8000/agent/" -H "Content-Type: application/json" -d '{"question":"meeting 3PM"}'
+# העתק trace_id → 
+curl -X POST "http://127.0.0.1:8000/agent/confirm" -H "Content-Type: application/json" -d '{"trace_id":"ה-trace_id","confirm":true}'
+
+# 4. עצור הכל
+Ctrl+C
