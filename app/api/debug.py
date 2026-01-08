@@ -1,26 +1,37 @@
-from fastapi import APIRouter
-from app.rag.vector_store import debug_info
-from app.storage.memory import memory_collection
+from fastapi import APIRouter, HTTPException
+from app.core.persistence import PersistenceManager
+from app.agent.agent import agent
 
-router = APIRouter(tags=["Debug"])
-
-
-@router.get("/vector-store")
-def vector_store_debug():
-    return debug_info()
+router = APIRouter(prefix="/debug", tags=["debug"])
 
 
-@router.get("/memory")
-async def debug_memory():
-    cursor = memory_collection.find()
-    items = []
+@router.get("/sessions")
+def list_sessions():
+    return PersistenceManager.list_sessions()
 
-    async for doc in cursor:
-        doc["_id"] = str(doc["_id"])
-        items.append(doc)
+@router.get("/metrics")
+def metrics():
+    return agent.metrics.snapshot()
 
-    return {
-        "total": len(items),
-        "items": items
-    }
+@router.get("/sessions/{session_id}")
+def get_session(session_id: str):
+    session = PersistenceManager.load_session(session_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+    return session
 
+
+@router.get("/agent/state")
+def get_agent_state():
+    return agent.dump_state()
+
+
+@router.post("/agent/reset")
+def reset_agent():
+    agent.reset()
+    return {"status": "agent reset"}
+
+
+@router.get("/events")
+def get_events(limit: int = 100):
+    return PersistenceManager.read_events(limit)

@@ -1,0 +1,11 @@
+<!DOCTYPE html>
+<html>
+<body>
+<h1>Sessions</h1>
+<ul>
+{% for s in sessions %}
+  <li><a href="/ui/sessions/{{s}}">{{s}}</a></li>
+{% endfor %}
+</ul>
+</body>
+</html>

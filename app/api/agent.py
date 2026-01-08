@@ -1,74 +1,39 @@
-from fastapi import APIRouter
-from pydantic import BaseModel
-from typing import List
-import uuid
+from fastapi import APIRouter, HTTPException
+from app.core.persistence import PersistenceManager
+from app.agent.agent import agent
 
-from app.rag.retriever import retrieve_context
-from app.llm.client import get_llm
-from app.services.trace_logger import log_event
-
-router = APIRouter(tags=["Agent"])
+router = APIRouter(prefix="/debug", tags=["debug"])
 
 
-class AgentRequest(BaseModel):
-    question: str
+@router.get("/sessions")
+def list_sessions():
+    return PersistenceManager.list_sessions()
 
 
-AGENT_PROMPT = """
-You are a proactive personal assistant.
-
-Given the following memories:
-{context}
-
-Answer the user's question.
-If there is a helpful action to suggest, suggest it politely.
-"""
+@router.get("/metrics")
+def metrics():
+    return agent.metrics.snapshot()
 
 
-@router.post("/")
-async def agent_endpoint(request: AgentRequest):
-    trace_id = str(uuid.uuid4())[:8]
-
-    try:
-        # 1️⃣ שליפת זיכרונות אמיתיים (FAISS + chunks + ranking)
-        memories = retrieve_context(request.question)
-
-        log_event(trace_id, "agent_retrieved_memories", {
-            "count": len(memories)
-        })
-
-        # 2️⃣ בניית prompt
-        context_text = "\n\n---\n\n".join(memories)
-        llm = get_llm()
-
-        answer = await llm.apredict(
-            AGENT_PROMPT.format(context=context_text)
-        )
-
-        # 3️⃣ תשובה אמיתית
-        return {
-            "answer": answer,
-            "agent_mode": True,
-            "sources": memories,
-            "suggestions": [],
-            "trace_id": trace_id
-        }
-
-    except Exception as e:
-        return {
-            "answer": f"Agent error: {str(e)}",
-            "agent_mode": False,
-            "sources": [],
-            "suggestions": [],
-            "trace_id": trace_id
-        }
+@router.get("/sessions/{session_id}")
+def get_session(session_id: str):
+    session = PersistenceManager.load_session(session_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+    return session
 
 
-@router.post("/confirm")
-async def confirm_agent(request: dict):
-    trace_id = request.get("trace_id", "unknown")
-    return {
-        "status": "executed",
-        "trace_id": trace_id
-    }
+@router.get("/agent/state")
+def get_agent_state():
+    return agent.dump_state()
 
+
+@router.post("/agent/reset")
+def reset_agent():
+    agent.reset()
+    return {"status": "agent reset"}
+
+
+@router.get("/events")
+def get_events(limit: int = 100):
+    return PersistenceManager.read_events(limit)

@@ -1,6 +1,7 @@
 from typing import List, Dict, Any
 from app.rag.retriever import retrieve_context
 from app.rag.rag_engine import generate_answer
+from app.core.persistence import PersistenceManager
 
 
 def detect_intents(query: str) -> List[str]:
@@ -41,6 +42,15 @@ def agent_rag_pipeline(
         {"intent": i, "action": "reason"}
         for i in intents
     ]
+
+    # 🔥 Persistence hook — agent decision
+    PersistenceManager.append_event("agent_decision", {
+        "session_id": session_id,
+        "query": query,
+        "intents": intents,
+        "confidence": explain_summary["confidence_overall"],
+        "memories_used": len(memories)
+    })
 
     return {
         "answer_text": generate_answer(memories, query),
