@@ -17,6 +17,7 @@ from app.api.self_improving import router as self_improving_router
 from app.ui.ui import router as ui_router
 from app.api.agent_query import router as agent_query_router
 from app.api.debug_memory import router as debug_memory_router
+from app.api.webhooks_whatsapp import router as whatsapp_router
 
 # --- NEW: Imports של הרכיבים החדשים ---
 from app.api.observability import router as observability_router 
@@ -106,6 +107,10 @@ app.include_router(self_improving_router, prefix="/agent", tags=["Agent"])
 app.include_router(observability_router, prefix="/observability", tags=["Observability"])
 app.include_router(policy_router, prefix="/policy", tags=["Policy"])
 app.include_router(ui_router, prefix="/ui", tags=["UI"])
+governance_router = APIRouter(prefix="/governance", tags=["Governance"])
+app.include_router(governance_router)
+app.include_router(whatsapp_router)
+
 
 # Custom Business Logic Routers
 tasks_router = APIRouter(tags=["tasks"], prefix="/tasks")

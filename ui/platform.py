@@ -144,3 +144,7 @@ with tab_integrations:
 
     st.subheader("Future Integrations")
     st.write("Slack, Email, CRM, Analytics – all via plugin system.")
+    
+with tab_agent:
+    st.subheader("Pending Approvals")
+    st.write("Pulling from Notion…")
