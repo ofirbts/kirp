@@ -199,24 +199,10 @@ class Agent:
         result = await self.executor.execute(plan, self)
         return result
 
-    def run_agent(self, question: str, memories: List[Dict[str, Any]], trace_id: Optional[str] = None) -> Dict[str, Any]:
-        assert_invariant(question is not None, "Agent decision without question")
-        assert_invariant(memories is not None, "Agent decision without memories")
-        self.metrics.inc("agent_decisions")
-        
-        top_text = memories[0].get("text", "") if memories else ""
-        answer = f"Based on your memories, here's what I see: {top_text}"
-        suggestions: List[str] = []
-
-        self._record_internal_memory("short", {
-            "type": "agent_sync_decision",
-            "query": question,
-            "memories_used": len(memories),
-        })
-
-        self._state["total_queries"] += 1
-        PersistenceManager.append_event("agent_async_decision", {"question": question, "answer": answer})
-
-        return {"answer": answer, "sources": memories, "suggestions": suggestions, "agent_mode": True}
+def run_agent(self, *args, **kwargs):
+    raise RuntimeError(
+        "run_agent() is deprecated. "
+        "Use async agent_query() via Planner/Executor."
+    )
 
 agent = Agent()

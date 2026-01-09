@@ -1,0 +1,120 @@
+{"id": "c3fdd87a-3761-4a71-867f-ae8a1e7adbd3", "type": "self_evaluation", "timestamp": "2026-01-08T20:26:56.101636", "payload": {"score": 0.0, "recommendation": "ok"}}
+{"id": "8daa22ba-10a7-4428-ae1a-744024213167", "type": "self_evaluation", "timestamp": "2026-01-08T20:27:27.812259", "payload": {"score": 0.0, "recommendation": "ok"}}
+{"id": "62a2f6c2-93aa-45f8-a33e-098464eac8f8", "type": "self_evaluation", "timestamp": "2026-01-08T20:28:07.408216", "payload": {"score": 0.0, "recommendation": "ok"}}
+{"id": "904d84f9-51aa-4f17-a1b1-ff373373bed9", "type": "self_evaluation", "timestamp": "2026-01-08T20:28:16.567928", "payload": {"score": 0.0, "recommendation": "ok"}}
+{"id": "fc0cecc4-297c-40f6-b584-b4684ff740d8", "type": "self_evaluation", "timestamp": "2026-01-08T20:28:26.953514", "payload": {"score": 0.0, "recommendation": "ok"}}
+{"id": "b63ebdda-c736-44b0-8ae9-e706cac4bdbd", "type": "self_evaluation", "timestamp": "2026-01-08T20:28:38.578922", "payload": {"score": 0.0, "recommendation": "ok"}}
+{"id": "e36c2727-cca1-4452-81d0-688295341ac4", "type": "self_evaluation", "timestamp": "2026-01-08T20:29:40.072958", "payload": {"score": 0.0, "recommendation": "ok"}}
+{"id": "2b38e653-3077-42fd-9e1f-1e65742bdf4f", "type": "self_evaluation", "timestamp": "2026-01-08T20:29:49.687287", "payload": {"score": 0.0, "recommendation": "ok"}}
+{"id": "43fca651-cdea-4171-b665-8cf39e03e8ea", "type": "self_evaluation", "timestamp": "2026-01-08T20:30:16.773298", "payload": {"score": 0.0, "recommendation": "ok"}}
+{"id": "bd5d9c52-a64e-4bb6-af60-c30d728e87b7", "type": "self_evaluation", "timestamp": "2026-01-08T20:32:46.446609", "payload": {"score": 0.0, "recommendation": "ok"}}
+{"id": "f49b9291-6ee4-4805-8a84-20f3294f4f4b", "type": "agent_decision", "timestamp": "2026-01-08T20:35:51.390635", "payload": {"session_id": "healthcheck_agent", "query": "How do we price the premium subscription?", "intents": ["pricing"], "confidence": 0.476, "memories_used": 1}}
+{"id": "62d53a15-e3bd-48d5-8447-f446b4558940", "type": "agent_decision", "timestamp": "2026-01-08T20:35:52.095116", "payload": {"session_id": "healthcheck_ltm", "query": "How do we price the premium subscription?", "intents": ["pricing"], "confidence": 0.476, "memories_used": 1}}
+{"id": "16af0014-710a-4ea6-82a9-5e974f64994f", "type": "session_update", "timestamp": "2026-01-08T20:35:52.095268", "payload": {"session_id": "healthcheck_ltm", "added_memories": 1}}
+{"id": "599cc5f0-b4dd-4f11-8d28-934266b31cff", "type": "agent_decision", "timestamp": "2026-01-08T20:35:52.802970", "payload": {"session_id": "healthcheck_self", "query": "How do we price the premium subscription?", "intents": ["pricing"], "confidence": 0.476, "memories_used": 1}}
+{"id": "6beb9702-ff5c-4a4a-88eb-5fa36c3fb58c", "type": "session_update", "timestamp": "2026-01-08T20:35:52.803123", "payload": {"session_id": "healthcheck_self", "added_memories": 1}}
+{"id": "00102cc0-7fc2-44e2-aaef-7fa081c9bba7", "type": "agent_decision", "timestamp": "2026-01-08T20:35:56.967499", "payload": {"session_id": "test_session_full", "query": "How should we price the premium subscription?", "intents": ["pricing"], "confidence": 0.49, "memories_used": 2}}
+{"id": "57640bc4-7dbd-416c-b655-2175d53bd73b", "type": "session_update", "timestamp": "2026-01-08T20:35:56.967669", "payload": {"session_id": "test_session_full", "added_memories": 2}}
+{"id": "381df798-a757-408d-bf10-830286210f6b", "type": "self_evaluation", "timestamp": "2026-01-08T20:36:32.603362", "payload": {"score": 0.0, "recommendation": "ok"}}
+{"id": "35ae6b66-700e-4a48-ae84-bdb8867027fc", "type": "self_evaluation", "timestamp": "2026-01-08T20:36:45.603249", "payload": {"score": 0.0, "recommendation": "ok"}}
+{"id": "e04fd6c8-b213-40d6-994e-2019ba201354", "type": "self_evaluation", "timestamp": "2026-01-08T20:37:02.641074", "payload": {"score": 0.0, "recommendation": "ok"}}
+{"id": "52d45df9-7941-4bd3-9bd0-b7a8a13e090e", "type": "self_evaluation", "timestamp": "2026-01-08T20:37:18.704349", "payload": {"score": 0.0, "recommendation": "ok"}}
+{"id": "e785351d-f037-46ca-a1db-529e4961e225", "type": "self_evaluation", "timestamp": "2026-01-08T20:40:25.116887", "payload": {"score": 0.0, "recommendation": "ok"}}
+{"id": "6868ecc0-8fdf-413f-b60c-a25ad3ec0483", "type": "self_evaluation", "timestamp": "2026-01-08T20:40:51.133315", "payload": {"score": 0.0, "recommendation": "ok"}}
+{"id": "2dff8c61-90ab-481a-b6e2-fda842c517a1", "type": "self_evaluation", "timestamp": "2026-01-08T20:41:16.045118", "payload": {"score": 0.0, "recommendation": "ok"}}
+{"id": "63f293c4-f155-4793-9e41-4e9f28d384c1", "type": "self_evaluation", "timestamp": "2026-01-08T20:43:13.327363", "payload": {"score": 0.0, "recommendation": "ok"}}
+{"id": "0dc12135-0380-4ca5-b118-2b7e507a45d5", "type": "self_evaluation", "timestamp": "2026-01-08T20:51:56.199743", "payload": {"score": 0.0, "recommendation": "ok"}}
+{"id": "f17bdc6b-0df3-4007-9e5f-7561110b656d", "type": "self_evaluation", "timestamp": "2026-01-08T20:52:06.759175", "payload": {"score": 0.0, "recommendation": "ok"}}
+{"id": "e31bb489-70bb-4599-ac12-4e3793dbd06a", "type": "self_evaluation", "timestamp": "2026-01-08T20:58:11.606160", "payload": {"score": 0.0, "recommendation": "ok"}}
+{"id": "cc78fb91-52da-4d46-b741-f8126aaf19da", "type": "self_evaluation", "timestamp": "2026-01-08T20:58:22.690382", "payload": {"score": 0.0, "recommendation": "ok"}}
+{"id": "281a9a3e-29d5-4e25-bc96-a7cc0218eb5f", "type": "self_evaluation", "timestamp": "2026-01-08T20:58:54.553552", "payload": {"score": 0.0, "recommendation": "ok"}}
+{"id": "4e8ecca9-ee1e-4840-a0f0-457494112430", "type": "self_evaluation", "timestamp": "2026-01-08T20:59:09.371877", "payload": {"score": 0.0, "recommendation": "ok"}}
+{"id": "dc58c4b2-b77c-42aa-a9e5-af403c45856b", "type": "self_evaluation", "timestamp": "2026-01-08T21:07:29.180028", "payload": {"score": 0.0, "recommendation": "ok"}}
+{"id": "b8151dee-313a-470d-ae48-e9f057fcbd8d", "type": "self_evaluation", "timestamp": "2026-01-08T21:09:55.509102", "payload": {"score": 0.0, "recommendation": "ok"}}
+{"id": "0c736dc3-b1cb-4bad-a3cc-9e58edb021c4", "type": "self_evaluation", "timestamp": "2026-01-08T21:11:01.555663", "payload": {"score": 0.0, "recommendation": "ok"}}
+{"id": "eb20f689-b06d-455c-9a51-4bfd500331b9", "type": "self_evaluation", "timestamp": "2026-01-08T21:11:23.257554", "payload": {"score": 0.0, "recommendation": "ok"}}
+{"id": "f17580ad-5cdf-454b-9be0-ced7778406d5", "type": "self_evaluation", "timestamp": "2026-01-08T21:12:19.441406", "payload": {"score": 0.0, "recommendation": "ok"}}
+{"id": "f211337b-40d3-438d-8ed6-c4e83c612421", "type": "self_evaluation", "timestamp": "2026-01-08T21:16:01.405668", "payload": {"score": 0.0, "recommendation": "ok"}}
+{"id": "cad4fba8-9bb6-468b-8016-ca4dc2763741", "type": "self_evaluation", "timestamp": "2026-01-08T21:17:56.780331", "payload": {"score": 0.0, "recommendation": "ok"}}
+{"id": "b84952f1-d096-43c6-afff-a92274d7e43c", "type": "self_evaluation", "timestamp": "2026-01-08T21:18:11.537844", "payload": {"score": 0.0, "recommendation": "ok"}}
+{"id": "dd0d56ef-d0e5-46ec-a8c7-298052c32d45", "type": "self_evaluation", "timestamp": "2026-01-08T21:20:33.663169", "payload": {"score": 0.0, "recommendation": "ok"}}
+{"id": "5b087859-f492-4a90-876c-2cd57849e414", "type": "self_evaluation", "timestamp": "2026-01-08T21:20:50.202527", "payload": {"score": 0.0, "recommendation": "ok"}}
+{"id": "9534ade5-419c-4a04-98d3-45e210abf551", "type": "self_evaluation", "timestamp": "2026-01-08T21:21:03.707027", "payload": {"score": 0.0, "recommendation": "ok"}}
+{"id": "375f1395-d9dc-4f57-9a59-843a405ac090", "type": "self_evaluation", "timestamp": "2026-01-08T21:24:11.013531", "payload": {"score": 0.0, "recommendation": "ok"}}
+{"id": "bb374490-1651-485b-ad50-e61b5bfdc18b", "type": "self_evaluation", "timestamp": "2026-01-08T21:30:01.112547", "payload": {"score": 0.0, "recommendation": "ok"}}
+{"id": "9c4dedae-82a8-4cd5-801b-73d4a916d884", "type": "self_evaluation", "timestamp": "2026-01-08T21:32:55.030370", "payload": {"score": 0.0, "recommendation": "ok"}}
+{"id": "31e8dcfc-4057-4869-bfdd-17807adf8589", "type": "self_evaluation", "timestamp": "2026-01-08T21:35:33.472576", "payload": {"score": 0.0, "recommendation": "ok"}}
+{"id": "ee16d38f-0948-4a25-a544-87ef9950d222", "type": "self_evaluation", "timestamp": "2026-01-08T21:39:13.862770", "payload": {"score": 0.0, "recommendation": "ok"}}
+{"id": "e955d2ba-776b-4225-8b17-bfc4c3e0accf", "type": "agent_decision", "timestamp": "2026-01-08T21:40:05.285435", "payload": {"session_id": "healthcheck_agent", "query": "How do we price the premium subscription?", "intents": ["pricing"], "confidence": 0.476, "memories_used": 1}}
+{"id": "ab075912-9e77-4125-928a-a43d1fa500db", "type": "agent_decision", "timestamp": "2026-01-08T21:40:05.689758", "payload": {"session_id": "healthcheck_ltm", "query": "How do we price the premium subscription?", "intents": ["pricing"], "confidence": 0.476, "memories_used": 1}}
+{"id": "bd9b2254-0cbf-494f-a9fb-019b30137bc9", "type": "session_update", "timestamp": "2026-01-08T21:40:05.689905", "payload": {"session_id": "healthcheck_ltm", "added_memories": 1}}
+{"id": "fd1fe660-cd90-40cc-88de-912fe7ae6c64", "type": "agent_decision", "timestamp": "2026-01-08T21:40:06.075336", "payload": {"session_id": "healthcheck_self", "query": "How do we price the premium subscription?", "intents": ["pricing"], "confidence": 0.476, "memories_used": 1}}
+{"id": "a81c54fa-0e7f-4ca6-86f6-fd9391eada50", "type": "session_update", "timestamp": "2026-01-08T21:40:06.075672", "payload": {"session_id": "healthcheck_self", "added_memories": 1}}
+{"id": "99e30f0b-36fa-479b-93f2-6d43158ab63c", "type": "agent_decision", "timestamp": "2026-01-08T21:40:11.166204", "payload": {"session_id": "test_session_full", "query": "How should we price the premium subscription?", "intents": ["pricing"], "confidence": 0.489, "memories_used": 2}}
+{"id": "32b05f9c-c3db-45fc-a37f-c0b9f14d6d69", "type": "session_update", "timestamp": "2026-01-08T21:40:11.166377", "payload": {"session_id": "test_session_full", "added_memories": 2}}
+{"id": "7322a38a-fdce-49ee-b2e5-501eb01f544d", "type": "agent_decision", "timestamp": "2026-01-08T21:41:45.337461", "payload": {"session_id": "healthcheck_agent", "query": "How do we price the premium subscription?", "intents": ["pricing"], "confidence": 0.476, "memories_used": 1}}
+{"id": "8a6b90e4-50c0-4b5f-8cef-cfc788bfd5ea", "type": "agent_decision", "timestamp": "2026-01-08T21:41:45.765116", "payload": {"session_id": "healthcheck_ltm", "query": "How do we price the premium subscription?", "intents": ["pricing"], "confidence": 0.476, "memories_used": 1}}
+{"id": "9c49b382-94c7-43c1-83e3-096ff02cb06c", "type": "session_update", "timestamp": "2026-01-08T21:41:45.765276", "payload": {"session_id": "healthcheck_ltm", "added_memories": 1}}
+{"id": "9d520c2f-dc1b-470b-85ff-24e417627747", "type": "agent_decision", "timestamp": "2026-01-08T21:41:46.615193", "payload": {"session_id": "healthcheck_self", "query": "How do we price the premium subscription?", "intents": ["pricing"], "confidence": 0.476, "memories_used": 1}}
+{"id": "5c92b05d-49a0-4406-8cf9-6364fa7a3ad5", "type": "session_update", "timestamp": "2026-01-08T21:41:46.615347", "payload": {"session_id": "healthcheck_self", "added_memories": 1}}
+{"id": "c7506f22-bb9f-46b1-9d93-46e07359c981", "type": "agent_decision", "timestamp": "2026-01-08T21:41:49.001127", "payload": {"session_id": "test_session_full", "query": "How should we price the premium subscription?", "intents": ["pricing"], "confidence": 0.489, "memories_used": 2}}
+{"id": "3cc097e9-8a53-4a81-a2e5-579cd662a606", "type": "session_update", "timestamp": "2026-01-08T21:41:49.001290", "payload": {"session_id": "test_session_full", "added_memories": 2}}
+{"id": "2fbe306d-bddd-4298-8cf4-2aeb13d78f19", "type": "self_evaluation", "timestamp": "2026-01-08T21:46:34.336340", "payload": {"score": 0.0, "recommendation": "ok"}}
+{"id": "16ea092d-a342-40df-bb5e-833ca2d27357", "type": "self_evaluation", "timestamp": "2026-01-08T21:48:14.125791", "payload": {"score": 0.0, "recommendation": "ok"}}
+{"id": "0749ad0c-de25-4226-a813-60feea097a77", "type": "agent_decision", "timestamp": "2026-01-08T21:49:08.849601", "payload": {"session_id": "healthcheck_agent", "query": "How do we price the premium subscription?", "intents": ["pricing"], "confidence": 0.476, "memories_used": 1}}
+{"id": "e2c8462d-fb2a-49f4-aab0-6f6a1d581184", "type": "agent_decision", "timestamp": "2026-01-08T21:49:09.168147", "payload": {"session_id": "healthcheck_ltm", "query": "How do we price the premium subscription?", "intents": ["pricing"], "confidence": 0.476, "memories_used": 1}}
+{"id": "f598899f-d08d-4941-b4e1-324eb79c2615", "type": "session_update", "timestamp": "2026-01-08T21:49:09.168283", "payload": {"session_id": "healthcheck_ltm", "added_memories": 1}}
+{"id": "60f7d17e-982a-4e67-be03-d1957f5d199f", "type": "agent_decision", "timestamp": "2026-01-08T21:49:09.633001", "payload": {"session_id": "healthcheck_self", "query": "How do we price the premium subscription?", "intents": ["pricing"], "confidence": 0.476, "memories_used": 1}}
+{"id": "7e525eeb-70b4-4d60-bded-8e39d89ef28b", "type": "session_update", "timestamp": "2026-01-08T21:49:09.633144", "payload": {"session_id": "healthcheck_self", "added_memories": 1}}
+{"id": "10df8678-34ff-41a6-a184-6941b1ca4a7b", "type": "agent_decision", "timestamp": "2026-01-08T21:49:11.963989", "payload": {"session_id": "test_session_full", "query": "How should we price the premium subscription?", "intents": ["pricing"], "confidence": 0.489, "memories_used": 2}}
+{"id": "e47ff2e3-61e3-4386-a0f1-da3fa39189af", "type": "session_update", "timestamp": "2026-01-08T21:49:11.964168", "payload": {"session_id": "test_session_full", "added_memories": 2}}
+{"id": "087910fd-8c57-41c4-a664-78f6d038399d", "type": "self_evaluation", "timestamp": "2026-01-08T21:49:25.521089", "payload": {"score": 0.0, "recommendation": "ok"}}
+{"id": "a1a3fa26-bacd-435a-9832-bbeb830def29", "type": "agent_decision", "timestamp": "2026-01-08T21:58:33.135119", "payload": {"session_id": "healthcheck_agent", "query": "How do we price the premium subscription?", "intents": ["pricing"], "confidence": 0.476, "memories_used": 1}}
+{"id": "de4350e0-e598-47df-b259-0fe4b12a6c70", "type": "agent_decision", "timestamp": "2026-01-08T21:58:33.700512", "payload": {"session_id": "healthcheck_ltm", "query": "How do we price the premium subscription?", "intents": ["pricing"], "confidence": 0.476, "memories_used": 1}}
+{"id": "3967cf57-6ecf-4f0e-a7bf-8df2fc744968", "type": "session_update", "timestamp": "2026-01-08T21:58:33.700663", "payload": {"session_id": "healthcheck_ltm", "added_memories": 1}}
+{"id": "bf18db8d-0376-4b68-b532-e3d0cfba1bc3", "type": "agent_decision", "timestamp": "2026-01-08T21:58:34.021363", "payload": {"session_id": "healthcheck_self", "query": "How do we price the premium subscription?", "intents": ["pricing"], "confidence": 0.476, "memories_used": 1}}
+{"id": "7a366cea-14c2-425a-a2b8-432ff27e5d6c", "type": "session_update", "timestamp": "2026-01-08T21:58:34.021691", "payload": {"session_id": "healthcheck_self", "added_memories": 1}}
+{"id": "09487050-6baf-45e9-b253-25191b85a704", "type": "agent_decision", "timestamp": "2026-01-08T21:58:36.617690", "payload": {"session_id": "test_session_full", "query": "How should we price the premium subscription?", "intents": ["pricing"], "confidence": 0.489, "memories_used": 2}}
+{"id": "3bf75758-c84e-44ec-a99c-0dc12d35f1f8", "type": "session_update", "timestamp": "2026-01-08T21:58:36.617844", "payload": {"session_id": "test_session_full", "added_memories": 2}}
+{"id": "9a55179c-5b70-4d76-b824-9430f934fe35", "type": "agent_decision", "timestamp": "2026-01-08T21:59:24.511204", "payload": {"session_id": "healthcheck_agent", "query": "How do we price the premium subscription?", "intents": ["pricing"], "confidence": 0.476, "memories_used": 1}}
+{"id": "8930cdf6-c8e3-4e39-867c-468cdd4f8f86", "type": "agent_decision", "timestamp": "2026-01-08T21:59:24.784535", "payload": {"session_id": "healthcheck_ltm", "query": "How do we price the premium subscription?", "intents": ["pricing"], "confidence": 0.476, "memories_used": 1}}
+{"id": "261ae7b9-33f9-4023-8882-ac08002c6d56", "type": "session_update", "timestamp": "2026-01-08T21:59:24.784763", "payload": {"session_id": "healthcheck_ltm", "added_memories": 1}}
+{"id": "f3b84659-400f-4837-86d3-c4cbf55e9043", "type": "agent_decision", "timestamp": "2026-01-08T21:59:25.064103", "payload": {"session_id": "healthcheck_self", "query": "How do we price the premium subscription?", "intents": ["pricing"], "confidence": 0.476, "memories_used": 1}}
+{"id": "29d1067b-77de-4b6b-9ea7-184ce728a12f", "type": "session_update", "timestamp": "2026-01-08T21:59:25.064291", "payload": {"session_id": "healthcheck_self", "added_memories": 1}}
+{"id": "f695ce17-bab8-4fd6-b24c-f07b3444b1df", "type": "agent_decision", "timestamp": "2026-01-08T21:59:27.620802", "payload": {"session_id": "test_session_full", "query": "How should we price the premium subscription?", "intents": ["pricing"], "confidence": 0.489, "memories_used": 2}}
+{"id": "e0ad62e0-5bf9-4603-bf97-f8f2dc029f33", "type": "session_update", "timestamp": "2026-01-08T21:59:27.620949", "payload": {"session_id": "test_session_full", "added_memories": 2}}
+{"id": "887558c2-362f-4813-b600-9fbc4423ad9c", "type": "self_evaluation", "timestamp": "2026-01-08T22:10:24.936049", "payload": {"score": 0.0, "recommendation": "ok"}}
+{"id": "23aa494e-27ce-4619-8505-0fdfd08d93d4", "type": "self_evaluation", "timestamp": "2026-01-08T22:10:40.229688", "payload": {"score": 0.0, "recommendation": "ok"}}
+{"id": "14ba0633-76ef-473c-8b18-ca27a9f10540", "type": "self_evaluation", "timestamp": "2026-01-08T22:11:03.974605", "payload": {"score": 0.0, "recommendation": "ok"}}
+{"id": "3e629a5e-3b64-457e-990e-0670f68ff2d1", "type": "self_evaluation", "timestamp": "2026-01-08T22:11:12.600690", "payload": {"score": 0.0, "recommendation": "ok"}}
+{"id": "202001ef-db5d-424e-bc81-60cea1604cdd", "type": "self_evaluation", "timestamp": "2026-01-08T22:11:19.428327", "payload": {"score": 0.0, "recommendation": "ok"}}
+{"id": "eed54520-7122-4862-874c-1b14d8a3ef6c", "type": "self_evaluation", "timestamp": "2026-01-08T22:11:24.358889", "payload": {"score": 0.0, "recommendation": "ok"}}
+{"id": "cfabc3e7-887d-4b25-945a-b1c2db642043", "type": "self_evaluation", "timestamp": "2026-01-08T22:11:29.705309", "payload": {"score": 0.0, "recommendation": "ok"}}
+{"id": "4a82574b-4d56-46a4-8317-f688f149ff9c", "type": "self_evaluation", "timestamp": "2026-01-08T22:12:38.366171", "payload": {"score": 0.0, "recommendation": "ok"}}
+{"id": "edeaf14b-bbde-4767-b0c7-87faa4d5eb3c", "type": "self_evaluation", "timestamp": "2026-01-08T22:15:25.909258", "payload": {"score": 0.0, "recommendation": "ok"}}
+{"id": "93c5ec24-9606-4b50-b291-df8045fcaeea", "type": "self_evaluation", "timestamp": "2026-01-08T22:15:58.858841", "payload": {"score": 0.0, "recommendation": "ok"}}
+{"id": "921e5fac-dfae-4c96-a3b2-5557610c17c5", "type": "self_evaluation", "timestamp": "2026-01-08T22:17:04.103821", "payload": {"score": 0.0, "recommendation": "ok"}}
+{"id": "414eab7a-c928-44b5-ac1f-eceddb04b713", "type": "self_evaluation", "timestamp": "2026-01-08T22:25:09.842630", "payload": {"score": 0.0, "recommendation": "ok"}}
+{"id": "1ffbb404-6736-46b7-afa0-a69c43be172a", "type": "self_evaluation", "timestamp": "2026-01-08T22:25:21.554528", "payload": {"score": 0.0, "recommendation": "ok"}}
+{"id": "44c4e06c-6620-4a06-b46a-4b661ebc4c3c", "type": "self_evaluation", "timestamp": "2026-01-08T22:32:06.261288", "payload": {"score": 0.0, "recommendation": "ok"}}
+{"id": "4c3d1ce7-768e-42da-8779-fedf2cb71f20", "type": "self_evaluation", "timestamp": "2026-01-08T22:32:51.440875", "payload": {"score": 0.0, "recommendation": "ok"}}
+{"id": "c1ce6219-de9a-4d42-a3da-076736396022", "type": "self_evaluation", "timestamp": "2026-01-08T22:33:21.520494", "payload": {"score": 0.0, "recommendation": "ok"}}
+{"id": "260f9df1-0b2d-42ac-88c4-f0ddae23fe76", "type": "self_evaluation", "timestamp": "2026-01-08T22:35:50.311450", "payload": {"score": 0.0, "recommendation": "ok"}}
+{"id": "21325a4e-252b-41c7-971f-478b5d12b606", "type": "self_evaluation", "timestamp": "2026-01-08T22:36:28.401333", "payload": {"score": 0.0, "recommendation": "ok"}}
+{"id": "d7f8afa2-6ac8-4df7-acb1-903c473f195b", "type": "self_evaluation", "timestamp": "2026-01-08T22:36:59.106529", "payload": {"score": 0.0, "recommendation": "ok"}}
+{"id": "c56ff53c-f6d6-431e-995b-9d99cab92c1a", "type": "self_evaluation", "timestamp": "2026-01-08T22:37:20.880030", "payload": {"score": 0.0, "recommendation": "ok"}}
+{"id": "16250666-cd48-4bd8-be30-5eb69e3bbfb5", "type": "self_evaluation", "timestamp": "2026-01-08T22:38:18.338984", "payload": {"score": 0.0, "recommendation": "ok"}}
+{"id": "1d5f99de-1dad-4b80-bd29-9f903b322d59", "type": "self_evaluation", "timestamp": "2026-01-08T22:40:17.422350", "payload": {"score": 0.0, "recommendation": "ok"}}
+{"id": "0ac53087-4468-411a-b58d-487e807b9c6c", "type": "self_evaluation", "timestamp": "2026-01-08T22:42:31.477617", "payload": {"score": 0.0, "recommendation": "ok"}}
+{"id": "d6f9867c-eb02-4276-9d09-825444f12f02", "type": "self_evaluation", "timestamp": "2026-01-08T22:47:29.963463", "payload": {"score": 0.0, "recommendation": "ok"}}
+{"id": "6828dd82-b4e9-487e-aed4-da9c3dc3e2ca", "type": "self_evaluation", "timestamp": "2026-01-08T22:48:05.126646", "payload": {"score": 0.0, "recommendation": "ok"}}
+{"id": "b2555119-ded4-4a94-8729-45c8919e7d76", "type": "self_evaluation", "timestamp": "2026-01-08T22:48:19.092497", "payload": {"score": 0.0, "recommendation": "ok"}}
+{"id": "394accee-3107-4ba6-9f29-1a1a0a2f587f", "type": "self_evaluation", "timestamp": "2026-01-08T22:48:28.790217", "payload": {"score": 0.0, "recommendation": "ok"}}
+{"id": "912e1c12-5b03-423a-8894-766575028c56", "type": "self_evaluation", "timestamp": "2026-01-08T22:48:41.361531", "payload": {"score": 0.0, "recommendation": "ok"}}
+{"id": "23215e15-0020-48de-885b-bb892f4c9607", "type": "self_evaluation", "timestamp": "2026-01-08T22:48:48.867170", "payload": {"score": 0.0, "recommendation": "ok"}}
+{"id": "0987eafb-e21f-4b6b-ac77-84df386e90c5", "type": "self_evaluation", "timestamp": "2026-01-08T22:48:57.719065", "payload": {"score": 0.0, "recommendation": "ok"}}
+{"id": "541d8fbf-0cf0-463a-92cc-3d1386b25f0b", "type": "self_evaluation", "timestamp": "2026-01-08T22:49:02.305107", "payload": {"score": 0.0, "recommendation": "ok"}}
+{"id": "1beba294-5187-4bb1-a03f-525a4121427d", "type": "self_evaluation", "timestamp": "2026-01-08T22:49:26.203851", "payload": {"score": 0.0, "recommendation": "ok"}}
+{"id": "8efb38e6-2e3d-4576-8ec0-f6c38c5502f6", "type": "self_evaluation", "timestamp": "2026-01-08T22:49:56.368683", "payload": {"score": 0.0, "recommendation": "ok"}}
+{"id": "49800194-3158-414e-b2c9-a12fef31dd1c", "type": "self_evaluation", "timestamp": "2026-01-08T22:50:17.730995", "payload": {"score": 0.0, "recommendation": "ok"}}
+{"id": "12c47bec-c25d-4498-9d76-509d742632cf", "type": "self_evaluation", "timestamp": "2026-01-08T22:51:55.480797", "payload": {"score": 0.0, "recommendation": "ok"}}

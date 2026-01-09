@@ -1,105 +1,107 @@
-# KIRP — Autonomous Knowledge Agent Platform
+# KIRP — Deterministic Multi-Agent Intelligence Platform
 
-KIRP is a research-grade autonomous agent system designed to ingest knowledge,
-reason over it, explain its decisions, and deterministically replay its behavior.
+KIRP is a deterministic, event-driven, multi-agent RAG system designed for
+replayable intelligence, observability, and controlled evolution.
 
-This is not a chatbot demo.
-It is an agent architecture with guarantees.
-
----
-
-## What KIRP Is
-
-KIRP is a backend AI system that combines:
-
-- Retrieval-Augmented Generation (RAG)
-- Multi-plane memory (knowledge / session / events)
-- Self-improving confidence estimation
-- Explainable agent decisions
-- Deterministic replay for audit and trust
+This is not a chatbot.
+This is an **Agent Platform**.
 
 ---
 
-## Core Capabilities
+## 🎯 Core Guarantees (Locked)
 
-### 🔍 Retrieval & Knowledge
-- FAISS-backed vector store
-- Semantic + logical deduplication
-- Metadata-normalized memories
+- Deterministic replay: agent state = function(events)
+- Event-sourced decision making
+- Multi-agent orchestration (Planner, Executor, Critic, Verifier)
+- Unified knowledge plane (vector store + replay)
+- Snapshot + fast restore
+- Tenant-isolated memory
+- Explainability for every decision
+- Observability (QPS, drift, memory, replay)
+- Tool-enabled agents (Phase 1)
 
-### 🧠 Agent Architecture
-- Planner / Executor split
-- Intent detection and reasoning
-- Policy-guarded execution
+---
 
-### 🧾 Explainability
-Every decision produces:
-- Why specific memories were retrieved
-- What the agent decided
-- Confidence estimation
+## �� Architecture Overview
 
-### 🔁 Deterministic Replay
-- All mutations are event-driven
-- Agent state can be reconstructed exactly
-- Replay certification script included
 
-### 📊 Observability
+User / API
+↓
+PlannerAgent
+↓
+ExecutorAgent
+↓
+Core Agent
+├── RAG (FAISS / Qdrant)
+├── MemoryManager (short/mid/long)
+├── KnowledgeStore
+├── ToolAgent
+├── Critic / Verifier
+↓
+Events → Persistence → Replay
+
+---
+
+## 🔁 Replay & Determinism
+
+All state mutations emit events.
+Replaying the same event stream produces the same state.
+
+Replay is certified via:
+tools/assert_replay_deterministic.py
+
+---
+
+## 📊 Observability
+
 - Query rate (QPS)
-- Confidence drift
+- Retrieval drift
 - Memory growth
-- Debug endpoints
+- Agent state
+- Vector store health
+
+Available via:
+- REST API
+- Streamlit Dashboard
 
 ---
 
-## Architecture (Conceptual)
+## 🧩 Multi-Agent System
 
-User Query
-   ↓
-Planner Agent
-   ↓
-Executor Agent
-   ↓
-Retrieval (RAG)
-   ↓
-Memory Planes
-   ├─ Knowledge (vector)
-   ├─ Session (ephemeral)
-   └─ Events (replay)
-   ↓
-Explainability + Observability
+- Planner — decomposes intent
+- Executor — executes plans
+- Critic — evaluates answers
+- Verifier — checks consistency
+- Negotiation engine — resolves conflicts
 
 ---
 
-## Example Flow
+## 🛠 Tool Usage (Phase 1)
 
-1. Ingest knowledge via `/ingest`
-2. Query agent via `/agent/query`
-3. Agent retrieves, reasons, answers
-4. Decision is explained and persisted
-5. Full behavior can be replayed offline
+Tools are invoked via deterministic heuristics.
+Autonomous LLM-based tool selection is **explicitly out of scope** for this phase.
 
 ---
 
-## System Guarantees
+## 🚫 Explicitly Not Included
 
-- Deterministic replay
-- Explainable decisions
-- Memory growth control
-- Extensible agent design
-
----
-
-## Status
-
-Feature-complete research-grade backend system.
-
-Suitable for:
-- Advanced AI engineering roles
-- Research prototypes
-- Agent-based product foundations
+- Autonomous self-modifying agents
+- Black-box learning without events
+- Non-replayable memory
+- Hidden prompts or policies
 
 ---
 
-## License
+## �� Validation
 
-MIT
+Run full system check:
+```bash
+python tools/check_kirp_full.py
+
+Replay certification:
+python tools/assert_replay_deterministic.py
+
+📦 Status
+
+Engineering Closed
+Further changes require explicit version bump and contract update.
