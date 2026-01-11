@@ -1,0 +1,32 @@
+import streamlit as st
+from app.core.metrics import Metrics
+from app.core.observability import Observability
+from app.core.tenant import TenantContext
+
+st.set_page_config(page_title="KIRP Control Plane", layout="wide")
+
+st.markdown("""
+## 🚀 KIRP Enterprise Control Plane
+**Governed Intelligence • Memory • Observability**
+""")
+
+# Sidebar
+st.sidebar.markdown("## 🧩 Tenant Control")
+tenant = st.sidebar.selectbox(
+    "Active Tenant",
+    ["default", "demo", "enterprise"]
+)
+TenantContext.set(tenant)
+st.sidebar.success(f"🟢 Active: {tenant}")
+
+metrics = Metrics.snapshot()
+obs = Observability.snapshot()
+
+c1, c2, c3, c4 = st.columns(4)
+c1.metric("🟢 System Health", "OK")
+c2.metric("🧠 Queries", metrics.get("qps", 0))
+c3.metric("📈 Drift", f"{obs.get('drift', 0)}%")
+c4.metric("💾 Memory (MB)", obs.get("memory_mb", 0))
+
+st.markdown("### 🧠 Agent State")
+st.json(obs.get("agent_state", {}))

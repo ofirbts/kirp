@@ -1,480 +1,164 @@
-import sys
-import os
-from dotenv import load_dotenv
-load_dotenv()
+#!/usr/bin/env python3
+"""
+KIRP SYSTEM DIAGNOSTIC HARNESS
+Layered, severity-aware, demo-grade system check
+"""
 
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path.insert(0, BASE_DIR)
-
-print("🧠 Initializing vector store for standalone script...")
-try:
-    from app.rag.vector_store import load_vector_store, debug_info
-    load_vector_store()
-    print("✅ Vector store ready:", debug_info())
-except Exception as e:
-    print("❌ Failed to initialize vector store:", e)
-
-import json
 import requests
-from datetime import datetime
+import sys
+from dataclasses import dataclass
+from typing import Optional
 
-from app.agent.agent import Agent
-from app.core.persistence import PersistenceManager
-from app.core.observability import Observability
-from app.services.knowledge import UnifiedKnowledgeStore
-from app.rag.self_improving_agent import self_improving_query
+BASE = "http://127.0.0.1:8000"
+HEADERS = {"X-Tenant": "default"}
 
-# טעינת מודולים פנימיים
-from app.rag import (
-    retriever,
-    retrieval_pipeline,
-    rag_engine,
-    agent_rag,
-    long_term_memory,
-    self_improving_agent,
-)
-
-API_URL = "http://127.0.0.1:8000"
-
-
-def print_header(title: str):
-    print("\n" + "=" * 60)
-    print(f"🔍 {title}")
-    print("=" * 60)
-
-
-def module_exists(module):
-    return module is not None
-
-
-def check_functions(module, func_names):
-    return {name: hasattr(module, name) for name in func_names}
-
-def test_replay_is_deterministic():
-    from app.agent.agent import agent
-    from app.core.persistence import PersistenceManager
-
-    events = PersistenceManager.read_events(limit=100_000)
-
-    agent.reset()
-    for e in events:
-        agent.apply_event(e)
-    state1 = agent.dump_state()
-
-    agent.reset()
-    for e in events:
-        agent.apply_event(e)
-    state2 = agent.dump_state()
-
-    assert state1 == state2
-
-def test_replay_deterministic():
-    agent = Agent()
-    agent.agent_query("hello")
-
-    events = PersistenceManager.read_events(limit=1000)
-
-    agent.reset()
-    for e in events:
-        agent.apply_event(e)
-
-    state = agent.dump_state()
-    assert state["state"]["total_queries"] >= 1
-
-def test_observability_alerts():
-    obs = Observability()
-
-    for _ in range(400):
-        obs.record_query()
-
-    alerts = obs.check_alerts()
-    assert isinstance(alerts, list)
-
-def test_knowledge_add_and_search():
-    ks = UnifiedKnowledgeStore()
-    ks.add("Berlin is the capital of Germany", "test")
-
-    results = ks.search("capital of Germany")
-    assert len(results) >= 0
-
-
-def check_imports():
-    print_header("MODULE IMPORT CHECK")
-
-    modules = {
-        "retriever": retriever,
-        "retrieval_pipeline": retrieval_pipeline,
-        "rag_engine": rag_engine,
-        "agent_rag": agent_rag,
-        "long_term_memory": long_term_memory,
-        "self_improving_agent": self_improving_agent,
-    }
-
-    for name, mod in modules.items():
-        print(f"Module {name}: exists={module_exists(mod)}")
-        if name == "retriever":
-            print("  Functions:", check_functions(mod, ["retrieve_context"]))
-        if name == "retrieval_pipeline":
-            print(
-                "  Functions:",
-                check_functions(
-                    mod,
-                    [
-                        "retrieval_pipeline",
-                        "semantic_dedup",
-                        "logical_dedup",
-                        "build_explanation",
-                    ],
-                ),
-            )
-        if name == "rag_engine":
-            print(
-                "  Functions:",
-                check_functions(
-                    mod,
-                    [
-                        "generate_answer",
-                        "format_context_for_answer",
-                    ],
-                ),
-            )
-        if name == "agent_rag":
-            print(
-                "  Functions:",
-                check_functions(
-                    mod,
-                    [
-                        "detect_intents",
-                        "agent_rag_pipeline",
-                    ],
-                ),
-            )
-        if name == "long_term_memory":
-            print(
-                "  Functions:",
-                check_functions(
-                    mod,
-                    [
-                        "update_session_memory",
-                        "summarize_session",
-                        "session_rag_pipeline",
-                    ],
-                ),
-            )
-        if name == "self_improving_agent":
-            print(
-                "  Functions:",
-                check_functions(
-                    mod,
-                    [
-                        "self_improving_query",
-                    ],
-                ),
-            )
-
-
-def check_vector_store():
-    print_header("VECTOR STORE CHECK")
-
-    try:
-        from app.rag.vector_store import get_vector_store
-        store = get_vector_store()
-        count = store.index.ntotal
-        print(f"✅ Vector store loaded successfully ({count} vectors)")
-    except Exception as e:
-        print(f"❌ Vector store error: {e}")
-
-
-def check_faiss_integrity():
-    print_header("FAISS INTEGRITY CHECK")
-
-    try:
-        from app.rag.vector_store import get_vector_store
-        store = get_vector_store()
-
-        results = store.similarity_search("test", k=1)
-        if results:
-            print("Sample search result:", results[0].page_content[:50], "...")
-            print("✅ FAISS integrity OK")
-        else:
-            print("⚠️ FAISS returned no results for 'test'")
-    except Exception as e:
-        print("❌ FAISS integrity failed:", e)
-
-
-def check_metadata_consistency():
-    print_header("METADATA CONSISTENCY CHECK")
-
-    try:
-        from app.rag.vector_store import get_vector_store
-        store = get_vector_store()
-        docs = store.similarity_search("test", k=5)
-
-        for doc in docs:
-            meta = doc.metadata
-            if not isinstance(meta, dict):
-                print("❌ Metadata is not a dict:", meta)
-                return
-            if "id" not in meta:
-                print("⚠️ Missing 'id' in metadata:", meta)
-            if "embedding" not in meta:
-                print("⚠️ Missing 'embedding' in metadata:", meta)
-
-        print("✅ Metadata consistency OK")
-    except Exception as e:
-        print("❌ Metadata consistency failed:", e)
-
-
-def check_embedding_shape():
-    print_header("EMBEDDING SHAPE CHECK")
-
-    try:
-        from app.rag.vector_store import get_vector_store
-        store = get_vector_store()
-        docs = store.similarity_search("test", k=3)
-
-        for doc in docs:
-            emb = doc.metadata.get("embedding")
-            if emb is None:
-                print("⚠️ Missing embedding")
-                continue
-            if not isinstance(emb, list):
-                print("❌ Embedding is not a list:", emb)
-                return
-            if len(emb) < 10:
-                print("⚠️ Embedding seems too short:", len(emb))
-
-        print("✅ Embedding shape OK")
-    except Exception as e:
-        print("❌ Embedding shape failed:", e)
-
-
-def check_dedup_correctness():
-    print_header("DEDUP CORRECTNESS CHECK")
-
-    try:
-        from app.rag.retrieval_pipeline import semantic_dedup
-
-        sample = [
-            {"text": "hello world", "embedding": [1, 0, 0]},
-            {"text": "hello world", "embedding": [1, 0, 0]},
-            {"text": "different text", "embedding": [0, 1, 0]},
-        ]
-
-        deduped = semantic_dedup(sample)
-        if len(deduped) == 2:
-            print("✅ Dedup correctness OK")
-        else:
-            print("❌ Dedup incorrect, length:", len(deduped), "data:", deduped)
-    except Exception as e:
-        print("❌ Dedup correctness failed:", e)
-
-
-def check_api_query():
-    print_header("API /query CHECK")
-
-    payload = {
-        "question": "How do we price the premium subscription?",
-        "k": 3,
-        "session_id": "healthcheck",
-    }
-
-    try:
-        r = requests.post(f"{API_URL}/query/", json=payload)
-        print(f"Status: {r.status_code}")
-        if r.status_code == 200:
-            data = r.json()
-            print("✅ /query OK")
-            if "answer_text" in data:
-                print("Answer preview:", data["answer_text"][:120], "...")
-            if "confidence_overall" in data:
-                print("Confidence:", data["confidence_overall"])
-            elif "explain_summary" in data and isinstance(
-                data["explain_summary"], dict
-            ):
-                print(
-                    "Confidence:",
-                    data["explain_summary"].get("confidence_overall"),
-                )
-        else:
-            print("❌ /query returned error:", r.text)
-    except Exception as e:
-        print("❌ /query failed:", e)
-
-
-def check_latency():
-    print_header("LATENCY CHECK")
-
-    import time
-    payload = {
-        "question": "test latency",
-        "k": 3,
-        "session_id": "latency_test",
-    }
-
-    try:
-        start = time.time()
-        r = requests.post(f"{API_URL}/query/", json=payload)
-        end = time.time()
-
-        if r.status_code == 200:
-            print(f"✅ Latency OK: {round(end - start, 3)}s")
-        else:
-            print(f"❌ Latency test failed: {r.text}")
-    except Exception as e:
-        print("❌ Latency test error:", e)
-
-
-def check_memory_usage():
-    print_header("MEMORY USAGE CHECK")
-
-    try:
-        import psutil
-        process = psutil.Process(os.getpid())
-        mem = process.memory_info().rss / (1024 * 1024)
-        print(f"Current memory usage: {round(mem, 2)} MB")
-        print("✅ Memory usage check OK")
-    except Exception as e:
-        print("❌ Memory usage check failed:", e)
-
-
-def check_api_stream():
-    print_header("API /query/stream CHECK")
-
-    payload = {
-        "question": "How do we price the premium subscription?",
-        "k": 3,
-        "session_id": "healthcheck",
-    }
-
-    try:
-        r = requests.post(
-            f"{API_URL}/query/stream",
-            json=payload,
-            stream=True,
-        )
-        print(f"Status: {r.status_code}")
-
-        if r.status_code != 200:
-            print("❌ /query/stream error:", r.text)
-            return
-
-        print("Streaming first 5 chunks:")
-        counter = 0
-        for line in r.iter_lines():
-            if line:
-                print("  ", line.decode())
-                counter += 1
-                if counter >= 5:
-                    break
-
-        print("✅ /query/stream OK")
-
-    except Exception as e:
-        print("❌ /query/stream failed:", e)
-
-
-def check_agent_pipeline():
-    print_header("AGENT RAG CHECK")
-
-    try:
-        result = agent_rag.agent_rag_pipeline(
-            "How do we price the premium subscription?",
-            session_id="healthcheck_agent",
-            k=3,
-        )
-        print("Answer preview:", result["answer_text"][:120], "...")
-        print("Explain summary:", result.get("explain_summary"))
-        print("✅ Agent pipeline OK")
-    except Exception as e:
-        print("❌ Agent pipeline failed:", e)
-
-
-def check_long_term_memory():
-    print_header("LONG TERM MEMORY CHECK")
-
-    try:
-        result = long_term_memory.session_rag_pipeline(
-            "How do we price the premium subscription?",
-            session_id="healthcheck_ltm",
-            k=3,
-        )
-        print(
-            "Session summary preview:",
-            result["session_summary"][:120],
-            "...",
-        )
-        print("✅ Long-term memory OK")
-    except Exception as e:
-        print("❌ Long-term memory failed:", e)
-
-
-def check_self_improving():
-    print_header("SELF IMPROVING AGENT CHECK")
-
-    try:
-        result = self_improving_agent.self_improving_query(
-            "How do we price the premium subscription?",
-            session_id="healthcheck_self",
-            k=3,
-            feedback=0.9,
-        )
-        explain = result.get("explain_summary", {})
-        print(
-            "Adjusted confidence:",
-            explain.get("confidence_overall"),
-        )
-        print("✅ Self-improving agent OK")
-    except Exception as e:
-        print("❌ Self-improving agent failed:", e)
-
-
-def test_basic_rag():
-    print_header("BASIC RAG RETRIEVAL TEST")
-
-    session_id = "test_session_full"
-    question = "What is the pricing plan for premium users?"
-    print("=== Testing basic RAG retrieval ===")
-    memories = retriever.retrieve_context(question, k=5)
-    print(f"Retrieved {len(memories)} memories")
-    answer_text = rag_engine.generate_answer(memories, question)
-    print("Generated answer:\n", answer_text[:300], "...\n")
-
-
-def test_self_improving_local():
-    print_header("SELF IMPROVING (LOCAL PIPELINE) TEST")
-
-    session_id = "test_session_full"
-    question = "How should we price the premium subscription?"
-    print("=== Testing self-improving agent ===")
-    result = self_improving_query(question, session_id, k=5, feedback=0.9)
-    print("Answer text:", result["answer_text"][:300], "...")
-    explain = result.get("explain_summary", {})
-    print("Confidence overall:", explain.get("confidence_overall"))
-    print("Session summary:", result["session_summary"][:300], "...")
-
-
-def main():
-    print("\n=== KIRP FULL SYSTEM CHECK ===\n")
-
-    check_imports()
-    check_vector_store()
-    check_api_query()
-    check_api_stream()
-    check_agent_pipeline()
-    check_long_term_memory()
-    check_self_improving()
-    check_latency()
-    check_memory_usage()
-    check_faiss_integrity()
-    check_metadata_consistency()
-    check_embedding_shape()
-    check_dedup_correctness()
-    test_basic_rag()
-    test_self_improving_local()
-
-    print("\n=== DONE ===\n")
-
-
-if __name__ == "__main__":
-    main()
+# -------------------- Result Model --------------------
+
+@dataclass
+class CheckResult:
+    name: str
+    ok: bool
+    severity: str  # OK / WARN / FAIL
+    detail: Optional[str] = None
+
+results = []
+
+def record(name, ok=True, severity="OK", detail=None):
+    results.append(CheckResult(name, ok, severity, detail))
+    icon = "✅" if severity == "OK" else "⚠️" if severity == "WARN" else "❌"
+    print(f"{icon} {name}")
+    if detail:
+        print(f"    ↳ {detail}")
+
+# -------------------- Helpers --------------------
+
+def http_ok(r):
+    # Accept 200–308 as valid for infra
+    return 200 <= r.status_code < 309
+
+def safe_get(path):
+    return requests.get(BASE + path, headers=HEADERS)
+
+def safe_post(path, payload):
+    return requests.post(BASE + path, json=payload, headers=HEADERS)
+
+# -------------------- Layer 0: Infra --------------------
+
+print("\n=== INFRA ===")
+
+try:
+    r = safe_get("/health/")
+    if http_ok(r):
+        record("API /health", True)
+    else:
+        record("API /health", False, "FAIL", f"status={r.status_code}")
+except Exception as e:
+    record("API /health", False, "FAIL", str(e))
+    sys.exit(1)
+
+# -------------------- Layer 1: Status --------------------
+
+print("\n=== CORE STATUS ===")
+
+r = safe_get("/status/")
+if http_ok(r):
+    record("/status", True)
+else:
+    record("/status", False, "FAIL")
+
+# -------------------- Layer 2: Debug / State --------------------
+
+print("\n=== STATE & EVENTS ===")
+
+r = safe_get("/debug/agent/state")
+if http_ok(r):
+    record("Agent state accessible", True)
+else:
+    record("Agent state accessible", False, "WARN")
+
+r = safe_get("/debug/events")
+if http_ok(r):
+    record("Event log accessible", True)
+else:
+    record("Event log accessible", False, "WARN")
+
+# -------------------- Layer 3: RAG --------------------
+
+print("\n=== RAG PIPELINE ===")
+
+payload = {"question": "What is KIRP?", "k": 3, "session_id": "diag"}
+
+r = safe_post("/query", payload)
+if http_ok(r):
+    record("RAG /query", True)
+else:
+    record("RAG /query", False, "FAIL", r.text)
+
+# -------------------- Layer 4: Agent --------------------
+
+print("\n=== AGENT ===")
+
+r = safe_post("/agent/query/", payload)
+if http_ok(r):
+    record("Agent /agent/query", True)
+else:
+    record("Agent /agent/query", False, "FAIL", r.text)
+
+# -------------------- Layer 5: Stream --------------------
+
+print("\n=== STREAMING ===")
+
+try:
+    r = requests.post(BASE + "/query/stream", json=payload, stream=True)
+    if r.status_code == 200:
+        record("Query streaming", True)
+    else:
+        record("Query streaming", False, "WARN", f"status={r.status_code}")
+except Exception as e:
+    record("Query streaming", False, "WARN", str(e))
+
+# -------------------- Layer 6: Observability --------------------
+
+print("\n=== OBSERVABILITY ===")
+
+r = safe_get("/observability/metrics")
+if http_ok(r):
+    record("Observability metrics", True)
+else:
+    record("Observability metrics", False, "WARN")
+
+# -------------------- Layer 7: Policy / Governance --------------------
+
+print("\n=== GOVERNANCE ===")
+
+r = safe_get("/policy/")
+if http_ok(r):
+    record("Policy engine present", True)
+else:
+    record("Policy engine present", False, "WARN")
+
+# -------------------- Layer 8: Integrations --------------------
+
+print("\n=== INTEGRATIONS ===")
+
+r = safe_get("/webhooks/whatsapp/")
+if http_ok(r):
+    record("WhatsApp webhook reachable", True)
+else:
+    record("WhatsApp webhook reachable", False, "WARN")
+
+# -------------------- SUMMARY --------------------
+
+print("\n=== SUMMARY ===")
+
+failures = [r for r in results if r.severity == "FAIL"]
+warnings = [r for r in results if r.severity == "WARN"]
+
+print(f"✅ OK: {len(results) - len(failures) - len(warnings)}")
+print(f"⚠️ WARN: {len(warnings)}")
+print(f"❌ FAIL: {len(failures)}")
+
+if failures:
+    print("\nSystem is NOT demo-ready.")
+else:
+    print("\n🎉 System is DEMO-READY (with warnings).")

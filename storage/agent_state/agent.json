@@ -1,11 +1,62 @@
 {
   "state": {
-    "total_queries": 1577,
+    "total_queries": 1582,
     "last_answer": "note",
     "last_suggestions": []
   },
   "memory": {
-    "short": [],
+    "short": [
+      {
+        "timestamp": "2026-01-10T20:42:55.227920",
+        "content": {
+          "type": "agent_async_decision",
+          "query": "מה עושים מחר?",
+          "memories_used": 5,
+          "answer_preview": "note",
+          "memory_plane": "session"
+        }
+      },
+      {
+        "timestamp": "2026-01-10T20:43:13.218756",
+        "content": {
+          "type": "agent_async_decision",
+          "query": "מה עושים מחרתיים?",
+          "memories_used": 5,
+          "answer_preview": "note",
+          "memory_plane": "session"
+        }
+      },
+      {
+        "timestamp": "2026-01-10T20:49:18.606318",
+        "content": {
+          "type": "agent_async_decision",
+          "query": "מה התכנון להשבוע?",
+          "memories_used": 5,
+          "answer_preview": "note",
+          "memory_plane": "session"
+        }
+      },
+      {
+        "timestamp": "2026-01-10T20:51:04.328106",
+        "content": {
+          "type": "agent_async_decision",
+          "query": "כמה עולה חלב?",
+          "memories_used": 5,
+          "answer_preview": "note",
+          "memory_plane": "session"
+        }
+      },
+      {
+        "timestamp": "2026-01-10T21:10:55.088738",
+        "content": {
+          "type": "agent_async_decision",
+          "query": "מה עושים באירופה?",
+          "memories_used": 5,
+          "answer_preview": "note",
+          "memory_plane": "session"
+        }
+      }
+    ],
     "mid": [
       {
         "timestamp": "2026-01-08T16:06:04.927469",

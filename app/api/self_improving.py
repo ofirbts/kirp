@@ -14,7 +14,7 @@ class SelfImprovingRequest(BaseModel):
 @router.post("/")
 async def self_improving_endpoint(req: SelfImprovingRequest):
     return self_improving_query(
-        question=req.question,
+        query=req.question,
         session_id=req.session_id,
         k=req.k,
         feedback=req.feedback

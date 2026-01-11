@@ -66,3 +66,24 @@ def debug_info() -> Dict[str, Any]:
         }
     except:
         return {"ram_loaded": False, "disk_exists": disk_exists, "status": "Error"}
+
+def list_memories_for_ui(limit: int = 20):
+    """
+    Adapter for UI / Debug / Observability.
+    Returns flat, safe memory objects.
+    """
+    if _vector_store is None:
+        return []
+
+    docs = _vector_store.docstore._dict
+    memories = []
+
+    for i, doc in enumerate(docs.values()):
+        if i >= limit:
+            break
+        memories.append({
+            "content": doc.page_content,
+            "source": doc.metadata.get("source", "unknown")
+        })
+
+    return memories

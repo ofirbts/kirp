@@ -1,80 +1,43 @@
 import streamlit as st
-from api import get_health, ingest, get_tasks, weekly_summary, ask, get_status
+import requests
+import pandas as pd
 
-st.set_page_config(page_title="KIRP", layout="centered")
-st.title("🧠 KIRP – Personal Intelligence")
-col1, col2 = st.columns([3,1])
-try:
-    status = get_status()
-except:
-    status = {"memories_loaded": "API DOWN"}
+st.set_page_config(page_title="KIRP Intelligence", layout="wide")
 
-col1.metric("🧠 Memories Loaded", status.get("memories_loaded", 0))
-col2.metric("📋 Tasks", status.get("tasks_count", 0))
+BASE_URL = "http://localhost:8000"
 
-
-# --- Health ---
-with st.expander("🩺 System status"):
+def call_api(method, endpoint, json=None):
     try:
-        health = get_health()
-        st.json(health)
-        st.json(status)
-        st.success("✅ Server LIVE")
+        if method == "GET":
+            return requests.get(f"{BASE_URL}/{endpoint}").json()
+        return requests.post(f"{BASE_URL}/{endpoint}", json=json).json()
     except:
-        st.error("❌ Server down")
+        return None
 
-# --- Ingest ---
-st.header("📥 Add Memory")
-text = st.text_area("What happened?", height=80, placeholder="הכנס זיכרון חדש כאן...")
+st.title("🧠 KIRP Control Center")
 
-if st.button("💾 Save Memory") and text.strip():
-    try:
-        result = ingest(text)
-        chunks = result.get("chunks_added", 1)
-        st.success(f"✅ Added {chunks} memory chunks!")
-        st.rerun()
-    except Exception as e:
-        st.error(f"❌ API Error: {e}")
+col1, col2 = st.columns(2)
 
-# --- Tasks ---
-st.header("📋 Tasks")
-if st.button("🔄 Load Tasks"):
-    try:
-        response = get_tasks()
+with col1:
+    st.subheader("📥 Ingest")
+    txt = st.text_input("מידע חדש:")
+    if st.button("שמור"):
+        call_api("POST", "ingest/", json={"text": txt})
+        st.success("נשמר!")
 
-        # תיקון: שימוש במפתח ישיר במקום get()
-        tasks = response["tasks"]
+with col2:
+    st.subheader("🔍 Query")
+    q = st.text_input("שאלה:")
+    if st.button("שאל"):
+        res = call_api("POST", "query/", json={"query": q})
+        if res:
+            st.info(f"Answer: {res.get('answer_text')}")
+            # תצוגת Intent ו-Effects (משימה 7)
+            with st.expander("Show Logic (Intent & Effects)"):
+                st.json(res)
 
-        if tasks:
-            for task in tasks:
-                title = task.get("title", "No title")
-                status = task.get("status", "unknown")
-                st.write(f"• **{title}** — {status}")
-        else:
-            st.info("📭 No tasks found")
-
-    except Exception as e:
-        st.error(f"❌ Tasks error: {e}")
-
-# --- Weekly Summary ---
-st.header("📅 Weekly Summary")
-if st.button("✨ Generate Summary"):
-    try:
-        summary = weekly_summary()
-        st.success("✅ Summary ready!")
-        st.json(summary)
-    except Exception as e:
-        st.error(f"❌ Summary error: {e}")
-
-# --- Ask KIRP ---
-st.header("🔍 Ask KIRP")
-question = st.text_input("שאל שאלה", placeholder="הכנס כאן שאלה ..")
-
-if question and st.button("💭 Ask"):
-    with st.spinner("KIRP חושב..."):
-        try:
-            answer = ask(question)
-            st.markdown("### 💬 **תשובה:**")
-            st.write(answer.get("answer", str(answer)))
-        except Exception as e:
-            st.error(f"❌ KIRP error: {e}")
+st.divider()
+st.subheader("📜 Recent Events")
+events = call_api("GET", "debug/events")
+if events:
+    st.table(pd.DataFrame(events).tail(5))

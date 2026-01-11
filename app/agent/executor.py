@@ -1,36 +1,48 @@
 # app/agent/executor.py
 from typing import Dict, Any
-from app.runtime.sandbox import run_with_timeout
-
+import asyncio
+from app.services.notion import notion  # הייבוא נשאר אותו דבר
 
 class ExecutorAgent:
-    """
-    Executor that takes a plan and delegates to the core Agent.
-
-    This makes it easy to later plug in different execution backends or
-    add new actions while keeping the Agent's core logic reusable.
-    """
-
     async def execute(self, plan: Dict[str, Any], agent) -> Dict[str, Any]:
-        action = plan.get("action")
+        query = plan.get("query", "")
 
-        if action == "answer":
-            query = plan.get("query", "")
+        # 1️⃣ הרצה ישירה – async תקני
+        result = await self._run_query_step(query, agent)
 
-            # Wrap the execution inside sandbox timeout
-            def step():
-                # This is the synchronous wrapper that run_with_timeout expects
-                # It calls the async agent method using asyncio.run or loop.run_until_complete
-                import asyncio
-                return asyncio.run(agent._execute_query(query))
+        # 2️⃣ רישום ב-Notion – כאן השינוי המרכזי!
+        confidence = result.get("confidence", 1.0)
+        trace_id = result.get("explanation_id", "gen-" + query[:10])
 
-            result = run_with_timeout(step)
-            return result
+        # בדיקה אם השירות פעיל לפני הביצוע
+        if notion.enabled():
+            notion.create_task(
+                title=f"Query: {query[:50]}...",
+                trace_id=trace_id,
+                source="Agent",
+                confidence=confidence,
+            )
 
-        # Future actions (e.g. "search_only", "update_memory") can go here.
-        return {
-            "answer": "Unsupported action in plan.",
-            "sources": [],
-            "suggestions": [],
-            "agent_mode": True,
-        }
+        # 3️⃣ בדיקת אישורים - גם כאן כדאי להגן
+        if notion.enabled():
+            await self.process_approved_tasks()
+
+        return result
+
+    async def _run_query_step(self, query: str, agent) -> Dict[str, Any]:
+        return await asyncio.wait_for(
+            agent._execute_query(query),
+            timeout=30
+        )
+
+    async def process_approved_tasks(self):
+        # אין צורך לשנות את כל הלוגיקה כאן, 
+        # כי ה-if notion.enabled() למעלה כבר מגן עלינו
+        approved_tasks = notion.get_pending_approvals()
+        
+        for task in approved_tasks:
+            # ... שאר הקוד שלך ללא שינוי ...
+            properties = task.get("properties", {})
+            # וכו'
+            page_id = task["id"]
+            notion.update_status(page_id, "Done")

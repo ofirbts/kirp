@@ -1,13 +1,18 @@
 from fastapi import APIRouter
 import json
+from threading import Lock
 
 router = APIRouter()
+_lock = Lock()
+POLICY_FILE = "policies.json"
 
 @router.get("/")
 def get_policy():
-    return json.load(open("policies.json"))
+    with _lock:
+        return json.load(open(POLICY_FILE))
 
 @router.post("/")
 def update_policy(data: dict):
-    json.dump(data, open("policies.json", "w"), indent=2)
-    return {"status": "updated"}
+    with _lock:
+        json.dump(data, open(POLICY_FILE, "w"), indent=2)
+    return {"status": "updated", "policy": data}

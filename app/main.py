@@ -1,5 +1,4 @@
-from dotenv import load_dotenv
-load_dotenv()
+import app.bootstrap 
 
 from fastapi import FastAPI, APIRouter, Query, Request
 from contextlib import asynccontextmanager
@@ -32,6 +31,9 @@ from app.core.persistence import PersistenceManager
 from app.agent.agent import agent
 from app.core.state_snapshot import save_snapshot, load_snapshot
 from app.core.tenant import TenantContext
+from app.api.webhooks_twilio import router as twilio_router
+from app.api.memories import router as memories_router
+
 
 # אתחול מופעי הסוכנים
 multi_agent = MultiAgentOrchestrator()
@@ -109,7 +111,10 @@ app.include_router(policy_router, prefix="/policy", tags=["Policy"])
 app.include_router(ui_router, prefix="/ui", tags=["UI"])
 governance_router = APIRouter(prefix="/governance", tags=["Governance"])
 app.include_router(governance_router)
-app.include_router(whatsapp_router)
+#app.include_router(whatsapp_router)
+app.include_router(twilio_router)
+app.include_router(memories_router) 
+
 
 
 # Custom Business Logic Routers
@@ -136,5 +141,15 @@ async def weekly_summary():
 
 app.include_router(tasks_router)
 app.include_router(intelligence_router)
+
+@app.get("/")
+async def root():
+    return {
+        "app": "KIRP AI Platform",
+        "status": "running",
+        "api_docs": "/docs",
+        "agent_ui": "http://localhost:8502"
+    }
+
 
 print("🚀 KIRP API fully ready with Multi-Agent and Tenant Middleware!")
