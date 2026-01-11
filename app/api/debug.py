@@ -1,58 +1,28 @@
-from fastapi import APIRouter, HTTPException
-from app.core.persistence import PersistenceManager
+from fastapi import APIRouter
 from app.agent.agent import agent
+from app.core.persistence import PersistenceManager
 
-router = APIRouter(tags=["debug"])
+router = APIRouter()
 
-
-@router.get("/sessions")
-def list_sessions():
-    return PersistenceManager.list_sessions()
-
-
-@router.get("/metrics")
-def metrics():
-    return agent.metrics.snapshot()
-
-
-@router.get("/sessions/{session_id}")
-def get_session(session_id: str):
-    session = PersistenceManager.load_session(session_id)
-    if not session:
-        raise HTTPException(status_code=404, detail="Session not found")
-    return session
-
-
-@router.get("/agent/state")
-def get_agent_state():
+@router.get("/state")
+def debug_state():
     return agent.dump_state()
 
 
-@router.post("/agent/reset")
-def reset_agent():
-    agent.reset()
-    return {"status": "agent reset"}
+@router.get("/memories")
+def debug_memories():
+    snapshot = agent.memory_hub.snapshot(limit=50)
+    return {
+        "memories": snapshot["recent_memories"],
+        "stats": snapshot["stats"],
+        "total_vectors": snapshot["total_vectors"],
+    }
 
 
 @router.get("/events")
-def get_events(limit: int = 100):
-    return PersistenceManager.read_events(limit)
+def debug_events(limit: int = 50):
+    return PersistenceManager.read_events(limit=limit)
 
-
-@router.get("/observability")
-def observability():
-    return {
-        "qps": agent.observability.qps(),
-        "drift": agent.observability.drift(),
-        "alerts": agent.observability.check_alerts(),
-    }
-
-@router.get("/health/full")
-def full_health():
-    return {
-        "qps": agent.observability.qps(),
-        "drift": agent.observability.drift(),
-        "total_queries": agent.dump_state()["state"]["total_queries"],
-        "memory_snapshot": agent.dump_state()["memory"],
-    }
-
+@router.get("/timeline")
+def debug_timeline(limit: int = 50):
+    return PersistenceManager.read_events(limit=limit)

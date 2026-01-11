@@ -35,6 +35,7 @@ from app.api.webhooks_twilio import router as twilio_router
 from app.api.memories import router as memories_router
 
 
+
 # אתחול מופעי הסוכנים
 multi_agent = MultiAgentOrchestrator()
 negotiation = NegotiationEngine()
@@ -81,7 +82,12 @@ app = FastAPI(
     title="KIRP AI Platform",
     lifespan=lifespan,
 )
-
+@app.on_event("startup")
+async def startup_event():
+    print("🧠 Loading vector store...")
+    load_vector_store()
+    print("✅ Vector store ready:", debug_info())
+    
 # --- 🚀 הוספת ה-MIDDLEWARE הגלובלי כאן ---
 @app.middleware("http")
 async def tenant_middleware(request: Request, call_next):

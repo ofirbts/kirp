@@ -4,6 +4,7 @@ from typing import Optional, List, Dict, Any
 from langchain_community.vectorstores import FAISS
 from app.rag.embedder import get_embeddings
 
+
 VECTOR_STORE_PATH = Path("data/vector_store")
 VECTOR_STORE_PATH.mkdir(parents=True, exist_ok=True)
 
@@ -25,13 +26,30 @@ def add_texts(texts: List[str]) -> None:
 
 def add_texts_with_metadata(texts: List[str], metadatas: List[Dict[str, Any]]) -> int:
     global _vector_store
+
     embeddings = get_embeddings()
+
     if _vector_store is None:
-        _vector_store = FAISS.from_texts(texts, embeddings, metadatas=metadatas)
+        # 🔥 אתחול ראשון
+        _vector_store = FAISS.from_texts(
+            texts=texts,
+            embedding=embeddings,
+            metadatas=metadatas
+        )
     else:
-        _vector_store.add_texts(texts, metadatas=metadatas)
+        try:
+            _vector_store.add_texts(texts, metadatas=metadatas)
+        except AssertionError:
+            print("⚠️ Dimension mismatch – rebuilding index")
+            _vector_store = FAISS.from_texts(
+                texts=texts,
+                embedding=embeddings,
+                metadatas=metadatas
+            )
+
     _vector_store.save_local(str(VECTOR_STORE_PATH))
     return len(texts)
+
 
 def load_vector_store() -> None:
     global _vector_store

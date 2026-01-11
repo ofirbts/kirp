@@ -87,3 +87,11 @@
 {"id": "a60937b7-36c1-4020-a8a7-a5dbbd567671", "type": "ingest", "timestamp": "2026-01-11T12:29:56.489101", "payload": {"source": "api", "memory_type": "knowledge", "text_length": 31}}
 {"id": "4109fcca-9e08-4db7-b525-e5eb3b666055", "type": "knowledge_add", "timestamp": "2026-01-11T13:31:29.205364", "payload": {"content": "צריך לאסוף את הילדים מהגן", "source": "api", "hash": "a0606943747be3fb69b98d0c2fa95b18ddc5448def2957920a77e01458e2061a"}}
 {"id": "87b52c68-1f1a-4439-98f5-0fc55b42f88f", "type": "ingest", "timestamp": "2026-01-11T13:31:29.207161", "payload": {"source": "api", "memory_type": "knowledge", "text_length": 25}}
+{"id": "eed5d29b-c994-480c-a85f-17322c03de9c", "type": "agent_query", "timestamp": "2026-01-11T20:11:08.793090", "payload": {"query": "כמה עולה מטבע?", "memories": 0}}
+{"id": "8593cc12-5ec9-411b-8050-abb4c86183f8", "type": "agent_query", "timestamp": "2026-01-11T20:14:23.816700", "payload": {"query": "כמ העולה מטבע", "memories": 0}}
+{"id": "22cb41a3-2df1-45d1-a955-8ae9a96bacef", "type": "memory_add", "timestamp": "2026-01-11T20:14:33.498226", "payload": {"id": "0f8313d808b796fa069a51b2179e04d118e3cd2f21af5955c98c85949a451eac", "tier": "long", "source": "ui", "content_preview": "אני אוהב ארנבים"}}
+{"id": "823a7ddb-4f3b-4256-96e4-92cee998a9ff", "type": "agent_query", "timestamp": "2026-01-11T20:14:51.961442", "payload": {"query": "מה אני אוהב?\n", "memories": 0}}
+{"id": "80735c3d-a2ce-412f-903f-7f9426318ed7", "type": "memory_stored", "timestamp": "2026-01-11T22:31:36.467290", "payload": {"content": "תזכור שהפרויקט הזה נקרא KIRP", "tier": "long", "memory_id": "faiss"}}
+{"id": "cdcea071-c0b6-494f-a7d4-8c898e6894a6", "type": "memory_stored", "timestamp": "2026-01-11T22:36:09.432398", "payload": {"content": "תזכור שהפרויקט הזה נקרא KIRP", "tier": "long", "memory_id": "faiss"}}
+{"id": "a8cc966e-11b3-4d5a-8511-8fad280da46e", "type": "memory_stored", "timestamp": "2026-01-11T22:41:44.030566", "payload": {"content": "תזכור שהפרויקט הזה נקרא KIRP", "tier": "long", "memory_id": "faiss"}}
+{"id": "6369779a-453e-41d3-9ac7-c32e1e22e4fd", "type": "memory_stored", "timestamp": "2026-01-11T22:42:05.253770", "payload": {"content": "תזכור שהפרויקט הזה נקרא KIRP", "tier": "long", "memory_id": "faiss"}}

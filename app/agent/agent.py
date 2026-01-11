@@ -1,208 +1,161 @@
-# app/agent/agent.py
-from typing import Any, Dict, List, Optional
+import redis
+import json
+from typing import Any, Dict, List
 
-from app.rag.retriever import retrieve_context
 from app.llm.client import get_llm
-from app.services.memory import MemoryManager
-from app.services.trace_logger import log_event
 from app.core.persistence import PersistenceManager
 from app.core.explainability import ExplanationBuilder
 from app.core.metrics import Metrics
-from app.core.policy import PolicyEngine, PolicyViolation
-from app.services.knowledge import UnifiedKnowledgeStore
-from app.core.self_eval import SelfEvaluator
-from app.core.invariants import assert_invariant
-from app.core.events import EventApplier
 from app.core.observability import Observability
-from app.agent.planner import PlannerAgent
-from app.agent.executor import ExecutorAgent
-from app.agent.critic import CriticAgent
-from app.agent.verifier import VerifierAgent
+from app.core.invariants import assert_invariant
+from app.core.memory_hub import MemoryHub
+from app.core.intent_engine import IntentEngine
 
 AGENT_PROMPT = """
-You are a proactive personal assistant.
+You are an intelligent, precise assistant.
 
-Given the following memories:
+Context:
 {context}
 
-Decide if there is an action you could help with.
-If yes – suggest it politely.
-If no – answer normally.
+Answer clearly and concisely.
 """
 
 class Agent:
     def __init__(self) -> None:
-        self.explainer = ExplanationBuilder()
-        self.memory = MemoryManager()
         self.metrics = Metrics()
-        self.policy = PolicyEngine({
-            "update_memory": lambda p: len(str(p.get("content", ""))) < 10_000,
-            "self_modify": lambda p: False,
-        })
-        self.critic = CriticAgent()
-        self.verifier = VerifierAgent()
-
-        self.knowledge = UnifiedKnowledgeStore()
-        self.self_eval = SelfEvaluator()
         self.observability = Observability()
-        self.planner = PlannerAgent()
-        self.executor = ExecutorAgent()
+        self.explainer = ExplanationBuilder()
+        self.memory_hub = MemoryHub()
+        self.intent_engine = IntentEngine()
+        
+        # חיבור ל-Redis לצורך עדכון ה-UI
+        self.redis_client = redis.Redis(host='localhost', port=6379, decode_responses=True)
 
         self._state: Dict[str, Any] = {
             "total_queries": 0,
             "last_answer": None,
-            "last_suggestions": [],
         }
 
-    # ===== Persistence API =====
-
-    def load_state(self, data: Dict[str, Any]) -> None:
-        self._state = data.get("state", {
-            "total_queries": 0,
-            "last_answer": None,
-            "last_suggestions": [],
-        })
-        self.memory.load(data.get("memory", {}))
+    # ---------- State ----------
 
     def dump_state(self) -> Dict[str, Any]:
-        return {
-            "state": self._state,
-            "memory": self.memory.snapshot(),
-        }
+        return {"state": self._state}
 
-    # ===== Reset (for replay) =====
+    def load_state(self, data: Dict[str, Any]) -> None:
+        self._state = data.get("state", self._state)
 
     def reset(self) -> None:
-        self._state = {
-            "total_queries": 0,
-            "last_answer": None,
-            "last_suggestions": [],
-        }
-        self.memory = MemoryManager()
+        self._state = {"total_queries": 0, "last_answer": None}
 
-    # ===== Event-based replay API =====
+    # ---------- Core Query ----------
 
-    def apply_event(self, event: dict) -> None:
-        EventApplier().apply(self, event)
-
-    # ===== NEW: The missing query function =====
-    def query(self, text: str):
-        """
-        Public synchronous wrapper for the RAG pipeline.
-        Used by Orchestrator and Negotiation engines.
-        """
-        from app.rag.agent_rag import agent_rag_pipeline
-        result = agent_rag_pipeline(text)
-        return result.get("answer", "No answer found.")
-
-    # ===== Internal helpers =====
-
-    def _record_internal_memory(self, kind: str, content: Dict[str, Any]) -> None:
+    async def query(self, question: str) -> Dict[str, Any]:
         try:
-            self.policy.check("update_memory", {"content": content})
-        except PolicyViolation:
-            return
+            # 1. זיהוי כוונה
+            intent = self.intent_engine.classify(question)
 
-        content["memory_plane"] = "session"
-        tier_name = None
+            # עדכון UI ב-Redis - הודעה שהתקבלה שאילתה
+            self._push_to_ui("processing", {"query": question, "intent": intent["intent"]})
 
-        if kind == "short":
-            self.memory.short_term.add(content)
-            tier_name = "short_term"
-        elif kind == "mid":
-            self.memory.mid_term.add(content)
-            tier_name = "mid_term"
-        elif kind == "long":
-            self.memory.long_term.add(content)
-            tier_name = "long_term"
+            # 2. טיפול במקרים של התעלמות
+            if intent["intent"] == "ignore":
+                return {
+                    "answer_text": "👍",
+                    "sources": [],
+                    "explanation": None,
+                }
 
-        if tier_name is not None:
-            PersistenceManager.append_event(
-                "memory_add",
-                {"tier": tier_name, "item": content},
+            # 3. שמירת זיכרון (החשוד העיקרי בקריסה שלך)
+            if intent["intent"] == "store_memory":
+                memory_id = self.memory_hub.add_text(
+                    content=question,
+                    source="user",
+                    tier=intent.get("tier", "short"),
+                    session_id="default",
+                )
+
+                PersistenceManager.append_event(
+                    "memory_stored",
+                    {
+                        "content": question,
+                        "tier": intent.get("tier", "short"),
+                        "memory_id": memory_id,
+                    },
+                )
+                
+                # עדכון UI ב-Redis - נשמר זיכרון
+                self._push_to_ui("memory_stored", {"content": question})
+
+                return {
+                    "answer_text": "🧠 נשמר. אזכור את זה.",
+                    "sources": [],
+                    "explanation": {
+                        "type": "intent_store",
+                        "reason": "User explicitly asked to remember",
+                    },
+                }
+
+            # 4. שאילתה רגילה (RAG)
+            assert_invariant(question, "Query cannot be empty")
+
+            self.metrics.inc("queries")
+            self.observability.record_query()
+
+            # חיפוש בזיכרון
+            memories = self.memory_hub.search(question, k=5)
+            context = "\n".join(m["text"] for m in memories) if memories else ""
+
+            # קריאה ל-LLM
+            llm = get_llm()
+            answer = await llm.apredict(
+                AGENT_PROMPT.format(context=context)
             )
-        self.memory.promote()
 
-    async def _execute_query(self, question: str) -> Dict[str, Any]:
-        assert_invariant(question is not None, "Agent decision without question")
+            self._state["total_queries"] += 1
+            self._state["last_answer"] = answer
 
-        self.metrics.inc("agent_decisions")
-        self.observability.record_query()
+            explanation = self.explainer.explain(
+                reason="RAG answer",
+                inputs={"query": question, "memories": len(memories)},
+                outcome={"answer": answer},
+            )
 
-        memories = retrieve_context(question)
-        llm = get_llm()
+            PersistenceManager.append_event(
+                "agent_query",
+                {
+                    "query": question,
+                    "memories": len(memories),
+                },
+            )
 
-        confidence = 0.0
-        for m in memories:
-            expl = m.get("explanation", {})
-            score = expl.get("confidence")
-            if isinstance(score, (int, float)):
-                self.observability.record_score(float(score))
-                confidence = max(confidence, float(score))
+            # עדכון סופי ל-UI - תשובה מוכנה
+            self._push_to_ui("completed", {"query": question, "answer": answer})
 
-        context_str = "\n".join([m.get("text", "") for m in memories])
-        response = await llm.apredict(AGENT_PROMPT.format(context=context_str))
+            return {
+                "answer_text": answer,
+                "sources": memories,
+                "explanation": explanation,
+            }
 
-        answer = response
-        suggestions: List[str] = []
-
-        self._record_internal_memory("short", {
-            "type": "agent_async_decision",
-            "query": question,
-            "memories_used": len(memories),
-            "answer_preview": str(answer)[:300],
-        })
-
-        self._state["total_queries"] += 1
-        self._state["last_answer"] = answer
-        self._state["last_suggestions"] = suggestions
-
-        PersistenceManager.append_event(
-            "agent_counter",
-            {"key": "total_queries", "value": self._state["total_queries"]},
-        )
-
-        explanation = self.explainer.explain(
-            reason="Agent async decision",
-            inputs={"query": question, "memories": len(memories)},
-            outcome={"answer": answer, "suggestions": suggestions},
-        )
-        explanation["confidence"] = confidence
-        explanation_id = PersistenceManager.append_event("explanation", explanation)
-
-        decision_payload = {
-            "question": question,
-            "answer": answer,
-            "suggestions": suggestions,
-            "memory_count": len(memories),
-            "explanation_id": explanation_id,
-            "mode": "async",
-            "confidence": confidence,
-        }
-        PersistenceManager.append_event("agent_async_decision", decision_payload)
-
-        critique = self.critic.critique(answer)
-        verification = self.verifier.verify(answer, memories)
-
-        return {
-            "answer": answer,
-            "sources": memories,
-            "suggestions": suggestions,
-            "critique": critique,
-            "verification": verification,
-            "agent_mode": True,
-        }
-
-    async def agent_query(self, question: str) -> Dict[str, Any]:
-        assert_invariant(question is not None, "Agent decision without question")
-        plan = self.planner.plan(question)
-        result = await self.executor.execute(plan, self)
-        return result
-
-def run_agent(self, *args, **kwargs):
-    raise RuntimeError(
-        "run_agent() is deprecated. "
-        "Use async agent_query() via Planner/Executor."
-    )
+        except Exception as e:
+            # הדפסה בולטת במיוחד לטרמינל כדי לאתר את השגיאה
+            print("\n" + "="*50)
+            print(f"❌ AGENT ERROR: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            print("="*50 + "\n")
+            
+            # זריקת השגיאה הלאה כדי ש-FastAPI ידע שהייתה בעיה
+            raise e
+        self._push_to_ui("completed", {"query": question, "answer": answer})
+        
+    def _push_to_ui(self, status: str, data: dict):
+        """פונקציית עזר לדחיפת נתונים ל-Redis עבור ה-UI"""
+        try:
+            payload = json.dumps({"status": status, **data})
+            self.redis_client.lpush("kirp:memory:recent", payload)
+            self.redis_client.ltrim("kirp:memory:recent", 0, 19) # שומר 20 פעולות אחרונות
+        except Exception as e:
+            print(f"Failed to push to Redis UI: {e}")
 
 agent = Agent()
