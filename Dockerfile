@@ -1,10 +1,16 @@
 FROM python:3.10-slim
 
 WORKDIR /app
+
+# מעתיקים קודם רק את ה-requirements
+COPY requirements.txt .
+
+# מגדילים את ה-timeout ומתקינים
+RUN pip install --no-cache-dir --default-timeout=100 -r requirements.txt
+
+# רק עכשיו מעתיקים את כל השאר
 COPY . .
 
-RUN pip install --no-cache-dir -r requirements.txt
+EXPOSE 8501
 
-EXPOSE 8000
-
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["streamlit", "run", "app/ui/app.py", "--server.port=8501", "--server.address=0.0.0.0"]

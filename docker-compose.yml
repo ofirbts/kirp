@@ -1,7 +1,21 @@
 version: '3.8'
 
 services:
-  # הזיכרון הוקטורי (היכן ש-qdrant_store.py שומר נתונים)
+  # האפליקציה שלך
+  app:
+    build: .
+    ports:
+      - "8501:8501"
+    environment:
+      # כאן הקסם: משתמשים בשם השירות במקום ב-localhost
+      - MONGO_URI=mongodb://root:example@mongodb:27017
+      - QDRANT_HOST=qdrant
+      - REDIS_HOST=redis
+    depends_on:
+      - mongodb
+      - qdrant
+      - redis
+
   qdrant:
     image: qdrant/qdrant:latest
     ports:
@@ -9,7 +23,6 @@ services:
     volumes:
       - ./qdrant_data:/qdrant/storage
 
-  # מאגר האירועים (Persistence)
   mongodb:
     image: mongo:latest
     environment:
@@ -20,7 +33,6 @@ services:
     volumes:
       - ./mongo_data:/data/db
 
-  # ה-Cache לביצועים מהירים
   redis:
     image: redis:latest
     ports:

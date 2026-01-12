@@ -9,7 +9,7 @@ logger = logging.getLogger(__name__)
 
 @lru_cache
 def get_mongo_db():
-    uri = os.getenv("MONGO_URI", "mongodb://root:example@localhost:27017/?authSource=admin")
+    uri = os.getenv("MONGO_URI", "mongodb://localhost:27017")
     db_name = os.getenv("MONGO_DB_NAME", "kirp_os")
     client = MongoClient(uri)
     return client[db_name]
