@@ -1,28 +1,48 @@
-import requests
 import os
+import logging
 from typing import Dict, Any
-from app.integrations.whatsapp_gateway import WhatsAppGateway
 
-class MetaWhatsAppGateway(WhatsAppGateway):
-    def __init__(self):
-        self.token = os.getenv("WHATSAPP_TOKEN")
-        self.phone_id = os.getenv("WHATSAPP_PHONE_ID")
-        self.url = f"https://graph.facebook.com/v18.0/{self.phone_id}/messages"
+logger = logging.getLogger(__name__)
 
+class WhatsAppGateway:
+    """
+    Interface for WhatsApp Communication.
+    """
     def send_message(self, to: str, text: str) -> Dict[str, Any]:
-        if not self.token or self.token == "mock":
-            return {"status": "mock_success", "target": to}
+        raise NotImplementedError("WhatsApp provider not implemented. Use a specific subclass.")
 
-        headers = {
-            "Authorization": f"Bearer {self.token}",
-            "Content-Type": "application/json",
-        }
-        payload = {
-            "messaging_product": "whatsapp",
-            "to": to,
-            "type": "text",
-            "text": {"body": text},
-        }
-        
-        response = requests.post(self.url, json=payload, headers=headers)
-        return response.json()
+class MockWhatsAppGateway(WhatsAppGateway):
+    """
+    A Mock provider for testing and development.
+    """
+    def send_message(self, to: str, text: str) -> Dict[str, Any]:
+        logger.info(f"🧪 [MOCK WHATSAPP] Sending to {to}: {text}")
+        return {"status": "success", "provider": "mock", "message_id": "mock_123"}
+
+def get_whatsapp_gateway() -> WhatsAppGateway:
+    """
+    Factory function to return the correct provider based on ENV.
+    """
+    provider = os.getenv("WHATSAPP_PROVIDER", "mock").lower()
+    
+    if provider == "meta":
+        try:
+            from app.integrations.whatsapp_meta import MetaWhatsAppGateway
+            return MetaWhatsAppGateway()
+        except ImportError:
+            logger.error("MetaWhatsAppGateway not found, falling back to mock.")
+            return MockWhatsAppGateway()
+            
+    elif provider == "twilio":
+        try:
+            from app.integrations.whatsapp_twilio import TwilioWhatsAppGateway
+            return TwilioWhatsAppGateway()
+        except ImportError:
+            logger.error("TwilioWhatsAppGateway not found, falling back to mock.")
+            return MockWhatsAppGateway()
+    
+    # במקום להחזיר את ה-Interface הריק, מחזירים את ה-Mock
+    return MockWhatsAppGateway()
+
+# יצירת אובייקט סינגלטון לשימוש ברחבי האפליקציה
+wa_gateway = get_whatsapp_gateway()

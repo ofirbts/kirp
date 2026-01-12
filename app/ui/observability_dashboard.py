@@ -1,49 +1,43 @@
 import streamlit as st
-from app.core.tenant import TenantContext
-from app.core.metrics import Metrics
+import pandas as pd
 from app.core.persistence import PersistenceManager
-from app.agent.agent import agent
+from app.core.metrics import metrics
+from app.services.notion import notion
 
-st.set_page_config(layout="wide")
+st.set_page_config(layout="wide", page_title="KIRP Control Plane")
 
-st.markdown("""
-## 🚀 KIRP Enterprise Control Plane
-**Governed AI • Memory • Observability • Multi-Tenant**
-""")
+st.title("🛡️ KIRP Enterprise Dashboard")
 
-# ===== Sidebar =====
-st.sidebar.markdown("## 🧩 Tenant Control")
-tenant = st.sidebar.selectbox(
-    "Active Tenant",
-    ["default", "demo", "enterprise"],
-    index=0
-)
-TenantContext.set(tenant)
-st.sidebar.success(f"🟢 Active: {tenant}")
-
-# ===== Metrics =====
-metrics = Metrics().snapshot()
-
+# שורת מטריקות מה-Redis
+m = metrics.snapshot()
 c1, c2, c3, c4 = st.columns(4)
-c1.metric("🟢 System Health", "OK")
-c2.metric("🧠 Queries", metrics.get("qps", 0))
-c3.metric("📈 Drift", f"{metrics.get('drift', 0)}%")
-c4.metric("💾 Memory (MB)", round(metrics.get("memory_mb", 0), 1))
+c1.metric("System Health", m["health"])
+c2.metric("Total Queries", m["qps"])
+c3.metric("Drift", f"{m['drift']}%")
+c4.metric("Notion Status", "✅ Connected" if notion.enabled() else "❌ Disconnected")
 
-# ===== Agent State =====
-state = agent.dump_state()
+st.divider()
 
-st.markdown("### 🧠 Agent Summary")
-a1, a2, a3 = st.columns(3)
-a1.metric("Total Decisions", state["state"].get("total_queries", 0))
-a2.metric("Last Answer", "✅" if state["state"].get("last_answer") else "—")
-a3.metric("Suggestions", len(state["state"].get("last_suggestions", [])))
+# ניהול אישורים (Governance)
+st.subheader("📑 Pending Approvals")
+pending = PersistenceManager.get_pending_approvals()
+if pending:
+    for p in pending:
+        col1, col2, col3 = st.columns([3, 1, 1])
+        col1.write(f"**Task:** {p['data'].get('task')}")
+        if col2.button("Approve", key=f"app_{p['id']}"):
+            PersistenceManager.update_event_status(p['id'], "approved")
+            st.rerun()
+        if col3.button("Reject", key=f"rej_{p['id']}"):
+            PersistenceManager.update_event_status(p['id'], "rejected")
+            st.rerun()
+else:
+    st.success("No pending approvals. System is autonomous.")
 
-with st.expander("🔍 Raw Agent State"):
-    st.json(state)
+st.divider()
 
-# ===== Events =====
-st.markdown("### 📜 Recent Events")
-events = PersistenceManager.tail(50)
-with st.expander("Show events"):
-    st.json(events)
+# לוג אירועים מ-MongoDB
+st.subheader("📜 Recent Events (Audit Trail)")
+events = PersistenceManager.get_all_events(limit=20)
+if events:
+    st.table([{"Time": e["timestamp"], "Type": e["type"], "Status": e["status"]} for e in events])

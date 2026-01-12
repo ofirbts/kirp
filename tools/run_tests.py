@@ -104,7 +104,7 @@ except Exception as e:
     IntentEngine = None
 
 try:
-    from app.agent.agent import Agent
+    from app.agent.agent import agent
     print(f"{GREEN}✔ Loaded Agent{RESET}")
 except Exception as e:
     print(f"{RED}✘ Failed to import Agent: {e}{RESET}")

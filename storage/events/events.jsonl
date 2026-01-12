@@ -99,3 +99,7 @@
 {"id": "1cbc766b-93b9-4dcf-8567-1d3e42b1f540", "type": "query_success", "timestamp": "2026-01-12T08:31:39.947131", "payload": {"query": "איך קוראים לפרויקט?", "memories_count": 0}}
 {"id": "9aa9e5d8-8db6-4775-8910-7e4a694671b7", "type": "memory_stored", "timestamp": "2026-01-12T08:34:09.445766", "payload": {"content": "תזכור שהפרויקט הזה נקרא KIRP", "tier": "long", "memory_id": "mem_12345"}}
 {"id": "e697e054-50e5-437b-a4b4-ecef816cc2bd", "type": "query_success", "timestamp": "2026-01-12T08:34:15.768353", "payload": {"query": "איך קוראים לפרויקט?", "memories_count": 0}}
+{"id": "178f61df-17e7-4f89-9f72-c40471cd4ba0", "type": "knowledge_add", "timestamp": "2026-01-12T12:15:47.071463", "payload": {"content": "זה הזמן להשקיע", "source": "UI"}}
+{"id": "54fbb586-d961-48d4-9212-0212a09b547c", "type": "knowledge_add", "timestamp": "2026-01-12T12:15:57.818950", "payload": {"content": "צריך להיפגש עם רון", "source": "Meeting"}}
+{"id": "6cb1ede4-a1ba-4436-b037-1b980246c7c5", "type": "query_executed", "timestamp": "2026-01-12T12:56:51.353712", "payload": {"query": "מה צריך להכין לשבת?"}}
+{"id": "405b4720-01e1-4d79-b8d2-755c94e1e441", "type": "query_executed", "timestamp": "2026-01-12T13:40:05.354265", "payload": {"query": "אני מיואש"}}

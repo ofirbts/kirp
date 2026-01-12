@@ -24,3 +24,4 @@ def get_whatsapp_gateway() -> WhatsAppGateway:
     
     # Default fallback to a Null/Mock provider if needed
     return WhatsAppGateway()
+wa_gateway = WhatsAppGateway() # יוצר את האובייקט שה-API מחפש

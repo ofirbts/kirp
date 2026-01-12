@@ -1,30 +1,33 @@
 import logging
-import time
-from typing import Any, Dict
+from datetime import datetime
+from typing import List, Dict, Any
 
-logger = logging.getLogger(__name__)
+class EventStoryteller:
+    """Translates raw events into human-readable insights for the UI."""
+    
+    @staticmethod
+    def tell_story(event: Dict[str, Any]) -> Dict[str, str]:
+        etype = event.get("type")
+        payload = event.get("payload", {})
+        ts = event.get("timestamp", "")
+        
+        # המרת זמן לפורמט קריא
+        try:
+            dt = datetime.fromisoformat(ts.replace("Z", "+00:00"))
+            time_str = dt.strftime("%H:%M")
+        except:
+            time_str = "Recently"
 
-class Observability:
-    def __init__(self):
-        self.start_time = None
+        stories = {
+            "knowledge_add": f"🧠 תייקתי תובנה חדשה: '{payload.get('content', '')[:40]}...'",
+            "memory_add": f"🧠 זיכרון חדש נשמר במערכת.",
+            "task_add": f"✅ יצרתי משימה חדשה: '{payload.get('text', '')}'",
+            "intent_detected": f"🧭 זיהיתי כוונה מסוג {payload.get('intent')}",
+            "query_executed": f"🔍 חיפשתי תשובה בנושא '{payload.get('query', '')[:30]}...'"
+        }
 
-    def record_event(self, event_name: str, data: Dict[str, Any] = None):
-        """תיקון: הפונקציה שהייתה חסרה"""
-        log_msg = f"[OBSERVABILITY] Event: {event_name} | Data: {data or {}}"
-        logger.info(log_msg)
-
-    def record_query(self):
-        """תמיכה בשם הישן אם קיים בקוד אחר"""
-        self.record_event("query_processed")
-
-    def start_timer(self):
-        self.start_time = time.time()
-
-    def stop_timer(self, label: str):
-        if self.start_time:
-            duration = time.time() - self.start_time
-            self.record_event("timer_stop", {"label": label, "duration": f"{duration:.4f}s"})
-            self.start_time = None
-
-# יצירת סינגלטון לשימוש כללי אם צריך
-obs = Observability()
+        return {
+            "story": stories.get(etype, f"System Action: {etype}"),
+            "time": time_str,
+            "icon": "✨" if etype == "knowledge_add" else "⚙️"
+        }

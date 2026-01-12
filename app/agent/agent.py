@@ -1,49 +1,60 @@
 import logging
+import asyncio
+from datetime import datetime
 from app.llm.client import get_llm
-from app.core.memory_hub import MemoryHub
-from app.core.intent_engine import IntentEngine
-from app.integrations.whatsapp_gateway import get_whatsapp_gateway
+from app.core.persistence import PersistenceManager
+from app.core.metrics import metrics
+from app.rag.agent_rag import agent_rag_pipeline
 
 logger = logging.getLogger(__name__)
 
-AGENT_PROMPT = """You are KIRP OS.
-Use the provided context to answer accurately.
-
-Context:
-{context}
-
-Question:
-{question}
-
-Answer:
-"""
-
-class Agent:
+class CoreAgent:
     def __init__(self):
-        self.memory = MemoryHub()
-        self.intent_engine = IntentEngine()
-        self.whatsapp = get_whatsapp_gateway()
+        self.llm = get_llm()
 
-    async def query(self, question: str, sender_phone: str | None = None):
-        intent = self.intent_engine.classify(question)
+    async def query(self, question: str):
+        logger.info(f"CoreAgent processing: {question}")
+        metrics.record_query() # רישום מטריקה ב-Redis
+        
+        now = datetime.now()
+        current_time_info = now.strftime("%A, %H:%M, %d/%m/%Y")
 
-        if intent["intent"] == "store_memory":
-            self.memory.add_text(question, source="user", tier=intent.get("tier", "short"))
-            answer = "🧠 הזיכרון נשמר בהצלחה."
-            sources = []
-        else:
-            memories = self.memory.search(question, k=3)
-            context = "\n".join(m["text"] for m in memories)
-            prompt = AGENT_PROMPT.format(context=context, question=question)
-            answer = await get_llm().apredict(prompt)
-            sources = memories
+        # 1. RAG Pipeline - שליפת זיכרון
+        rag_result = await asyncio.to_thread(
+            agent_rag_pipeline, 
+            query=question, 
+            session_id="default_user"
+        )
+        memories = rag_result.get("memories", [])
+        context_str = "\n".join([str(m) for m in memories])
+        
+        # 2. בניית התשובה
+        refine_prompt = f"""You are KIRP OS, Ofir's personal intelligence system.
+        Current Time: {current_time_info}
+        Context: {context_str}
+        
+        Answer in Hebrew, be concise and professional.
+        """
+        
+        response = await self.llm.ainvoke([("system", refine_prompt), ("user", question)])
+        final_answer = response.content
 
-        if sender_phone:
-            self.whatsapp.send_message(to=sender_phone, text=answer)
+        # 3. זיהוי משימות ו-Governance (Multi-Agent Orchestration)
+        if any(word in question.lower() for word in ["תזכיר", "צריך", "לקנות", "תקבע"]):
+            event_id = PersistenceManager.append_event(
+                event_type="task_identified",
+                payload={"task": question, "suggested_action": "create_notion_task"},
+                requires_approval=True # כאן נכנס ה-Enterprise Governance
+            )
+            logger.info(f"Task identified and held for approval. Event ID: {event_id}")
 
         return {
-            "answer_text": answer,
-            "sources": sources
+            "answer_text": final_answer,
+            "sources": [{"text": m} for m in memories]
         }
 
-agent = Agent()
+    async def agent_query(self, text: str):
+        res = await self.query(text)
+        return {"answer": res["answer_text"]}
+
+agent = CoreAgent()

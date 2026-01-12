@@ -1,10 +1,10 @@
-from .notion_impl import RealNotionService
-from .null import NullNotionService
+import os
+# שימוש בנתיב מלא במקום יחסי
+from app.services.notion.notion_impl import RealNotionService
+from app.services.notion.null_impl import NullNotionService
 
-def get_notion_service():
-    service = RealNotionService()
-    if service.enabled():
-        return service
-    return NullNotionService()
-
-notion = get_notion_service()
+token = os.getenv("NOTION_TOKEN")
+if token and token not in ["mock", "YOUR_NOTION_TOKEN"]:
+    notion = RealNotionService()
+else:
+    notion = NullNotionService()
