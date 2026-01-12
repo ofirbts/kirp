@@ -51,5 +51,4 @@ async def receive_whatsapp(request: Request):
 
         return {"ok": True}
     except Exception as e:
-        print(f"❌ Error in WhatsApp Webhook: {e}")
         return {"ok": False, "error": str(e)}

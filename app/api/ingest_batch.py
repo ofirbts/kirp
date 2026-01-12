@@ -31,7 +31,6 @@ async def ingest_batch(items: List[IngestRequest]):
     })
 
     return {
-        "status": "ok",
         "documents": len(items),
         "chunks_added": len(all_chunks)
     }

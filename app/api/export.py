@@ -9,4 +9,3 @@ async def export_to_notion():
     tasks = await tasks_collection.find().to_list(50)
     for task in tasks:
         await export_task_to_notion(task)
-    return {"status": "exported"}

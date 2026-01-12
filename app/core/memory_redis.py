@@ -43,6 +43,7 @@ class RedisMemory:
             return False
 
         item = {
+            "type": "memory",
             "text": content,
             "ts": int(time.time()),
             "session_id": session_id,

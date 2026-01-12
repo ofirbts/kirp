@@ -1,15 +1,6 @@
-import time
+class Sandbox:
+    def execute(self, code: str):
+        raise NotImplementedError("Sandbox execution not implemented for safety.")
 
-
-class ExecutionTimeout(Exception):
-    pass
-
-
-def run_with_timeout(fn, timeout_sec=5):
-    start = time.time()
-    result = fn()
-
-    if time.time() - start > timeout_sec:
-        raise ExecutionTimeout("Execution timed out")
-
-    return result
+def run_in_sandbox(code: str):
+    return Sandbox().execute(code)

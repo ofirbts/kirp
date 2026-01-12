@@ -23,7 +23,6 @@ class MemoryRepository:
         }
 
         self.redis.hset(key, mapping=data)
-        self.redis.lpush("memories:recent", memory_id)
         self.redis.incr("stats:total_memories")
 
         return memory_id

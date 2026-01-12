@@ -16,7 +16,6 @@ class TaskExtractor:
             if match:
                 tasks.append({
                     "title": match.group(1).strip(),
-                    "status": "open"
                 })
 
         return tasks

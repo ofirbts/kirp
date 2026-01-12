@@ -31,7 +31,6 @@ def get_agent_state():
 @router.post("/agent/reset")
 def reset_agent():
     agent.reset()
-    return {"status": "agent reset"}
 
 
 @router.get("/events")

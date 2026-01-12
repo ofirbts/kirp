@@ -7,7 +7,5 @@ class GoogleCalendarClient:
         if not start_time:
             start_time = datetime.now()
         
-        print(f"📅 [MOCK CALENDAR] משריין אירוע: {summary} לזמן: {start_time}")
-        return {"status": "success", "event": summary, "time": start_time.isoformat()}
 
 calendar_client = GoogleCalendarClient()

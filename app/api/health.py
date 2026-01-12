@@ -1,12 +1,11 @@
 from fastapi import APIRouter
-from app.core.versions import VERSIONS
 
 router = APIRouter()
 
-@router.get("/")
-def health():
-    return {"status": "ok"}
+@router.get("")
+async def health_check():
+    return {"status": "ok", "service": "kirp-os"}
 
 @router.get("/versions")
-def versions():
-    return VERSIONS
+async def get_versions():
+    return {"version": "1.0.0", "engine": "gemini-flash-3"}

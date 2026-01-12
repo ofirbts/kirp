@@ -25,6 +25,5 @@ class RealNotionService(NotionAdapter):
             parent={"database_id": self.db_id},
             properties={
                 "Name": {"title": [{"text": {"content": title}}]},
-                "Status": {"status": {"name": "Pending"}},
             },
         )

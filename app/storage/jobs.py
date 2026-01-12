@@ -13,7 +13,6 @@ async def update_job_status(job_id: str, status):
         {"id": job_id},
         {
             "$set": {
-                "status": status,
                 "updated_at": datetime.now(timezone.utc)
             }
         }

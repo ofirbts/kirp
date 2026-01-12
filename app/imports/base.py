@@ -18,4 +18,3 @@ class BaseImporter(ABC):
         """
         Parse raw input into meaningful chunks.
         """
-        pass

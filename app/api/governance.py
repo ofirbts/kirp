@@ -12,4 +12,3 @@ async def get_pending_approvals():
 @router.post("/approve/{event_id}")
 async def approve_tool(event_id: str):
     # כאן תהיה הלוגיקה שמפעילה את הכלי אחרי אישור
-    return {"status": "approved", "event_id": event_id}

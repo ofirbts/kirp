@@ -95,3 +95,7 @@
 {"id": "cdcea071-c0b6-494f-a7d4-8c898e6894a6", "type": "memory_stored", "timestamp": "2026-01-11T22:36:09.432398", "payload": {"content": "תזכור שהפרויקט הזה נקרא KIRP", "tier": "long", "memory_id": "faiss"}}
 {"id": "a8cc966e-11b3-4d5a-8511-8fad280da46e", "type": "memory_stored", "timestamp": "2026-01-11T22:41:44.030566", "payload": {"content": "תזכור שהפרויקט הזה נקרא KIRP", "tier": "long", "memory_id": "faiss"}}
 {"id": "6369779a-453e-41d3-9ac7-c32e1e22e4fd", "type": "memory_stored", "timestamp": "2026-01-11T22:42:05.253770", "payload": {"content": "תזכור שהפרויקט הזה נקרא KIRP", "tier": "long", "memory_id": "faiss"}}
+{"id": "74cc7c1c-1bdb-4514-8695-5426c9fb7d46", "type": "memory_stored", "timestamp": "2026-01-12T08:31:31.583526", "payload": {"content": "תזכור שהפרויקט הזה נקרא KIRP", "tier": "long", "memory_id": "faiss"}}
+{"id": "1cbc766b-93b9-4dcf-8567-1d3e42b1f540", "type": "query_success", "timestamp": "2026-01-12T08:31:39.947131", "payload": {"query": "איך קוראים לפרויקט?", "memories_count": 0}}
+{"id": "9aa9e5d8-8db6-4775-8910-7e4a694671b7", "type": "memory_stored", "timestamp": "2026-01-12T08:34:09.445766", "payload": {"content": "תזכור שהפרויקט הזה נקרא KIRP", "tier": "long", "memory_id": "mem_12345"}}
+{"id": "e697e054-50e5-437b-a4b4-ecef816cc2bd", "type": "query_success", "timestamp": "2026-01-12T08:34:15.768353", "payload": {"query": "איך קוראים לפרויקט?", "memories_count": 0}}

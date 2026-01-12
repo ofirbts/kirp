@@ -7,4 +7,3 @@ router = APIRouter(prefix="/intelligence", tags=["intelligence"])
 @router.post("/decay")
 async def decay():
     await decay_memory_strength()
-    return {"status": "decay completed"}

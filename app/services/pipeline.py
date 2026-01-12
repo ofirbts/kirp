@@ -27,10 +27,8 @@ def ingest_text(text: str, source: str = "api", metadata: Dict[str, Any] = None)
     # 3. Vector store
     chunks_added = add_texts_with_metadata(chunks, metadata_list)
     
-    print(f"✅ Pipeline: {memory_type} | {chunks_added} chunks")
     
     return {
-        "status": "success",
         "memory_type": memory_type,
         "chunks_added": chunks_added
     }

@@ -18,7 +18,6 @@ async def agent_query(req: AgentQueryRequest):
 
         return {
             "trace_id": trace_id,
-            "status": "ok",
             "answer": result.get("answer"),
             "confidence": result.get("confidence", 0.7),
         }
@@ -26,7 +25,6 @@ async def agent_query(req: AgentQueryRequest):
     except Exception as e:
         return {
             "trace_id": trace_id,
-            "status": "error",
             "answer": None,
             "confidence": 0.0,
             "detail": str(e),

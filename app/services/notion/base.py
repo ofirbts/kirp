@@ -5,7 +5,6 @@ class NotionAdapter:
         raise NotImplementedError
 
     def create_task(self, **kwargs) -> None:
-        pass
 
     def get_tasks(self) -> List[Dict[str, Any]]:
         return []
@@ -14,4 +13,3 @@ class NotionAdapter:
         return []
 
     def update_status(self, page_id: str, status: str) -> None:
-        pass

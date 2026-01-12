@@ -1,107 +1,91 @@
-# KIRP — Deterministic Multi-Agent Intelligence Platform
+# KIRP – Knowledge-Integrated Reasoning Platform
 
-KIRP is a deterministic, event-driven, multi-agent RAG system designed for
-replayable intelligence, observability, and controlled evolution.
+KIRP is a modular AI system that combines short-term memory, long-term vector-based knowledge,
+and intent-aware reasoning to produce reliable, explainable answers.
 
-This is not a chatbot.
-This is an **Agent Platform**.
+## Core Features
+- Intent classification (store vs query)
+- Short-term memory (Redis)
+- Long-term knowledge (FAISS vector store)
+- Retrieval-Augmented Generation (RAG)
+- Modular Agent architecture
+- Dockerized local environment
 
----
+## Architecture
+- FastAPI backend
+- LangChain + OpenAI
+- FAISS persistent vector store
+- Redis for session memory
+- Streamlit dashboard
 
-## 🎯 Core Guarantees (Locked)
+## Memory Layers
+- **Redis** – session-based, UI-facing memory
+- **FAISS** – persistent semantic knowledge
 
-- Deterministic replay: agent state = function(events)
-- Event-sourced decision making
-- Multi-agent orchestration (Planner, Executor, Critic, Verifier)
-- Unified knowledge plane (vector store + replay)
-- Snapshot + fast restore
-- Tenant-isolated memory
-- Explainability for every decision
-- Observability (QPS, drift, memory, replay)
-- Tool-enabled agents (Phase 1)
-
----
-
-## �� Architecture Overview
-
-
-User / API
-↓
-PlannerAgent
-↓
-ExecutorAgent
-↓
-Core Agent
-├── RAG (FAISS / Qdrant)
-├── MemoryManager (short/mid/long)
-├── KnowledgeStore
-├── ToolAgent
-├── Critic / Verifier
-↓
-Events → Persistence → Replay
-
----
-
-## 🔁 Replay & Determinism
-
-All state mutations emit events.
-Replaying the same event stream produces the same state.
-
-Replay is certified via:
-tools/assert_replay_deterministic.py
-
----
-
-## 📊 Observability
-
-- Query rate (QPS)
-- Retrieval drift
-- Memory growth
-- Agent state
-- Vector store health
-
-Available via:
-- REST API
-- Streamlit Dashboard
-
----
-
-## 🧩 Multi-Agent System
-
-- Planner — decomposes intent
-- Executor — executes plans
-- Critic — evaluates answers
-- Verifier — checks consistency
-- Negotiation engine — resolves conflicts
-
----
-
-## 🛠 Tool Usage (Phase 1)
-
-Tools are invoked via deterministic heuristics.
-Autonomous LLM-based tool selection is **explicitly out of scope** for this phase.
-
----
-
-## 🚫 Explicitly Not Included
-
-- Autonomous self-modifying agents
-- Black-box learning without events
-- Non-replayable memory
-- Hidden prompts or policies
-
----
-
-## �� Validation
-
-Run full system check:
+## Run Locally
 ```bash
-python tools/check_kirp_full.py
+docker-compose up --build
 
-Replay certification:
-python tools/assert_replay_deterministic.py
+# KIRP – Knowledge-Integrated Reasoning Platform
 
-📦 Status
+KIRP is a modular AI system that combines short-term memory, long-term vector-based knowledge,
+and intent-aware reasoning to produce reliable, explainable answers.
 
-Engineering Closed
-Further changes require explicit version bump and contract update.
+## Core Features
+- Intent classification (store vs query)
+- Short-term memory (Redis)
+- Long-term knowledge (FAISS vector store)
+- Retrieval-Augmented Generation (RAG)
+- Modular Agent architecture
+- Dockerized local environment
+
+## Architecture
+- FastAPI backend
+- LangChain + OpenAI
+- FAISS persistent vector store
+- Redis for session memory
+- Streamlit dashboard
+
+## Memory Layers
+- **Redis** – session-based, UI-facing memory
+- **FAISS** – persistent semantic knowledge
+
+## Run Locally
+```bash
+docker-compose up --build
+# KIRP – Knowledge-Integrated Reasoning Platform
+
+KIRP is a modular AI system that combines short-term memory, long-term vector-based knowledge,
+and intent-aware reasoning to produce reliable, explainable answers.
+
+## Core Features
+- Intent classification (store vs query)
+- Short-term memory (Redis)
+- Long-term knowledge (FAISS vector store)
+- Retrieval-Augmented Generation (RAG)
+- Modular Agent architecture
+- Dockerized local environment
+
+## Architecture
+- FastAPI backend
+- LangChain + OpenAI
+- FAISS persistent vector store
+- Redis for session memory
+- Streamlit dashboard
+
+## Memory Layers
+- **Redis** – session-based, UI-facing memory
+- **FAISS** – persistent semantic knowledge
+
+## Run Locally
+```bash
+docker-compose up --build
+Roadmap
+
+MongoDB event sourcing
+
+Kafka for async pipelines
+
+Observability with Prometheus & Grafana
+
+WhatsApp production integration

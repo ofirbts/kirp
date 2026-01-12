@@ -45,7 +45,6 @@ async def system_status():
             "loaded": vector.get("ram_loaded"),
             "disk_exists": vector.get("disk_exists"),
             "vectors_count": vector.get("vectors_count_ram", 0),
-            "status": vector.get("status"),
         },
 
         # Ingest / Query

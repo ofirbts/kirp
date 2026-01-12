@@ -1,3 +1,4 @@
+import ast
 import requests
 from typing import Dict, Any, List
 from app.services.notion import notion
@@ -22,7 +23,7 @@ def tool_search_web(q):
 def tool_calc(expr): 
     # הערה: eval הוא מסוכן, אבל למטרת הפרויקט כרגע זה יעבוד
     try:
-        return eval(expr)
+        return ast.literal_eval(expr)
     except Exception as e:
         return str(e)
 

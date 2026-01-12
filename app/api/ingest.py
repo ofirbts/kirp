@@ -40,7 +40,6 @@ def ingest_text_endpoint(data: IngestRequest):
         })
 
         return {
-            "status": result["status"],
             "chunks_added": result["chunks_added"],
             "memory_type": result["memory_type"],
         }

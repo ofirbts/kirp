@@ -17,20 +17,16 @@ class NotionService:
 
     def create_task_page(self, title, trace_id="manual", source="api", confidence=1.0):
         if not self.client:
-            return {"status": "no_client"}
         try:
             new_page = {
                 "parent": {"database_id": self.db_id},
                 "properties": {
                     "Name": {"title": [{"text": {"content": title}}]},
-                    "Status": {"status": {"name": "Pending"}},
                     "Source": {"select": {"name": source}}
                 }
             }
             return self.client.pages.create(**new_page)
         except Exception as e:
-            print(f"❌ Notion Error: {e}")
-            return {"status": "error", "message": str(e)}
 
     def get_tasks(self):
         if not self.client: return []
@@ -47,7 +43,6 @@ class NotionService:
                 tasks.append({"Title": title, "Status": status})
             return tasks
         except Exception as e:
-            print(f"❌ Notion Fetch Error: {e}")
             return []
 
 notion = NotionService()

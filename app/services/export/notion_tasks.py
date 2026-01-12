@@ -15,14 +15,12 @@ headers = {
 def create_notion_task(title: str, description: str = "", trace_id: str = "") -> Dict[str, Any]:
     """Create REAL Notion page with trace_id"""
     if not all([NOTION_TOKEN, NOTION_DB_ID]):
-        return {"status": "skipped", "reason": "NOTION_TOKEN or NOTION_DB_ID missing"}
     
     url = "https://api.notion.com/v1/pages"
     payload = {
         "parent": {"database_id": NOTION_DB_ID},
         "properties": {
             "Name": {"title": [{"text": {"content": f"✅ {title}"}}]},
-            "Status": {"status": {"name": "To Do"}},
             "Trace ID": {"rich_text": [{"text": {"content": trace_id[:36]}}]},
             "Source": {"rich_text": [{"text": {"content": "KIRP Agent"}}]},
             "Created": {"date": {"start": datetime.utcnow().isoformat()}}
@@ -32,10 +30,7 @@ def create_notion_task(title: str, description: str = "", trace_id: str = "") ->
     try:
         res = requests.post(url, headers=headers, json=payload, timeout=10)
         if res.status_code == 200:
-            return {"status": "created", "title": title, "trace_id": trace_id}
-        return {"status": "failed", "error": res.text}
     except Exception as e:
-        return {"status": "error", "error": str(e)}
 
 def create_notion_tasks_batch(trace_id: str, tasks: List[Dict]) -> Dict[str, Any]:
     """Create multiple Notion tasks from agent suggestions"""
@@ -47,7 +42,6 @@ def create_notion_tasks_batch(trace_id: str, tasks: List[Dict]) -> Dict[str, Any
         results.append(result)
     
     return {
-        "status": "executed",
         "action": "create_notion_tasks", 
         "tasks_created": len(tasks),
         "notion_pages": len([r for r in results if r["status"] == "created"]),

@@ -15,4 +15,3 @@ def get_policy():
 def update_policy(data: dict):
     with _lock:
         json.dump(data, open(POLICY_FILE, "w"), indent=2)
-    return {"status": "updated", "policy": data}

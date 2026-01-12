@@ -31,7 +31,6 @@ async def create_weekly_summary(days: int = 7):
     try:
         memory = await generate_weekly_summary(days)
         return {
-            "status": "ok",
             "summary": memory.content,
             "memory_id": memory.id
         }
