@@ -1,91 +1,41 @@
-# KIRP – Knowledge-Integrated Reasoning Platform
+# 🧠 KIRP OS: Knowledge-Integrated Reasoning Platform
+> **The Personal AI Operating System with Neural Memory & Intent Awareness.**
 
-KIRP is a modular AI system that combines short-term memory, long-term vector-based knowledge,
-and intent-aware reasoning to produce reliable, explainable answers.
+KIRP OS is not just another chatbot wrapper. It is a high-performance, modular AI infrastructure designed to solve the "Memory Gap" in LLMs. By combining **Vector-based Long-Term Memory**, **Stateful Session Management**, and an **Autonomous Intent Engine**, KIRP OS creates a truly personalized intelligence layer.
 
-## Core Features
-- Intent classification (store vs query)
-- Short-term memory (Redis)
-- Long-term knowledge (FAISS vector store)
-- Retrieval-Augmented Generation (RAG)
-- Modular Agent architecture
-- Dockerized local environment
+---
 
-## Architecture
-- FastAPI backend
-- LangChain + OpenAI
-- FAISS persistent vector store
-- Redis for session memory
-- Streamlit dashboard
+## 🏗️ System Architecture: The Three Pillars
 
-## Memory Layers
-- **Redis** – session-based, UI-facing memory
-- **FAISS** – persistent semantic knowledge
+### 1. The Cognition Layer (Intent Engine)
+Unlike basic RAG, KIRP OS doesn't just search; it **thinks first**. The Intent Engine classifies every incoming signal:
+* **Storage Intent:** Automatic extraction and embedding of facts.
+* **Query Intent:** Semantic retrieval and context augmentation.
+* **Command Intent:** Triggering system actions (WhatsApp, UI).
 
-## Run Locally
+### 2. The Memory Flywheel (Neural Vector Store)
+Using **FAISS** (Facebook AI Similarity Search) and **OpenAI Embeddings**, the system transforms text into high-dimensional vectors ($R^n$). 
+* **Semantic Retrieval:** Finding answers based on *meaning*, not keywords.
+* **Persistence:** Local disk storage with MongoDB event sourcing.
+
+### 3. The Integration Fabric (Multi-Channel)
+A unified API built with **FastAPI** that bridges the gap between digital interfaces (Web UI) and real-world communication (WhatsApp via Twilio).
+
+---
+
+## 🛠️ Technology Stack
+* **Brain:** GPT-4o-mini (via LangChain)
+* **Memory:** FAISS (Vector DB), Redis (Cache), MongoDB (Events)
+* **Backend:** FastAPI (Asynchronous Python 3.10)
+* **Infrastructure:** Docker & Docker Compose
+* **Observability:** Prometheus & Grafana (Planned)
+
+---
+
+## 🚀 Deployment
 ```bash
+# Clone and Launch
+git clone [https://github.com/youruser/kirp-os](https://github.com/youruser/kirp-os)
 docker-compose up --build
 
-# KIRP – Knowledge-Integrated Reasoning Platform
-
-KIRP is a modular AI system that combines short-term memory, long-term vector-based knowledge,
-and intent-aware reasoning to produce reliable, explainable answers.
-
-## Core Features
-- Intent classification (store vs query)
-- Short-term memory (Redis)
-- Long-term knowledge (FAISS vector store)
-- Retrieval-Augmented Generation (RAG)
-- Modular Agent architecture
-- Dockerized local environment
-
-## Architecture
-- FastAPI backend
-- LangChain + OpenAI
-- FAISS persistent vector store
-- Redis for session memory
-- Streamlit dashboard
-
-## Memory Layers
-- **Redis** – session-based, UI-facing memory
-- **FAISS** – persistent semantic knowledge
-
-## Run Locally
-```bash
-docker-compose up --build
-# KIRP – Knowledge-Integrated Reasoning Platform
-
-KIRP is a modular AI system that combines short-term memory, long-term vector-based knowledge,
-and intent-aware reasoning to produce reliable, explainable answers.
-
-## Core Features
-- Intent classification (store vs query)
-- Short-term memory (Redis)
-- Long-term knowledge (FAISS vector store)
-- Retrieval-Augmented Generation (RAG)
-- Modular Agent architecture
-- Dockerized local environment
-
-## Architecture
-- FastAPI backend
-- LangChain + OpenAI
-- FAISS persistent vector store
-- Redis for session memory
-- Streamlit dashboard
-
-## Memory Layers
-- **Redis** – session-based, UI-facing memory
-- **FAISS** – persistent semantic knowledge
-
-## Run Locally
-```bash
-docker-compose up --build
-Roadmap
-
-MongoDB event sourcing
-
-Kafka for async pipelines
-
-Observability with Prometheus & Grafana
-
-WhatsApp production integration
+Developed by Ofir Betesh - Engineering the future of personal intelligence.

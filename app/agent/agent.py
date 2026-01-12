@@ -6,32 +6,44 @@ from app.integrations.whatsapp_gateway import get_whatsapp_gateway
 
 logger = logging.getLogger(__name__)
 
-AGENT_PROMPT = """You are KIRP OS. Answer based on context:
-Context: {context}
-Question: {question}
-Answer:"""
+AGENT_PROMPT = """You are KIRP OS.
+Use the provided context to answer accurately.
+
+Context:
+{context}
+
+Question:
+{question}
+
+Answer:
+"""
 
 class Agent:
     def __init__(self):
-        self.memory_hub = MemoryHub()
+        self.memory = MemoryHub()
         self.intent_engine = IntentEngine()
         self.whatsapp = get_whatsapp_gateway()
 
-    async def query(self, question: str, sender_phone: str = None) -> dict:
+    async def query(self, question: str, sender_phone: str | None = None):
         intent = self.intent_engine.classify(question)
-        
-        if intent["intent"] == "store_memory":
-            self.memory_hub.add_text(question, source="user")
-            ans = "🧠 זיכרון נשמר במערכת KIRP."
-        else:
-            memories = self.memory_hub.search(question, k=3)
-            context = "\n".join([m['text'] for m in memories])
-            ans = await get_llm().apredict(AGENT_PROMPT.format(context=context, question=question))
 
-        # שליחה לוואטסאפ אם יש מספר שולח
+        if intent["intent"] == "store_memory":
+            self.memory.add_text(question, source="user", tier=intent.get("tier", "short"))
+            answer = "🧠 הזיכרון נשמר בהצלחה."
+            sources = []
+        else:
+            memories = self.memory.search(question, k=3)
+            context = "\n".join(m["text"] for m in memories)
+            prompt = AGENT_PROMPT.format(context=context, question=question)
+            answer = await get_llm().apredict(prompt)
+            sources = memories
+
         if sender_phone:
-            self.whatsapp.send_message(to=sender_phone, text=ans)
-            
-        return {"answer_text": ans, "sources": memories if intent["intent"] != "store_memory" else []}
+            self.whatsapp.send_message(to=sender_phone, text=answer)
+
+        return {
+            "answer_text": answer,
+            "sources": sources
+        }
 
 agent = Agent()
