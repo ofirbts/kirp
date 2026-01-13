@@ -1,26 +1,28 @@
-# UI & Server
-streamlit==1.52.2
-uvicorn==0.29.0
-fastapi==0.110.0
+# UI
+streamlit>=1.35.0
+plotly>=6.0.0
 
-# Database & Cloud Connectors
-pymongo[srv]==4.16.0
-motor==3.3.2
-dnspython==2.8.0
-qdrant-client==1.16.2
-redis==7.1.0
+# API & Backend
+fastapi
+uvicorn
+python-dotenv
 
-# AI & LLM
-openai==1.109.1
-langchain==0.1.20
-langchain-openai==0.1.6
-langchain-community==0.0.38
-tiktoken==0.6.0
+# Databases
+pymongo[srv]>=4.6.0
+motor>=3.3.0
+dnspython>=2.6.0
+qdrant-client>=1.10.0
+redis>=5.0.0
 
-# Tools & Utilities
-python-dotenv==1.0.1
-requests==2.32.5
-pandas==2.3.3
-notion-client==2.7.0
-twilio==9.4.1
-plotly==6.0.0
+# AI - עדכנתי לגרסאות מודרניות שפותרות את בעיית ה-Numpy
+openai>=1.30.0
+langchain>=0.2.0
+langchain-openai>=0.1.7
+langchain-community>=0.2.0
+tiktoken>=0.7.0
+
+# Utilities
+requests>=2.32.0
+pandas>=2.0.0
+notion-client>=2.2.0
+twilio>=9.0.0
