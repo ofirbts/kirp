@@ -8,3 +8,4 @@ headless = true
 [browser]
 serverAddress = "kirp-ofirbts.runmydocker-app.com"
 gatherUsageStats = false
+
