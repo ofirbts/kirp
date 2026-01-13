@@ -16,7 +16,7 @@ Unlike basic RAG, KIRP OS doesn't just search; it **thinks first**. The Intent E
 ### 2. The Memory Flywheel (Neural Vector Store)
 Using **FAISS** (Facebook AI Similarity Search) and **OpenAI Embeddings**, the system transforms text into high-dimensional vectors ($R^n$). 
 * **Semantic Retrieval:** Finding answers based on *meaning*, not keywords.
-* **Persistence:** Local disk storage with MongoDB event sourcing.
+* **Persistence:** Local disk Stateful storage with MongoDB event sourcing.
 
 ### 3. The Integration Fabric (Multi-Channel)
 A unified API built with **FastAPI** that bridges the gap between digital interfaces (Web UI) and real-world communication (WhatsApp via Twilio).
@@ -25,9 +25,9 @@ A unified API built with **FastAPI** that bridges the gap between digital interf
 
 ## 🛠️ Technology Stack
 * **Brain:** GPT-4o-mini (via LangChain)
-* **Memory:** FAISS (Vector DB), Redis (Cache), MongoDB (Events)
+* **Memory:** -Qdrant (Cloud-Native Vector DB), Redis (Cache), MongoDB (Events)
 * **Backend:** FastAPI (Asynchronous Python 3.10)
-* **Infrastructure:** Docker & Docker Compose
+* **Infrastructure:** Docker & Docker Compose (Multi-container)
 * **Observability:** Prometheus & Grafana (Planned)
 
 ---

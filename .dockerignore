@@ -1,6 +1,29 @@
+# Databases - אסור להעתיק, זה נוצר בתוך ה-Container או ב-Volumes
 mongo_data/
+qdrant_data/
+data/faiss_index/
+data/vector_store/
+
+# Python & Cache
 venv/
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+
+# Git & IDE
 .git/
 .gitignore
-__pycache__/
+.vscode/
+.idea/
+
+# Logs & Storage
 *.log
+storage/audit/
+storage/jobs.json
+
+# Docker
+docker-compose.yml
+Dockerfile
+.dockerignore

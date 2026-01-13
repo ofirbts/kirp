@@ -37,7 +37,7 @@ async def system_status():
         "uptime_seconds": uptime(),
 
         # External services
-        "ui_live": check_service("http://localhost:8502"),
+        "ui_live": check_service("http://localhost:8501"),
         "bot_live": check_service("http://localhost:5000/health"),
 
         # Vector store

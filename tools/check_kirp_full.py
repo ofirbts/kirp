@@ -4,12 +4,13 @@ KIRP SYSTEM DIAGNOSTIC HARNESS
 Layered, severity-aware, demo-grade system check
 """
 
+import os
 import requests
 import sys
 from dataclasses import dataclass
 from typing import Optional
 
-BASE = "http://127.0.0.1:8000"
+BASE = os.getenv("API_URL", "http://127.0.0.1:8000")
 HEADERS = {"X-Tenant": "default"}
 
 # -------------------- Result Model --------------------

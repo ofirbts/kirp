@@ -1,15 +1,19 @@
 import os
-import logging  # <--- תוסיף את השורה הזו!
+import logging
 from typing import List, Dict, Any, Optional
 from dotenv import load_dotenv
 from langchain_openai import OpenAIEmbeddings
-from langchain_community.vectorstores import FAISS
+from langchain_community.vectorstores import Qdrant
+from qdrant_client import QdrantClient
 
 load_dotenv()
-
 logger = logging.getLogger(__name__)
 
-DB_PATH = "data/faiss_index"
+# הגדרות חיבור (משתמש בשמות השירותים מה-docker-compose)
+QDRANT_HOST = os.getenv("QDRANT_HOST", "localhost")
+QDRANT_PORT = 6333
+COLLECTION_NAME = "kirp_memories"
+
 _vector_store = None
 _embeddings = None
 
@@ -19,30 +23,22 @@ def get_embeddings():
         _embeddings = OpenAIEmbeddings()
     return _embeddings
 
-def load_vector_store():
-    global _vector_store
-    embeddings = get_embeddings()
-    os.makedirs(DB_PATH, exist_ok=True)
-
-    if os.path.exists(os.path.join(DB_PATH, "index.faiss")):
-        _vector_store = FAISS.load_local(
-            DB_PATH,
-            embeddings,
-            allow_dangerous_deserialization=True
-        )
-        logger.info("Vector store loaded from disk")
-    else:
-        _vector_store = FAISS.from_texts(
-            ["KIRP OS initialized"],
-            embeddings
-        )
-        _vector_store.save_local(DB_PATH)
-        logger.info("New vector store created")
-
 def get_vector_store():
     global _vector_store
     if _vector_store is None:
-        load_vector_store()
+        embeddings = get_embeddings()
+        
+        # חיבור ללקוח Qdrant
+        client = QdrantClient(host=QDRANT_HOST, port=QDRANT_PORT)
+        
+        # יצירת ה-Vector Store של LangChain מעל Qdrant
+        _vector_store = Qdrant(
+            client=client,
+            collection_name=COLLECTION_NAME,
+            embeddings=embeddings
+        )
+        logger.info(f"Connected to Qdrant at {QDRANT_HOST}:{QDRANT_PORT}")
+        
     return _vector_store
 
 def add_texts(
@@ -50,13 +46,17 @@ def add_texts(
     metadatas: Optional[List[Dict[str, Any]]] = None
 ):
     store = get_vector_store()
+    # ב-Qdrant אין צורך ב-save_local, הוא שומר אוטומטית ב-DB
     store.add_texts(texts, metadatas=metadatas)
-    store.save_local(DB_PATH)
+    logger.info(f"Added {len(texts)} items to Qdrant")
 
 def search_vectors(query: str, k: int = 5):
     store = get_vector_store()
+    results = store.similarity_search(query, k=k)
     return [
         {"text": d.page_content, "metadata": d.metadata}
-        for d in store.similarity_search(query, k=k)
+        for d in results
     ]
+
+# Alias תאימות לקוד ישן
 add_texts_with_metadata = add_texts

@@ -1,38 +1,39 @@
-import requests
-BASE_URL = "http://127.0.0.1:8000"
+import os
+import asyncio
+# ייבוא ישיר של הלוגיקה מהפרויקט שלך
+from app.agent.agent import agent
+from app.core.persistence import PersistenceManager
+from app.core.metrics import metrics
+
+# פונקציה לעזרה בהרצת קוד אסינכרוני בתוך Streamlit
+def run_async(coro):
+    try:
+        loop = asyncio.get_event_loop()
+    except RuntimeError:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+    return loop.run_until_complete(coro)
 
 def get_health():
-    r = requests.get(f"{BASE_URL}/health/")
-    return r.json()
+    # בדיקה ישירה של המטריקות
+    return {"status": "healthy", "metrics": metrics.snapshot()}
 
 def ingest(text):
-    r = requests.post(
-        f"{BASE_URL}/ingest/",
-        json={"text": text, "metadata": {"source": "ui"}},
-        timeout=10
+    # הוספה ישירה למסד הנתונים דרך ה-PersistenceManager
+    event_id = PersistenceManager.append_event(
+        "knowledge_add", 
+        {"text": text, "source": "ui_manual"}
     )
-    return r.json()
-
+    return {"status": "success", "event_id": event_id}
 
 def get_tasks():
-    r = requests.get(f"{BASE_URL}/tasks/")
-    return r.json()
-
-def weekly_summary():
-    r = requests.post(f"{BASE_URL}/intelligence/weekly-summary/")
-    return r.json()
+    # שליפת משימות ישירות מה-DB
+    return PersistenceManager.get_pending_approvals()
 
 def ask(question, debug=False):
-    r = requests.post(
-        f"{BASE_URL}/agent/",
-        json={
-            "question": question,
-            "debug": debug
-        },
-        timeout=10
-    )
-    return r.json()
+    # הפעלת הסוכן ישירות (בלי לעבור ב-API חיצוני)
+    res = run_async(agent.query(question))
+    return res
 
 def get_status():
-    r = requests.get(f"{BASE_URL}/status/")
-    return r.json()
+    return metrics.snapshot()

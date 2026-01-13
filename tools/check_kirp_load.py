@@ -1,7 +1,8 @@
+import os
 import time
 import requests
 
-BASE = "http://127.0.0.1:8000"
+BASE = os.getenv("API_URL", "http://127.0.0.1:8000")
 
 def main():
     print("=== LOAD TEST (1000 queries) ===")

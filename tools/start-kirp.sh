@@ -25,7 +25,7 @@ sleep 2
 
 echo "📊 Starting Streamlit UI..."
 cd ui
-streamlit run app.py --server.port 8502 &
+streamlit run app.py --server.port 8501 &
 UI_PID=$!
 cd $BASE_DIR
 
@@ -40,7 +40,7 @@ curl -sf http://127.0.0.1:8000/health && echo "✅ API OK"
 echo ""
 echo "✅ KIRP IS LIVE"
 echo "🌐 Dashboard: http://127.0.0.1:8080/dashboard.html"
-echo "📊 UI:        http://localhost:8502"
+echo "📊 UI:        http://localhost:8501"
 echo "🧠 API:       http://127.0.0.1:8000/docs"
 echo "💬 WhatsApp:  http://localhost:5000"
 echo ""

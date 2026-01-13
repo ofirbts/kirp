@@ -14,6 +14,13 @@ from app.core.metrics import metrics
 from app.services.notion import notion 
 from app.integrations.whatsapp_gateway import get_whatsapp_gateway
 
+st.write("System Booting...")
+try:
+    all_events = PersistenceManager.get_all_events(limit=5)
+    st.write("DB Connected!")
+except Exception as e:
+    st.write(f"DB Error: {e}")
+
 # אתחול שער הווטסאפ
 wa_gateway = get_whatsapp_gateway()
 
@@ -115,12 +122,38 @@ def get_event_summary(e):
     if 'answer_text' in data: return f"🤖 {data['answer_text'][:45]}..."
     return f"⚙️ {e.get('type', 'System Update')}"
 
-# --- DATA FETCHING ---
-all_events = PersistenceManager.get_all_events(limit=100)
-m_stats = metrics.snapshot()
-pending_tasks = PersistenceManager.get_pending_approvals()
-memories = [e for e in all_events if "knowledge" in e.get('type', '') or "memory" in e.get('type', '')]
+# --- DATA FETCHING (Fixed & Secure) ---
+all_events = []
+try:
+    # שליפת האירועים - הוספנו מנגנון הגנה אם הבסיס ריק או לא מחובר
+    all_events = PersistenceManager.get_all_events(limit=100)
+except Exception as e:
+    st.error(f"Database Connection Error: {e}")
+    all_events = []
 
+# בדיקה אם להציג Onboarding (אם אין אירועים בכלל)
+if not all_events:
+    st.info("👋 ברוך הבא ל-KIRP OS! בוא נגדיר את הסוכן האישי שלך.")
+    with st.form("onboarding_form"):
+        u_name = st.text_input("איך לקרוא לך?")
+        u_goal = st.selectbox("מה מטרת השימוש העיקרית?", ["ניהול משימות", "סיכום ידע", "עוזר אישי כללי"])
+        u_submit = st.form_submit_button("צא לדרך")
+        if u_submit:
+            PersistenceManager.append_event("knowledge_add", {"text": f"שם המשתמש הוא {u_name}. המטרה העיקרית שלו היא {u_goal}.", "source": "Onboarding"})
+            st.success("הנתונים נשמרו! טוען מערכת...")
+            st.rerun()
+
+# אתחול נתונים לתצוגה
+try:
+    m_stats = metrics.snapshot()
+    pending_tasks = PersistenceManager.get_pending_approvals()
+    memories = [e for e in all_events if "knowledge" in str(e.get('type', '')) or "memory" in str(e.get('type', ''))]
+except Exception as e:
+    st.warning("חלק מהנתונים לא נטענו כראוי")
+    pending_tasks = []
+    memories = []
+    m_stats = {}
+    
 # --- SIDEBAR (THE BRAIN) ---
 with st.sidebar:
     st.markdown('<div class="k-logo">K</div>', unsafe_allow_html=True)
@@ -176,35 +209,127 @@ tab_chat, tab_vault, tab_actions, tab_network, tab_internal = st.tabs([
 
 # --- TAB 1: INTELLIGENCE ---
 with tab_chat:
-    if "messages" not in st.session_state: st.session_state.messages = []
+    if "messages" not in st.session_state: 
+        st.session_state.messages = []
+        
     for m in st.session_state.messages:
-        with st.chat_message(m["role"]): st.markdown(m["content"])
+        with st.chat_message(m["role"]): 
+            st.markdown(m["content"])
     
     if prompt := st.chat_input("Command KIRP OS..."):
         st.session_state.messages.append({"role": "user", "content": prompt})
-        with st.chat_message("user"): st.markdown(prompt)
+        with st.chat_message("user"): 
+            st.markdown(prompt)
+            
         with st.spinner("Processing Logic..."):
-            res = asyncio.run(agent.query(prompt))
-            st.session_state.messages.append({"role": "assistant", "content": res['answer_text']})
-            if any(word in prompt.lower() for word in ["תזכיר", "צריך", "לקנות", "תזכורת"]):
-                st.toast("Task Captured!", icon="✅")
-        st.rerun()
+            try:
+                # --- השינוי המרכזי כאן: ניהול לופ אסינכרוני בטוח לשרת ---
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                res = loop.run_until_complete(agent.query(prompt))
+                loop.close()
+                # ------------------------------------------------------
 
-# --- TAB 2: CORE VAULT (INGEST) ---
+                st.session_state.messages.append({"role": "assistant", "content": res['answer_text']})
+                
+                if any(word in prompt.lower() for word in ["תזכיר", "צריך", "לקנות", "תזכורת"]):
+                    st.toast("Task Captured!", icon="✅")
+            except Exception as e:
+                st.error(f"Error processing query: {e}")
+                
+        st.rerun()
+        
+# --- TAB 2: CORE VAULT (INTELLIGENCE INGESTION) ---
 with tab_vault:
-    st.subheader("🧠 Memory Ingest")
-    v_col1, v_col2 = st.columns([2, 1])
-    with v_col1:
-        insight = st.text_area("Record a new strategic insight:", placeholder="Type anything that needs to be part of your long-term memory...", height=150)
-    with v_col2:
-        st.info("🔍 **Auto-Context Engine**")
-        if insight:
-            detected = "Web/Link" if "http" in insight else "General Insight"
-            st.success(f"Detected: **{detected}**")
-            if st.button("Archive to Core Vault", width='stretch'):
-                PersistenceManager.append_event("knowledge_add", {"text": insight, "source": "UI_Direct"})
-                st.balloons()
-                st.rerun()
+    st.subheader("🔮 Intelligence Ingestion")
+    st.markdown("כאן ניתן להזין ידע חדש למערכת כדי לשפר את הזיכרון וההבנה של הסוכן לגביך.")
+    
+    # בחירה בין סוגי הזרקה - ממשק אינטואיטיבי
+    ingest_type = st.radio(
+        "בחר שיטת הזרקה:", 
+        ["תובנה מהירה", "הזרקת טקסט חופשי (Bulk)", "העלאת קובץ (CSV/TXT)"], 
+        horizontal=True
+    )
+
+    st.divider()
+
+    # --- אפשרות 1: תובנה מהירה ---
+    if ingest_type == "תובנה מהירה":
+        col1, col2 = st.columns([3, 1])
+        with col1:
+            fast_note = st.text_input("מה תרצה שהמערכת תזכור?", placeholder="למשל: אופיר מעדיף לעבוד עם ספריות Python נקיות...")
+        with col2:
+            st.write("") # ריוח קטן
+            if st.button("זכור תובנה", use_container_width=True):
+                if fast_note:
+                    PersistenceManager.append_event("knowledge_add", {"text": fast_note, "source": "Quick_Note"})
+                    st.toast("נשמר בזיכרון!", icon="🧠")
+                    st.rerun()
+
+    # --- אפשרות 2: הזרקת טקסט חופשי ---
+    elif ingest_type == "הזרקת טקסט חופשי (Bulk)":
+        bulk_text = st.text_area("הדבק כאן ערימת טקסט (מיילים, סיכומי פגישות, פרוטוקולים):", height=250, placeholder="הדבק כאן את הטקסט הגולמי...")
+        if st.button("נתח והזרק לזיכרון", use_container_width=True):
+            if bulk_text:
+                with st.spinner("מבצע אינדוקס לטקסט..."):
+                    PersistenceManager.append_event("knowledge_add", {"text": bulk_text, "source": "Bulk_Paste"})
+                    st.success("הטקסט הוזרק בהצלחה לזיכרון המערכת!")
+                    st.balloons()
+
+# --- אפשרות 3: העלאת קובץ (כולל הורדת טמפלייט) ---
+    elif ingest_type == "העלאת קובץ (CSV/TXT)":
+        col_info, col_dl = st.columns([3, 1])
+        with col_info:
+            st.info("💡 מומלץ להשתמש בפורמט הקבוע כדי שהסוכן יבין את ההקשר של המידע.")
+        with col_dl:
+            # יצירת קובץ Template ריק להורדה
+            template_csv = "Category,Insight,Context,Importance\nדוגמה: העדפות אישיות,אופיר אוהב קפה חזק בבוקר,יום-יום,Medium"
+            st.download_button(
+                label="📥 הורד תבנית CSV",
+                data=template_csv,
+                file_name="KIRP_Knowledge_Template.csv",
+                mime="text/csv",
+                use_container_width=True
+            )
+
+        uploaded_file = st.file_uploader("בחר קובץ מהמחשב", type=['csv', 'txt'])
+        
+        if uploaded_file is not None:
+            with st.status("מעבד נתונים ומזריק לזיכרון...", expanded=True) as status:
+                try:
+                    if uploaded_file.type == "text/plain":
+                        content = uploaded_file.read().decode("utf-8")
+                        PersistenceManager.append_event("knowledge_add", {
+                            "text": content, 
+                            "source": f"File: {uploaded_file.name}",
+                            "ingested_at": datetime.now().isoformat()
+                        })
+                        st.write(f"✅ טקסט מקובץ {uploaded_file.name} נקלט.")
+
+                    elif uploaded_file.type == "text/csv":
+                        df = pd.read_csv(uploaded_file)
+                        st.write("👀 תצוגה מקדימה:")
+                        st.dataframe(df.head(3), use_container_width=True)
+                        
+                        if st.button("אשר הזרקה סופית לזיכרון"):
+                            count = 0
+                            for _, row in df.iterrows():
+                                combined_text = (
+                                    f"קטגוריה: {row.get('Category', 'כללי')} | "
+                                    f"תובנה: {row.get('Insight', '')} | "
+                                    f"הקשר: {row.get('Context', 'ללא')} | "
+                                    f"חשיבות: {row.get('Importance', 'Normal')}"
+                                )
+                                PersistenceManager.append_event("knowledge_add", {
+                                    "text": combined_text,
+                                    "source": uploaded_file.name
+                                })
+                                count += 1
+                            st.write(f"✅ הוזרקו {count} תובנות חדשות.")
+                            status.update(label="העיבוד הושלם!", state="complete", expanded=False)
+                            st.balloons()
+                except Exception as e:
+                    st.error(f"שגיאה: {e}")
 
 # --- TAB 3: ACTION PIPELINE ---
 with tab_actions:
