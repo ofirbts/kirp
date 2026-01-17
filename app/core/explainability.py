@@ -1,5 +1,5 @@
 from typing import Dict, Any, List
-from datetime import datetime
+from datetime import datetime, timezone
 
 
 class ExplanationBuilder:
@@ -17,7 +17,7 @@ class ExplanationBuilder:
         This is what is persisted into events as "explanation".
         """
         return {
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
             "reason": reason,
             "inputs": inputs,
             "outcome": outcome,

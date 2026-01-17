@@ -1,7 +1,7 @@
 # app/services/notion/notion_impl.py
 import os
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from notion_client import Client
 from .base import NotionAdapter
 
@@ -35,7 +35,7 @@ class RealNotionService(NotionAdapter):
                     "Trace ID": {"rich_text": [{"text": {"content": trace_id}}]},
                     "Source": {"select": {"name": source}},
                     # אם הוספת שדה 'Created' בנשן מסוג Date:
-                    "Created": {"date": {"start": datetime.utcnow().isoformat()}}
+                    "Created": {"date": {"start": datetime.now(timezone.utc).isoformat()}}
                 },
             )
         except Exception as e:

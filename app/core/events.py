@@ -1,6 +1,6 @@
 # app/core/events.py
 from typing import Dict, Any
-from datetime import datetime
+from datetime import datetime, timezone
 import uuid
 from app.core.persistence import PersistenceManager
 
@@ -14,7 +14,8 @@ class EventManager:
         Record a new event and save it to persistent storage.
         """
         event_id = str(uuid.uuid4())
-        timestamp = datetime.utcnow().isoformat()
+        timestamp = datetime.now(timezone.utc).isoformat()
+
         
         # בניית האובייקט המאוחד
         full_event = {

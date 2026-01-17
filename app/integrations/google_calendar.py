@@ -1,5 +1,5 @@
 import os
-from datetime import datetime, timedelta
+from datetime import datetime, timezone, timedelta
 
 class GoogleCalendarClient:
     def create_event(self, summary: str, start_time: datetime = None):

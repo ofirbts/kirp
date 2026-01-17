@@ -8,7 +8,7 @@ import sys
 import subprocess
 import requests
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 import pathlib
 
 def run_cmd(cmd):

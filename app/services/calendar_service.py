@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from app.integrations.google_calendar import GoogleCalendarClient
 
 class CalendarService:

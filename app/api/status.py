@@ -3,7 +3,7 @@ from time import time
 from app.rag.vector_store import debug_info
 import requests
 from typing import Optional
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timezone
 from app.observability.alerts import get_alerts
 
 router = APIRouter(tags=["Status"])

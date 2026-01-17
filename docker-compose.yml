@@ -1,46 +1,88 @@
+networks:
+  kirp-net:
+    driver: bridge
 
 services:
-  app:
-    build: .
-    ports:
-      - "8501:8501"
-    env_file:
-      - .env
-    environment:
-      - MONGO_URI=mongodb://root:example@mongodb:27017
-      - QDRANT_HOST=qdrant
-      - REDIS_HOST=redis
-    depends_on:
-      - mongodb
-      - qdrant
-      - redis
-
   qdrant:
     image: qdrant/qdrant:latest
+    container_name: qdrant
     ports:
       - "6333:6333"
     volumes:
       - qdrant_data:/qdrant/storage
+    networks:
+      - kirp-net
+    healthcheck:
+      test: ["CMD-SHELL", "timeout 1s bash -c ':> /dev/tcp/127.0.0.1/6333' || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
   mongodb:
     image: mongo:latest
+    container_name: mongodb
     environment:
-      MONGO_INITDB_ROOT_USERNAME: root
-      MONGO_INITDB_ROOT_PASSWORD: example
+      - MONGO_INITDB_ROOT_USERNAME=root
+      - MONGO_INITDB_ROOT_PASSWORD=example
     ports:
       - "27017:27017"
     volumes:
-      - mongodb_data:/data/db
+      - mongo_data:/data/db
+    networks:
+      - kirp-net
 
   redis:
     image: redis:latest
+    container_name: redis
     ports:
       - "6379:6379"
+    networks:
+      - kirp-net
+
+  kirp-api:
+    build: .
+    container_name: kirp-api
+    working_dir: /app
+    env_file:
+      - .env
+    environment:
+      - PYTHONPATH=/app
+      - RUNNING_IN_DOCKER=true
+      - QDRANT_HOST=qdrant
+      - REDIS_HOST=redis
+      - MONGO_URI=mongodb://root:example@mongodb:27017/kirp?authSource=admin
+    ports:
+      - "8000:8000"
+    depends_on:
+      qdrant:
+        condition: service_healthy
+      mongodb:
+        condition: service_started
+      redis:
+        condition: service_started
+    networks:
+      - kirp-net
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000
+
+  kirp-ui:
+    build: .
+    container_name: kirp-ui
+    working_dir: /app
+    env_file:
+      - .env
+    environment:
+      - PYTHONPATH=/app
+      - RUNNING_IN_DOCKER=true
+      - API_BASE_URL=http://kirp-api:8000
+      - INTERNAL_API_URL=http://kirp-api:8000
+    ports:
+      - "8501:8501"
+    depends_on:
+      - kirp-api
+    networks:
+      - kirp-net
+    command: streamlit run app/ui/main_ui.py --server.port=8501 --server.address=0.0.0.0
 
 volumes:
-  mongodb_data:
   qdrant_data:
-
-networks:
-  default:
-    name: kirp_network
+  mongo_data:

@@ -6,6 +6,6 @@ enableXsrfProtection = false
 headless = true
 
 [browser]
-serverAddress = "kirp-ofirbts.runmydocker-app.com"
+serverAddress = localhost
 gatherUsageStats = false
 

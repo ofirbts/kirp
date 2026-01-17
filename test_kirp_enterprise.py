@@ -1,7 +1,7 @@
 import asyncio
 import sys
 import os
-from datetime import datetime
+from datetime import datetime, timezone
 
 # הוספת נתיב הפרויקט - חייב להיות לפני הייבוא של app
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), ".")))

@@ -1,7 +1,7 @@
 from fastapi import APIRouter
 from typing import List
 from pydantic import BaseModel
-from datetime import datetime
+from datetime import datetime, timezone
 from app.rag.chunker import chunk_text
 from app.rag.vector_store import add_texts
 from app.core.persistence import PersistenceManager
@@ -19,7 +19,7 @@ async def ingest_batch(items: List[IngestRequest]):
         chunks = chunk_text(item.text)
         for chunk in chunks:
             all_chunks.append(
-                f"{chunk}\n\nMETA: {item.metadata} | INGESTED_AT: {datetime.utcnow().isoformat()}"
+                f"{chunk}\n\nMETA: {item.metadata} | INGESTED_AT: {datetime.now(timezone.utc).isoformat()}"
             )
 
     add_texts(all_chunks)

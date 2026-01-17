@@ -1,6 +1,7 @@
-# UI
+# UI & Frontend
 streamlit>=1.35.0
 plotly>=6.0.0
+extra-streamlit-components>=0.1.71
 
 # API & Backend
 fastapi
@@ -14,15 +15,23 @@ dnspython>=2.6.0
 qdrant-client>=1.10.0
 redis>=5.0.0
 
-# AI - עדכנתי לגרסאות מודרניות שפותרות את בעיית ה-Numpy
+# AI & LLM
 openai>=1.30.0
 langchain>=0.2.0
 langchain-openai>=0.1.7
 langchain-community>=0.2.0
 tiktoken>=0.7.0
 
-# Utilities
+# Auth & Integrations
+pyjwt
+google-auth
+google-auth-oauthlib
+streamlit-oauth
 requests>=2.32.0
 pandas>=2.0.0
 notion-client>=2.2.0
 twilio>=9.0.0
+boto3
+google-auth-httplib2
+passlib[bcrypt]==1.7.4
+bcrypt==4.1.2

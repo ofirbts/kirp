@@ -1,10 +1,10 @@
 from pydantic import BaseModel, Field
 from typing import List, Dict, Any
-from datetime import datetime
+from datetime import datetime, timezone
 import uuid
 
 class TraceEvent(BaseModel):
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     type: str
     payload: Dict[str, Any]
 
