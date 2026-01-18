@@ -1,55 +1,49 @@
-# app/services/notion/notion_impl.py
 import os
+import requests
 import logging
-from datetime import datetime, timezone
-from notion_client import Client
-from .base import NotionAdapter
+from app.services.notion.base import NotionAdapter
 
 logger = logging.getLogger(__name__)
 
 class RealNotionService(NotionAdapter):
     def __init__(self):
-        token = os.getenv("NOTION_TOKEN")
-        # שים לב לשם המשתנה - ב-Docker שלך זה NOTION_TASKS_DB_ID
-        self.db_id = os.getenv("NOTION_TASKS_DB_ID")
-
-        if not token or token in ["mock", "YOUR_NOTION_TOKEN"]:
-            self.client = None
-            logger.warning("Notion Token is missing or mock.")
-        else:
-            self.client = Client(auth=token)
-            logger.info("Notion Client connected successfully.")
+        self.token = os.getenv("NOTION_TOKEN")
+        self.database_id = os.getenv("NOTION_DATABASE_ID")
+        self.headers = {
+            "Authorization": f"Bearer {self.token}",
+            "Content-Type": "application/json",
+            "Notion-Version": "2022-06-28"
+        }
 
     def enabled(self) -> bool:
-        return self.client is not None and self.db_id is not None
+        """בדיקה האם Notion מוגדר במערכת"""
+        return bool(self.token and self.database_id)
 
-    def create_task(self, title: str, trace_id: str = "N/A", source: str = "KIRP Agent", confidence: float = 1.0):
+    def create_task(self, title: str, trace_id: str = "N/A", source: str = "KIRP Agent"):
+        """יצירת משימה חדשה ב-Notion עם סטטוס Backlog"""
         if not self.enabled():
+            logger.warning("⚠️ Notion Service disabled or missing config")
             return None
-
+        
+        url = "https://api.notion.com/v1/pages"
+        payload = {
+            "parent": {"database_id": self.database_id},
+            "properties": {
+                "Name": {"title": [{"text": {"content": title}}]},
+                "Source": {"rich_text": [{"text": {"content": source}}]},
+                "TraceID": {"rich_text": [{"text": {"content": trace_id}}]},
+                "Status": {"select": {"name": "Backlog"}}
+            }
+        }
+        
         try:
-            return self.client.pages.create(
-                parent={"database_id": self.db_id},
-                properties={
-                    "Name": {"title": [{"text": {"content": title}}]},
-                    "Trace ID": {"rich_text": [{"text": {"content": trace_id}}]},
-                    "Source": {"select": {"name": source}},
-                    # אם הוספת שדה 'Created' בנשן מסוג Date:
-                    "Created": {"date": {"start": datetime.now(timezone.utc).isoformat()}}
-                },
-            )
+            response = requests.post(url, json=payload, headers=self.headers)
+            if response.status_code == 200:
+                logger.info(f"✅ Notion task created: {trace_id}")
+                return response.json()
+            else:
+                logger.error(f"❌ Notion API Error: {response.text}")
+                return None
         except Exception as e:
-            logger.error(f"Notion Page Creation Failed: {e}")
+            logger.error(f"❌ Failed to connect to Notion: {e}")
             return None
-
-    def get_pending_approvals(self):
-        if not self.enabled(): return []
-        # כאן אפשר להוסיף שאילתה שמחפשת דפים שבהם הסטטוס הוא 'Pending'
-        try:
-            results = self.client.databases.query(
-                database_id=self.db_id,
-                filter={"property": "Status", "status": {"equals": "Pending Approval"}}
-            ).get("results", [])
-            return results
-        except:
-            return []

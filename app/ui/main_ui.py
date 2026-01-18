@@ -1,305 +1,160 @@
-# ================================
-# KIRP OS – main_ui.py (v6.5 CLEAN)
-# ================================
-
 import streamlit as st
 import requests
-import os
-import sys
-import asyncio
-import logging
-from pathlib import Path
-from datetime import datetime, timedelta
-from typing import Dict, Any, List
-
 import pandas as pd
-import plotly.express as px
-from dotenv import load_dotenv
-import importlib.util
+import time
 
-# ----------------
-# BOOTSTRAP
-# ----------------
-load_dotenv()
-logger = logging.getLogger("KIRP_UI")
+# הגדרת כתובת ה-Backend בתוך רשת ה-Docker
+API_URL = "http://kirp-api:8000"
 
-CURRENT_FILE = Path(__file__).resolve()
-ROOT_PATH = CURRENT_FILE.parent.parent.parent
-if str(ROOT_PATH) not in sys.path:
-    sys.path.insert(0, str(ROOT_PATH))
-
-# ----------------
-# CONFIG
-# ----------------
-CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
-INTERNAL_API_URL = os.getenv("INTERNAL_API_URL", "http://kirp-api:8000")
-EXTERNAL_URL = os.getenv("EXTERNAL_URL", "http://localhost:8501").rstrip("/")
-REDIRECT_URI = f"{EXTERNAL_URL}/"
-
+# הגדרות תצורה של Streamlit
 st.set_page_config(
-    page_title="🧠 KIRP OS",
+    page_title="KIRP Intelligence OS",
     page_icon="🧠",
-    layout="wide",
+    layout="wide"
 )
 
-# ----------------
-# SESSION STATE
-# ----------------
-DEFAULT_STATE = {
-    "authenticated": False,
-    "auth_checked": False,
-    "user_id": None,
-    "full_name": None,
-    "avatar_url": None,
-    "messages": [],
-    "processed_codes": set(),
-}
+# פונקציית עזר לשליחת בקשות API בצורה בטוחה
+def call_api(method, endpoint, data=None):
+    try:
+        url = f"{API_URL}/{endpoint}"
+        if method == "GET":
+            response = requests.get(url, timeout=10)
+        else:
+            response = requests.post(url, json=data, timeout=10)
+        return response.json()
+    except Exception as e:
+        st.error(f"API Connection Error: {e}")
+        return None
 
-for k, v in DEFAULT_STATE.items():
-    st.session_state.setdefault(k, v)
+# --- מנגנון LOGIN ---
+if "logged_in" not in st.session_state:
+    st.session_state.logged_in = False
 
-# ----------------
-# CORE LOADER
-# ----------------
-def load_module(path: Path, attr: str):
-    spec = importlib.util.spec_from_file_location(attr, str(path))
-    mod = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(mod)
-    return getattr(mod, attr)
-
-PersistenceManager = None
-Agent = None
-
-try:
-    PersistenceManager = load_module(
-        ROOT_PATH / "app/core/persistence.py",
-        "PersistenceManager"
-    )()
-    logger.info("Persistence loaded")
-except Exception as e:
-    logger.error(f"Persistence load failed: {e}")
-
-try:
-    Agent = load_module(
-        ROOT_PATH / "app/agent/agent.py",
-        "agent"
-    )
-    logger.info("Agent loaded")
-except Exception as e:
-    logger.error(f"Agent load failed: {e}")
-
-# ----------------
-# AUTH MANAGER
-# ----------------
-class Auth:
-    @staticmethod
-    def restore():
-        if st.session_state.auth_checked:
-            return
-        st.session_state.auth_checked = True
-        try:
-            import extra_streamlit_components as stx
-            cm = stx.CookieManager(key="kirp_auth")
-            uid = cm.get("kirp_user_id")
-            if uid:
-                st.session_state.update({
-                    "authenticated": True,
-                    "user_id": uid,
-                    "full_name": uid,
-                })
-        except:
-            pass
-
-    @staticmethod
-    def login(user: Dict[str, Any]):
-        st.session_state.update({
-            "authenticated": True,
-            "user_id": user.get("user_id"),
-            "full_name": user.get("full_name", user.get("user_id")),
-            "avatar_url": user.get("avatar_url"),
-        })
-        try:
-            import extra_streamlit_components as stx
-            cm = stx.CookieManager(key="kirp_auth")
-            cm.set(
-                "kirp_user_id",
-                st.session_state.user_id,
-                expires_at=datetime.now() + timedelta(days=30)
-            )
-        except:
-            pass
-
-    @staticmethod
-    def logout():
-        for k in DEFAULT_STATE:
-            st.session_state[k] = DEFAULT_STATE[k]
-        try:
-            import extra_streamlit_components as stx
-            stx.CookieManager(key="kirp_auth").delete("kirp_user_id")
-        except:
-            pass
-        st.rerun()
-
-Auth.restore()
-
-# ----------------
-# GOOGLE CALLBACK
-# ----------------
-if "code" in st.query_params and not st.session_state.authenticated:
-    code = st.query_params["code"]
-    if code not in st.session_state.processed_codes:
-        st.session_state.processed_codes.add(code)
-        try:
-            resp = requests.post(
-                f"{INTERNAL_API_URL}/auth/google/callback",
-                json={"code": code},
-                timeout=10,
-            )
-            if resp.status_code == 200:
-                Auth.login(resp.json())
-        finally:
-            st.query_params.clear()
-            st.rerun()
-
-# ----------------
-# LOGIN SCREEN
-# ----------------
-if not st.session_state.authenticated:
-    st.title("🧠 KIRP OS")
-    c1, c2 = st.columns(2)
-
-    with c1:
-        u = st.text_input("Username")
-        p = st.text_input("Password", type="password")
-        if st.button("Login", use_container_width=True):
-            r = requests.post(
-                f"{INTERNAL_API_URL}/auth/login",
-                json={"username": u, "password": p},
-                timeout=10,
-            )
-            if r.status_code == 200:
-                Auth.login(r.json())
+if not st.session_state.logged_in:
+    st.title("🧠 KIRP Intelligence OS")
+    st.subheader("מערכת ניהול ידע ותובנות אוטונומית")
+    
+    with st.container(border=True):
+        user_id = st.text_input("מזהה משתמש (User ID)", placeholder=" שלח/י מזהה ייחודי")
+        password = st.text_input("סיסמה", type="password")
+        
+        if st.button("התחבר למערכת", use_container_width=True):
+            if user_id: # כאן אפשר להוסיף לוגיקת אימות מול DB בעתיד
+                st.session_state.user_id = user_id
+                st.session_state.logged_in = True
+                st.success("מתחבר...")
+                time.sleep(1)
                 st.rerun()
             else:
-                st.error("Invalid credentials")
+                st.warning("נא להזין מזהה משתמש")
+    st.stop() # עוצר את הרצת שאר הדף עד להתחברות
 
-    with c2:
-        google_url = (
-            "https://accounts.google.com/o/oauth2/v2/auth"
-            f"?client_id={CLIENT_ID}"
-            "&response_type=code"
-            "&scope=openid email profile"
-            f"&redirect_uri={REDIRECT_URI}"
-        )
-        st.markdown(
-            f"<a href='{google_url}'><button style='width:100%'>Google Login</button></a>",
-            unsafe_allow_html=True,
-        )
-
-    st.stop()
-
-# ----------------
-# HELPERS
-# ----------------
-def run_agent(prompt: str) -> str:
-    if not Agent:
-        return "🤖 Agent unavailable"
-    try:
-        return asyncio.run(
-            Agent.query(prompt, st.session_state.user_id)
-        ).get("answer_text", "")
-    except Exception as e:
-        return f"Error: {e}"
-
-# ----------------
-# SIDEBAR
-# ----------------
+# --- SIDEBAR (תפריט ניווט) ---
 with st.sidebar:
-    st.markdown(f"### 👤 {st.session_state.full_name}")
-    if st.button("🚪 Logout", use_container_width=True):
-        Auth.logout()
-
-# ----------------
-# DASHBOARD
-# ----------------
-st.success(f"Welcome {st.session_state.full_name}")
-
-col1, col2, col3 = st.columns(3)
-with col1:
-    st.metric("Messages", len(st.session_state.messages))
-with col2:
-    count = (
-        len(PersistenceManager.get_user_events(st.session_state.user_id, 100))
-        if PersistenceManager else 0
+    st.title("🧠 KIRP OS")
+    st.write(f"👤 מחובר כ: **{st.session_state.user_id}**")
+    st.divider()
+    
+    # בחירת עמוד
+    page = st.radio(
+        "ניווט",
+        ["דף הבית (Dashboard)", "שאילתת ידע (Query)", "תובנות עסקיות (Insights)", "ניהול סוכנים (Agents)"]
     )
-    st.metric("Memories", count)
-with col3:
-    st.metric("Status", "LIVE")
-
-# ----------------
-# TABS
-# ----------------
-tab_chat, tab_memory, tab_tasks, tab_analytics, tab_system = st.tabs(
-    ["🤖 Chat", "🧠 Knowledge", "✅ Tasks", "📊 Analytics", "⚙️ System"]
-)
-
-# ---- CHAT
-with tab_chat:
-    for m in st.session_state.messages:
-        with st.chat_message(m["role"]):
-            st.markdown(m["content"])
-
-    prompt = st.chat_input("Ask KIRP…")
-    if prompt:
-        st.session_state.messages.append({"role": "user", "content": prompt})
-        reply = run_agent(prompt)
-        st.session_state.messages.append({"role": "assistant", "content": reply})
+    
+    st.divider()
+    if st.button("🔄 רענן נתונים", use_container_width=True):
         st.rerun()
 
-# ---- KNOWLEDGE
-with tab_memory:
-    text = st.text_area("Add knowledge")
-    if st.button("Save") and text and PersistenceManager:
-        PersistenceManager.append_event(
-            st.session_state.user_id,
-            "knowledge",
-            {"text": text},
-        )
-        st.success("Saved")
+# --- דף הבית: DASHBOARD & MONITORING ---
+if page == "דף הבית (Dashboard)":
+    st.title("📊 מערכת ניטור ובקרה")
+    
+    # שליפת נתוני בריאות מה-API
+    health_data = call_api("GET", "health")
+    
+    if health_data:
+        # הצגת כרטיסי מדדים (Metrics)
+        col1, col2, col3 = st.columns(3)
+        
+        # בדיקת סטטוס מונגו
+        mongo_status = health_data.get("mongodb", {}).get("status", "error")
+        col1.metric("MongoDB Status", "🟢 תקין" if mongo_status == "healthy" else "🔴 שגיאה")
+        
+        # בדיקת סטטוס קוואדרנט
+        qdrant_status = health_data.get("qdrant", {}).get("status", "error")
+        col2.metric("Qdrant Status", "🟢 תקין" if qdrant_status == "healthy" else "🔴 שגיאה")
+        
+        # השהיית מערכת
+        latency = health_data.get("mongodb", {}).get("latency", "N/A")
+        col3.metric("System Latency", latency)
+        
+        st.divider()
+        st.subheader("🖥️ פרטי שרתים")
+        st.json(health_data) # מציג את כל הפירוט הטכני בצורה נקייה
+    else:
+        st.error("לא ניתן להתחבר לשרת ה-API. וודא שקונטיינר kirp-api רץ.")
+# --- דף שאילתת ידע ---
+elif page == "שאילתת ידע (Query)":
+    st.title("🔍 שאילתת ידע חכמה (RAG)")
+    st.write("שאל את המערכת כל דבר המבוסס על מאגר הנתונים שלך.")
+    
+    with st.container(border=True):
+        query_input = st.text_input("הקלד את שאלתך כאן:", placeholder="למשל: מה היו הבעיות המרכזיות בלוגים אתמול?")
+        col1, col2 = st.columns([1, 5])
+        if col1.button("שלח שאילתה", use_container_width=True):
+            if query_input:
+                with st.spinner("הסוכן סורק את מאגרי הידע..."):
+                    result = call_api("POST", "query", {"query": query_input, "user_id": st.session_state.user_id})
+                    if result and "answer" in result:
+                        st.chat_message("assistant").write(result["answer"])
+                    else:
+                        st.error("הסוכן לא הצליח לגבש תשובה.")
+            else:
+                st.warning("נא להזין שאלה.")
 
-# ---- TASKS
-with tab_tasks:
-    if PersistenceManager:
-        tasks = PersistenceManager.get_pending_approvals(st.session_state.user_id)
-        if not tasks:
-            st.success("No pending tasks")
-        for t in tasks:
-            with st.expander(t.get("type", "Task")):
-                st.json(t)
+# --- דף תובנות עסקיות ---
+elif page == "תובנות עסקיות (Insights)":
+    st.title("💡 תובנות מנוע הבינה")
+    st.write("תובנות אלו נוצרות אוטומטית על ידי סריקה תקופתית של המערכת.")
+    
+    insights = call_api("GET", f"insights/{st.session_state.user_id}")
+    
+    if insights:
+        for ins in insights:
+            with st.expander(f"📌 {ins.get('title', 'תובנה חדשה')}"):
+                c1, c2 = st.columns([3, 1])
+                c1.write(ins.get("description", "אין תיאור זמין"))
+                
+                # תצוגת Confidence/Impact
+                confidence = ins.get("confidence", 0)
+                c2.metric("Confidence", f"{int(confidence*100)}%")
+                
+                st.caption(f"סוג: {ins.get('type')} | השפעה צפויה: {ins.get('impact_score', 'N/A')}/10")
+    else:
+        st.info("עדיין לא נוצרו תובנות. המתן לסריקה הבאה של המנוע.")
+# --- דף ניהול סוכנים ---
+elif page == "ניהול סוכנים (Agents)":
+    st.title("🤖 Agent Architect")
+    st.write("הגדר סוכן חדש למשימה ספציפית בתוך המערכת.")
+    
+    with st.form("new_agent_form"):
+        st.subheader("יצירת סוכן משימה")
+        agent_name = st.text_input("שם הסוכן", placeholder="למשל: LogAnalyzer_Agent")
+        agent_goal = st.text_area("הגדרת מטרה", placeholder="למשל: סרוק לוגים של MongoDB והתראה על איטיות מעל 100ms")
+        
+        # כפתור שליחה - תיקון השגיאה הקודמת מ-form_submit_state ל-form_submit_button
+        submit_agent = st.form_submit_button("הפעל ארכיטקט סוכנים", use_container_width=True)
+        
+        if submit_agent:
+            if agent_name and agent_goal:
+                with st.spinner("בונה תצורת סוכן..."):
+                    res = call_api("POST", "agents/generate", {"name": agent_name, "goal": agent_goal})
+                    if res:
+                        st.success(f"הסוכן {agent_name} נוצר בהצלחה ונכנס לתהליך פריסה.")
+                        st.json(res)
+            else:
+                st.error("נא למלא את כל השדות.")
 
-# ---- ANALYTICS
-with tab_analytics:
-    if PersistenceManager:
-        events = PersistenceManager.get_user_events(st.session_state.user_id, 200)
-        if events:
-            df = pd.DataFrame(events)
-            fig = px.histogram(df, x="timestamp", color="type")
-            st.plotly_chart(fig, use_container_width=True)
-
-# ---- SYSTEM
-with tab_system:
-    st.json({
-        "user": st.session_state.user_id,
-        "messages": len(st.session_state.messages),
-        "time": datetime.now().isoformat(),
-    })
-
-# ----------------
-# FOOTER
-# ----------------
-st.markdown(
-    f"<div style='text-align:center;color:#888;margin-top:3rem'>"
-    f"KIRP OS • {datetime.now().year} • Built by Ofir Betesh"
-    f"</div>",
-    unsafe_allow_html=True,
-)
+# עיצוב תחתון (Footer)
+st.sidebar.markdown("---")
+st.sidebar.caption("KIRP OS v1.0.0 | Enterprise Knowledge Engine")

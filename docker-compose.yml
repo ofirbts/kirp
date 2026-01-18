@@ -1,3 +1,4 @@
+
 networks:
   kirp-net:
     driver: bridge
@@ -49,16 +50,14 @@ services:
       - PYTHONPATH=/app
       - RUNNING_IN_DOCKER=true
       - QDRANT_HOST=qdrant
-      - REDIS_HOST=redis
       - MONGO_URI=mongodb://root:example@mongodb:27017/kirp?authSource=admin
+      - MONGO_DB_NAME=kirp
     ports:
       - "8000:8000"
     depends_on:
       qdrant:
         condition: service_healthy
       mongodb:
-        condition: service_started
-      redis:
         condition: service_started
     networks:
       - kirp-net
@@ -73,8 +72,7 @@ services:
     environment:
       - PYTHONPATH=/app
       - RUNNING_IN_DOCKER=true
-      - API_BASE_URL=http://kirp-api:8000
-      - INTERNAL_API_URL=http://kirp-api:8000
+      - API_URL=http://kirp-api:8000
     ports:
       - "8501:8501"
     depends_on:

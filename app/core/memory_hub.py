@@ -5,36 +5,31 @@ from app.rag.vector_store import add_texts, search_vectors
 logger = logging.getLogger(__name__)
 
 class MemoryHub:
-    """
-    Central memory abstraction for KIRP.
-    Backed by vector store (FAISS).
-    """
+    def add_text(self, content: str, source: str, user_id: str) -> str:
+        """הוספת מידע לזיכרון הוקטורי עם מניעת כפילויות סמנטית"""
+        # 1. Semantic Deduplication Check
+        try:
+            existing = search_vectors(content, k=1)
+            if existing and existing[0].get("score", 0) > 0.95:
+                logger.info(f"ℹ️ Semantic duplicate detected for user {user_id}. Skipping.")
+                return "duplicate"
+        except Exception as e:
+            logger.warning(f"Deduplication check failed, proceeding with storage: {e}")
 
-    def add_text(
-        self,
-        content: str,
-        source: str,
-        tier: str = "short",
-        session_id: str = "default"
-    ) -> str | None:
+        # 2. Store in Vector DB
         try:
             add_texts(
                 texts=[content],
-                metadatas=[{
-                    "source": source,
-                    "tier": tier,
-                    "session_id": session_id
-                }]
+                metadatas=[{"source": source, "user_id": user_id, "timestamp": str(logging.time.time())}]
             )
-            logger.info("Memory stored successfully")
-            return f"mem_{hash(content) & 0xfffffff}"
+            logger.info(f"🧠 New memory indexed for user {user_id}")
+            return "stored"
         except Exception as e:
-            logger.error(f"Memory storage failed: {e}")
-            return None
+            logger.error(f"❌ Memory storage failed: {e}")
+            return "error"
 
-    def search(self, query: str, k: int = 5) -> List[Dict[str, Any]]:
-        try:
-            return search_vectors(query, k=k)
-        except Exception as e:
-            logger.error(f"Memory search failed: {e}")
-            return []
+    def search_context(self, query: str, k: int = 5):
+        """חיפוש הקשר רלוונטי בזיכרון הוקטורי"""
+        return search_vectors(query, k=k)
+
+memory_hub = MemoryHub()

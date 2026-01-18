@@ -1,91 +1,46 @@
 import logging
-import asyncio
-from datetime import datetime, timezone
+from typing import List, Optional
 from app.llm.client import get_llm
+from app.rag.vector_store import search_vectors
 from app.core.persistence import PersistenceManager
+from app.models.schemas import Insight
 
 logger = logging.getLogger(__name__)
 
-class CoreAgent:
-    def __init__(self):
+class OmniAgent:
+    def __init__(self, role: str = "general_assistant"):
+        self.role = role
         self.llm = get_llm()
 
-    async def query(self, question: str, user_id: str):
-        # 1. שליפת אירועים רלוונטיים - שימוש ב-Thread כדי לא לחסום את ה-Event Loop
-        raw_events = await asyncio.to_thread(PersistenceManager.get_user_events, user_id=user_id, limit=50)
+    async def process_task(self, task_description: str, context_query: Optional[str] = None):
+        """ביצוע משימה ספציפית (סיכום, זיהוי בעיות וכו')"""
         
-        processed_context_parts = []
-        now = datetime.now(timezone.utc)
+        # 1. שליפת הקשר רלוונטי מה-Vector Store אם נדרש
+        context = ""
+        if context_query:
+            results = search_vectors(context_query, k=5)
+            context = "\n".join([r['text'] for r in results])
 
-
-        for e in raw_events:
-            importance = e.get("importance", 1)
-            try:
-                # תמיכה גם במחרוזת וגם באובייקט datetime
-                ts = e["timestamp"]
-                timestamp = datetime.fromisoformat(ts) if isinstance(ts, str) else ts
-            except:
-                timestamp = now
-                
-            days_passed = (now - timestamp).days
-            effective_score = importance - (days_passed * 0.1)
-            
-            if effective_score > 0:
-                e_type = e.get('type', '')
-                data = e.get('data', {})
-                
-                if e_type == 'knowledge_add':
-                    content = data.get('text', '')
-                    processed_context_parts.append(f"[מידע - רלוונטיות {effective_score:.1f}]: {content}")
-                elif e_type == 'task_identified':
-                    task = data.get('task', '')
-                    processed_context_parts.append(f"[משימה פתוחה]: {task}")
-
-        context_str = "\n".join(processed_context_parts)
-
-        # 2. ה-Prompt המשודרג
-        refine_prompt = f"""
-        אתה KIRP OS, ה-AI האישי של {user_id}. 
-        אם המשתמש הוא אופיר בטש: הוא מנהל פרויקטים מנוסה (10+ שנים) עם לב ענק, איש של אמונה וערכים.
+        # 2. בניית ה-Prompt בהתאם לתפקיד (Role)
+        system_prompts = {
+            "problem_detector": "You are a diagnostic agent. Find anomalies and issues in the data.",
+            "auto_summarizer": "You are a summarization agent. Create concise reports from logs.",
+            "content_analyzer": "You are a pattern recognition agent. Find trends in user behavior."
+        }
         
-        הקשר נוכחי מזיכרון המשתמש:
-        {context_str}
+        full_prompt = f"{system_prompts.get(self.role, '')}\n\nContext:\n{context}\n\nTask: {task_description}"
         
-        הנחיות:
-        1. חבר נקודות בין טכנולוגיה (Docker, RAG) לערכים אישיים.
-        2. תעדוף משימות טריות.
-        3. שפה: עברית רהוטה, חמה ומקצועית.
-        """
-
-        response = await self.llm.ainvoke([("system", refine_prompt), ("user", question)])
-        # 2.5 לוג החלטת סוכן (Agent Decision Trace)
         try:
-            await asyncio.to_thread(
-                PersistenceManager.append_event,
-                user_id,
-                "agent_decision",
-                {
-                    "query": question,
-                    "answer_preview": response.content[:500],
-                    "memories_used": len(processed_context_parts),
-                    "timestamp": datetime.now(timezone.utc).isoformat()
-
-                }
-            )
+            # 3. ביצוע הקריאה ל-LLM
+            response = await self.llm.ainvoke(full_prompt)
+            
+            # 4. עדכון הצלחה ב-Persistence (עבור ה-Success Rate ב-UI)
+            # כאן היינו מעדכנים מונה הצלחות ב-DB
+            
+            return response.content
         except Exception as e:
-            logger.warning(f"Agent decision log failed: {e}")
+            logger.error(f"❌ Agent Task Error ({self.role}): {e}")
+            return f"Task failed: {str(e)}"
 
-        # 3. זיהוי אוטומטי של משימות ושמירה כ-Pending
-        trigger_words = ["תזכיר", "צריך", "לקנות", "משימה", "תקבע", "חשוב ש"]
-        if any(word in question.lower() for word in trigger_words):
-            await asyncio.to_thread(
-                PersistenceManager.append_event, 
-                user_id, 
-                "task_identified", 
-                {"task": question, "source": "chat_input"}, 
-                True # מצריך אישור ב-Action Pipeline
-            )
-
-        return {"answer_text": response.content}
-
-agent = CoreAgent()
+# אינסטנס גלובלי לשימוש מהיר
+agent = OmniAgent()

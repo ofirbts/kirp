@@ -1,12 +1,14 @@
+import os
+import logging
 from fastapi import APIRouter, Request, HTTPException, Query
 from app.agent.agent import agent
 from app.integrations.whatsapp_gateway import wa_gateway
-from app.core.tenant import TenantContext
-import os
 
 router = APIRouter(prefix="/webhooks/whatsapp", tags=["WhatsApp"])
+logger = logging.getLogger(__name__)
 
-VERIFY_TOKEN = os.getenv("WHATSAPP_VERIFY_TOKEN", "my_secure_token")
+# טוקן האימות שאתה מגדיר ב-Facebook Developer Portal
+VERIFY_TOKEN = os.getenv("WHATSAPP_VERIFY_TOKEN", "kirp_secure_token")
 
 @router.get("/")
 async def verify_webhook(
@@ -14,41 +16,37 @@ async def verify_webhook(
     token: str = Query(None, alias="hub.verify_token"),
     challenge: str = Query(None, alias="hub.challenge")
 ):
-    """אימות ה-Webhook מול Meta (קורה פעם אחת בהגדרה)"""
+    """אימות ראשוני מול Meta"""
     if mode == "subscribe" and token == VERIFY_TOKEN:
+        logger.info("✅ WhatsApp Webhook Verified Successfully")
         return int(challenge)
     raise HTTPException(status_code=403, detail="Verification failed")
 
 @router.post("/")
 async def receive_whatsapp(request: Request):
-    """קבלת הודעה חיה ממשתמש"""
+    """קבלת הודעה חיה ועיבודה דרך הסוכן"""
     body = await request.json()
-    
     try:
-        # חילוץ נתוני ההודעה מהמבנה של Meta
-        entry = body["entry"][0]["changes"][0]["value"]
+        # שליפת נתוני ההודעה ממבנה ה-JSON של Meta
+        entry = body.get("entry", [{}])[0].get("changes", [{}])[0].get("value", {})
         if "messages" not in entry:
-            return {"ok": True} # התעלמות מאירועים שהם לא הודעה (כמו Status)
-
-        msg = entry["messages"][0]
-        text = msg.get("text", {}).get("body")
-        phone = msg["from"]
-
-        if not text:
             return {"ok": True}
 
-        # 1. זיהוי Tenant (לוגיקה פשוטה כרגע, אפשר לשכלל)
-        # בהמשך תוכל לממש: TenantContext.set(resolve_tenant(phone))
-        TenantContext.set("whatsapp_user") 
+        message = entry["messages"][0]
+        text = message.get("text", {}).get("body")
+        sender_phone = message.get("from")
 
-        # 2. הרצת ה-Agent
-        # משתמשים ב-agent_query שתומך ב-Planner ו-Tools
-        result = await agent.agent_query(text)
-        answer = result.get("answer", "מצטער, לא הצלחתי לעבד את הבקשה.")
+        if text and sender_phone:
+            logger.info(f"📱 New WA message from {sender_phone}: {text[:30]}...")
+            
+            # הפעלה של ה-Agent (משתמש ב-RAG ובזיכרון)
+            result = await agent.query(text, user_id=sender_phone)
+            answer = result["answer_text"]
 
-        # 3. שליחת תשובה חזרה
-        wa_gateway.send_message(phone, answer)
-
+            # שליחה חזרה דרך ה-Gateway הישיר שלך
+            wa_gateway.send_message(sender_phone, answer)
+            
         return {"ok": True}
     except Exception as e:
+        logger.error(f"❌ WhatsApp Webhook Error: {e}")
         return {"ok": False, "error": str(e)}
