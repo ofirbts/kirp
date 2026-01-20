@@ -3,7 +3,7 @@ from typing import List
 from pydantic import BaseModel
 from datetime import datetime, timezone
 from app.rag.chunker import chunk_text
-from app.rag.vector_store import add_texts
+from app.rag.vector_store import add_texts_with_metadata as add_texts
 from app.core.persistence import PersistenceManager
 
 router = APIRouter(tags=["Ingest"])
@@ -25,11 +25,10 @@ async def ingest_batch(items: List[IngestRequest]):
     add_texts(all_chunks)
 
     # 🔥 Persistence hook — ingest batch
-    PersistenceManager.append_event("ingest_batch", {
+    await PersistenceManager.save_event("ingest_batch", {
         "documents": len(items),
         "chunks_added": len(all_chunks)
     })
-
     return {
         "documents": len(items),
         "chunks_added": len(all_chunks)

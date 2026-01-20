@@ -7,7 +7,7 @@ router = APIRouter()
 
 class SelfImprovingRequest(BaseModel):
     question: str
-    session_id: str = "default"
+    user_id: str
     k: int = 5
     feedback: float | None = None
 
@@ -15,7 +15,7 @@ class SelfImprovingRequest(BaseModel):
 async def self_improving_endpoint(req: SelfImprovingRequest):
     return self_improving_query(
         query=req.question,
-        session_id=req.session_id,
+        user_id=req.user_id,
         k=req.k,
         feedback=req.feedback
     )

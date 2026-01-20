@@ -1,6 +1,5 @@
-from app.services.memory_classifier import classify_memory
 from app.rag.chunker import chunk_text
-from app.rag.vector_store import add_texts_with_metadata
+from app.rag.vector_store import add_texts_with_metadata as add_texts_with_metadata
 from typing import Dict, Any, List
 
 def classify_memory(text: str) -> str:  # ← string, לא async!

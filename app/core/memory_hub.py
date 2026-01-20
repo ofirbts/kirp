@@ -1,6 +1,6 @@
 import logging
 from typing import List, Dict, Any
-from app.rag.vector_store import add_texts, search_vectors
+from app.rag.vector_store import add_texts_with_metadata as add_texts, search_vectors
 
 logger = logging.getLogger(__name__)
 

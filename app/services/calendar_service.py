@@ -8,8 +8,8 @@ class CalendarService:
         event = {
             "summary": "Event from KIRP",
             "description": text,
-            "start": datetime.now().isoformat(),
-            "end": datetime.now().isoformat()
+            "start": datetime.now(timezone.utc).isoformat(),
+            "end": datetime.now(timezone.utc).isoformat()
         }
 
         client = GoogleCalendarClient()

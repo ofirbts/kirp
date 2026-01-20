@@ -19,7 +19,7 @@ except ImportError as e:
 
 async def run_test():
     print("🚀 Starting KIRP Enterprise Integration Test v3.0...")
-    print(f"⏰ Execution Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    print(f"⏰ Execution Time: {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')}")
     print("-" * 50)
 
     # 1. Infrastructure Layer: Mongo & Redis
@@ -93,6 +93,23 @@ async def run_test():
     except Exception as e:
         print(f"❌ WhatsApp: Gateway Failed ({e})")
 
+# 7. Pipeline Performance Test
+    print("\n⏱ Testing Pipeline Latency...")
+    try:
+        import time # הוספת הייבוא החסר
+        db = await PersistenceManager.get_db() # הגדרת db
+        start = time.time()
+        # סימולציה של Ingest מהיר
+        await db.events.insert_one({
+            "event_type": "ingest", 
+            "created_at": datetime.now(timezone.utc),
+            "processed": False,
+            "data": {"text": "latency test"}
+        })
+        end = time.time()
+        print(f"✅ Pipeline Trigger: {int((end-start)*1000)}ms")
+    except Exception as e:
+        print(f"❌ Latency Test: Failed ({e})")
     # 6. Final Summary
     print("\n" + "=" * 50)
     m_snap = metrics.snapshot()

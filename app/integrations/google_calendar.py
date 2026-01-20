@@ -5,7 +5,7 @@ class GoogleCalendarClient:
     def create_event(self, summary: str, start_time: datetime = None):
         # Mock פשוט שעובד (משימה 3)
         if not start_time:
-            start_time = datetime.now()
+            start_time = datetime.now(timezone.utc)
         
 
 calendar_client = GoogleCalendarClient()

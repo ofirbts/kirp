@@ -1,27 +1,24 @@
+import os
+import logging
 from typing import Dict, Any
 
+logger = logging.getLogger(__name__)
+
 class WhatsAppGateway:
-    """
-    Interface for WhatsApp Communication.
-    Subclasses must implement the send_message method.
-    """
     def send_message(self, to: str, text: str) -> Dict[str, Any]:
-        raise NotImplementedError("WhatsApp provider not implemented. Use a specific subclass.")
+        raise NotImplementedError()
+
+class MockWhatsAppGateway(WhatsAppGateway):
+    def send_message(self, to: str, text: str) -> Dict[str, Any]:
+        logger.info(f"🧪 [MOCK WA] To {to}: {text}")
+        return {"status": "success", "id": "mock_123"}
 
 def get_whatsapp_gateway() -> WhatsAppGateway:
-    """
-    Factory function to return the correct provider based on ENV.
-    """
-    import os
-    provider = os.getenv("WHATSAPP_PROVIDER", "mock")
-    
-    if provider == "meta":
-        from app.integrations.whatsapp_meta import MetaWhatsAppGateway
-        return MetaWhatsAppGateway()
-    elif provider == "twilio":
+    provider = os.getenv("WHATSAPP_PROVIDER", "mock").lower()
+    if provider == "twilio":
         from app.integrations.whatsapp_twilio import TwilioWhatsAppGateway
         return TwilioWhatsAppGateway()
-    
-    # Default fallback to a Null/Mock provider if needed
-    return WhatsAppGateway()
-wa_gateway = WhatsAppGateway() # יוצר את האובייקט שה-API מחפש
+    # כאן תוכל להוסיף את Meta בעתיד
+    return MockWhatsAppGateway()
+
+wa_gateway = get_whatsapp_gateway()

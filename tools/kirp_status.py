@@ -32,7 +32,7 @@ def check_endpoint(url, method="GET", data=None):
 
 def main():
     print("=" * 60)
-    print(f"KIRP STATUS REPORT - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    print(f"KIRP STATUS REPORT - {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')}")
     print("=" * 60)
     
     # 1. סביבה

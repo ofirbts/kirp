@@ -2,7 +2,7 @@ import ast
 import requests
 from typing import Dict, Any, List
 from app.services.notion import notion
-from app.services.export.notion_tasks import create_notion_tasks_batch
+#from app.services.export.notion_tasks import create_notion_tasks_batch
 
 async def create_notion_tasks(tasks: List[Dict]) -> Dict[str, Any]:
     """Create Notion tasks from agent suggestions"""

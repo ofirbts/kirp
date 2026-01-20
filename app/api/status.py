@@ -1,16 +1,18 @@
+# app/api/status.py
 from fastapi import APIRouter
 from time import time
-from app.rag.vector_store import debug_info
 import requests
-from typing import Optional
-from datetime import datetime, timezone, timezone
+from datetime import datetime, timezone
+from typing import Optional, Dict, Any
+
 from app.observability.alerts import get_alerts
+from app.rag.vector_store import get_vector_store
 
 router = APIRouter(tags=["Status"])
 
 # --- System State ---
 START_TIME = time()
-STATE = {
+STATE: Dict[str, Any] = {
     "last_ingest": None,
     "last_query": None,
     "last_error": None,
@@ -18,19 +20,33 @@ STATE = {
     "query_count": 0,
 }
 
-def uptime():
+def uptime() -> float:
     return round(time() - START_TIME, 2)
 
-def check_service(url):
+def check_service(url: str) -> bool:
     try:
         r = requests.get(url, timeout=1)
         return r.status_code == 200
-    except:
+    except Exception:
         return False
 
 @router.get("/")
 async def system_status():
-    vector = debug_info()
+    # ניסיון עדין לבדוק את ה־Vector Store
+    vector_info = {
+        "loaded": False,
+        "disk_exists": None,
+        "vectors_count": None,
+    }
+    try:
+        store = get_vector_store()
+        # לא תמיד יש API נוח לספירה, אז נשאיר את זה “רך”
+        vector_info["loaded"] = store is not None
+    except Exception as e:
+        STATE["last_error"] = {
+            "message": f"vector_store_init_failed: {e}",
+            "time": datetime.now(timezone.utc).isoformat(),
+        }
 
     return {
         "api": "live",
@@ -41,11 +57,7 @@ async def system_status():
         "bot_live": check_service("http://localhost:5000/health"),
 
         # Vector store
-        "vector_store": {
-            "loaded": vector.get("ram_loaded"),
-            "disk_exists": vector.get("disk_exists"),
-            "vectors_count": vector.get("vectors_count_ram", 0),
-        },
+        "vector_store": vector_info,
 
         # Ingest / Query
         "ingest": {
@@ -61,7 +73,6 @@ async def system_status():
         "last_error": STATE["last_error"],
     }
 
-# --- STAGE 50 Snapshot ---
 @router.get("/snapshot")
 def product_snapshot():
     return {

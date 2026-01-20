@@ -1,5 +1,5 @@
 # app/rag/sharded_store.py
-from app.rag.vector_store import add_texts_with_metadata, get_vector_store
+from app.rag.vector_store import add_texts_with_metadata as add_texts_with_metadata, get_vector_store
 
 
 class ShardedVectorStore:

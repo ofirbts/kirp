@@ -20,7 +20,7 @@ class KIRPUltimateCheck:
 
     async def run(self):
         print(f"\n{B}{C}🚀 STARTING KIRP ULTIMATE SYSTEM AUDIT{RESET}")
-        print(f"Timestamp: {datetime.now().isoformat()}\n" + "="*50)
+        print(f"Timestamp: {datetime.now(timezone.utc).isoformat()}\n" + "="*50)
 
         # --- שלב 1: ארכיטקטורה וקבצים ---
         critical_files = [

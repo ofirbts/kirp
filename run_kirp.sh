@@ -1,73 +1,89 @@
 #!/bin/bash
 
-# צבעים להודעות
-GREEN='\033[0;32m'
-BLUE='\033[0;34m'
-RED='\033[0;31m'
-YELLOW='\033[1;33m'
-NC='\033[0m'
+UI_URL="http://localhost:8501"
 
-echo -e "${BLUE}🚀 KIRP OS - Universal Launcher v5.0${NC}"
+# פונקציה שתתבצע ברגע שתלחץ Ctrl+C
+cleanup() {
+    echo -e "\n🛑 Ctrl+C detected. Shutting down KIRP Stack..."
+    docker-compose down
+    exit 0
+}
+
+# הגדרת המלכודת
+trap cleanup SIGINT
+
+run_stack() {
+    echo "--------------------------------"
+    echo "🧹 Quick Clean..."
+    docker-compose down --remove-orphans
+    
+    echo "🐳 Starting Full Stack..."
+    docker-compose up -d --build
+    
+    echo "🧠 Services are up! Opening UI..."
+    (
+        sleep 5
+        if command -v explorer.exe > /dev/null; then explorer.exe $UI_URL
+        elif command -v xdg-open > /dev/null; then xdg-open $UI_URL
+        fi
+    ) &
+
+    echo "📺 LIVE LOGS (Press Ctrl+C to STOP EVERYTHING)"
+    echo "------------------------------------------------"
+    # מציג לוגים של הכל כדי שתראה אם משהו קורס
+    docker-compose logs -f
+}
+
+run_seed() {
+    echo "--------------------------------"
+    echo "🔋 Injecting Knowledge Seed..."
+    docker-compose up -d mongodb
+    sleep 3
+    if docker-compose run --rm kirp-api python seed_data.py; 
+    then
+        echo "✅ Intelligence Seeded successfully!"
+    else
+        echo "❌ Seed failed!"
+        exit 1
+    fi
+}
+
+echo "🚀 KIRP OS - Universal Launcher v8.7"
 echo "--------------------------------"
-echo "1) 🛠️  Development Mode (Local venv + Docker DBs)"
-echo "2) 🐳 Container Mode (Full Docker Stack)"
-echo "3) 🛑 Stop all services"
-echo "4) 🧹 Clean Session + Restart" 
-read -p "Select option [1-4]: " opt
+echo "1) 🚀 Full Boot (Clean + Start + Live Logs)"
+echo "2) 🔋 Seed + Boot (Fresh Data + Logs)"
+echo "3) 🛑 Stop Services"
+echo "4) 🧹 Hard Reset (Full Clean + Seed + Logs)"
+echo "5) 📜 View Logs Only"
+echo "--------------------------------"
+
+read -p "Select option [1-5]: " opt
 
 case $opt in
-    1)
-        echo -e "${GREEN}Starting LOCAL mode...${NC}"
-        export RUNNING_IN_DOCKER=false
-        
-        # 1. הרמת מסדי הנתונים ב-Docker
-        echo -e "${BLUE}📡 Starting Databases (Qdrant, Redis, Mongo)...${NC}"
-        docker-compose up -d qdrant redis mongodb
-        
-        # 2. בדיקה והתקנה של ה-Venv
-        if [ ! -d "venv" ]; then
-            echo -e "${YELLOW}Creating virtual environment...${NC}"
-            python3 -m venv venv
-        fi
-        
-        source venv/bin/activate
-        echo -e "${YELLOW}Checking dependencies...${NC}"
-        pip install -r requirements.txt | grep -v 'already satisfied'
-
-        # 3. בדיקת זמינות ה-DB (חשוב מאוד לפני הרצת ה-API)
-        echo -e "${YELLOW}Waiting for databases to be ready...${NC}"
-        sleep 3
-
-        # 4. הרצת ה-API ברקע
-        echo -e "${BLUE}⚙️  Starting FastAPI Backend...${NC}"
-        python3 -m uvicorn app.main:app --reload --port 8000 &
-        API_PID=$!
-        
-        # 5. הרצת ה-UI (Streamlit)
-        echo -e "${BLUE}🖥️  Starting Streamlit UI...${NC}"
-        # מוודא ש-Streamlit מזהה את ה-Python הנכון
-        python3 -m streamlit run app/ui/main_ui.py --server.port 8501
-        
-        # ניקוי בסיום (הריגת ה-API כשסוגרים את ה-UI)
-        trap "kill $API_PID" EXIT
-        ;;
-    2)
-        echo -e "${GREEN}Starting FULL DOCKER mode...${NC}"
-        export RUNNING_IN_DOCKER=true
-        docker-compose up --build
-        ;;
-    3)
-        echo -e "${RED}Stopping all services...${NC}"
-        docker-compose down
-        ;;
-    4)
-        echo -e "${YELLOW}🧹 Cleaning session state...${NC}"
-        docker-compose down
-        rm -rf ~/.streamlit/credentials.toml 
-        docker volume prune -f
-        echo -e "${GREEN}✅ Cleaned! Run option 2 now.${NC}"
-        ;;
-    *)
-        echo "Invalid option"
-        ;;
+1)
+    echo "Running Pre-Flight Auto-Fix..."
+    bash diagnostic.sh --fix  # הרצת הדיאגנוסטיקה עם דגל תיקון
+    docker-compose up -d
+    ;;
+2)
+    docker-compose down
+    run_seed
+    run_stack
+    ;;
+  3)
+    echo "🛑 Stopping Services..."
+    docker-compose down
+    ;;
+  4)
+    echo "🧹 Performing Hard Reset..."
+    docker-compose down -v
+    run_seed
+    run_stack
+    ;;
+  5)
+    docker-compose logs -f kirp-api kirp-worker
+    ;;
+  *)
+    echo "❌ Invalid option"
+    ;;
 esac

@@ -8,4 +8,3 @@ headless = true
 [browser]
 serverAddress = localhost
 gatherUsageStats = false
-

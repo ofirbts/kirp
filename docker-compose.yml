@@ -1,27 +1,12 @@
-
 networks:
   kirp-net:
     driver: bridge
 
 services:
-  qdrant:
-    image: qdrant/qdrant:latest
-    container_name: qdrant
-    ports:
-      - "6333:6333"
-    volumes:
-      - qdrant_data:/qdrant/storage
-    networks:
-      - kirp-net
-    healthcheck:
-      test: ["CMD-SHELL", "timeout 1s bash -c ':> /dev/tcp/127.0.0.1/6333' || exit 1"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-
   mongodb:
-    image: mongo:latest
+    image: mongo:6
     container_name: mongodb
+    restart: unless-stopped
     environment:
       - MONGO_INITDB_ROOT_USERNAME=root
       - MONGO_INITDB_ROOT_PASSWORD=example
@@ -32,9 +17,21 @@ services:
     networks:
       - kirp-net
 
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: qdrant
+    restart: unless-stopped
+    ports:
+      - "6333:6333"
+    volumes:
+      - qdrant_data:/qdrant/storage
+    networks:
+      - kirp-net
+
   redis:
-    image: redis:latest
+    image: redis:alpine
     container_name: redis
+    restart: unless-stopped
     ports:
       - "6379:6379"
     networks:
@@ -43,22 +40,23 @@ services:
   kirp-api:
     build: .
     container_name: kirp-api
-    working_dir: /app
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
     env_file:
       - .env
     environment:
       - PYTHONPATH=/app
-      - RUNNING_IN_DOCKER=true
-      - QDRANT_HOST=qdrant
       - MONGO_URI=mongodb://root:example@mongodb:27017/kirp?authSource=admin
-      - MONGO_DB_NAME=kirp
-    ports:
-      - "8000:8000"
+      - REDIS_URL=redis://redis:6379
+      - QDRANT_HOST=qdrant
+      - QDRANT_PORT=6333
+      - OAUTH_REDIRECT_URI=http://localhost:8501
+      - RUNNING_IN_DOCKER=true
     depends_on:
-      qdrant:
-        condition: service_healthy
-      mongodb:
-        condition: service_started
+      - mongodb
+      - qdrant
+      - redis
     networks:
       - kirp-net
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000
@@ -66,21 +64,40 @@ services:
   kirp-ui:
     build: .
     container_name: kirp-ui
-    working_dir: /app
+    restart: unless-stopped
+    ports:
+      - "8501:8501"
     env_file:
       - .env
     environment:
-      - PYTHONPATH=/app
-      - RUNNING_IN_DOCKER=true
       - API_URL=http://kirp-api:8000
-    ports:
-      - "8501:8501"
+      - EXTERNAL_URL=http://localhost:8501
+      - GOOGLE_CLIENT_ID=971736642876-120gn7nihtm30s4aopsdvm53tt81kn2q.apps.googleusercontent.com
     depends_on:
       - kirp-api
     networks:
       - kirp-net
-    command: streamlit run app/ui/main_ui.py --server.port=8501 --server.address=0.0.0.0
+    command: streamlit run app/ui/main_ui.py --server.port=8501 --server.address=0.0.0.0 --server.enableCORS false
+  kirp-worker:
+    build: .
+    container_name: kirp-worker
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      - PYTHONPATH=/app
+      - MONGO_URI=mongodb://root:example@mongodb:27017/kirp?authSource=admin
+      - QDRANT_HOST=qdrant
+      - QDRANT_PORT=6333
+      - RUNNING_IN_DOCKER=true
+    depends_on:
+      - mongodb
+      - qdrant
+    networks:
+      - kirp-net
+    # שינוי הפקודה להרצה ישירה של הלוגיקה האוטונומית
+    command: python -m app.core.worker
 
 volumes:
-  qdrant_data:
   mongo_data:
+  qdrant_data:

@@ -1,5 +1,8 @@
 import os
 import logging
+import uuid
+from app.core.persistence import PersistenceManager
+from app.models.schemas import IngestionJob
 from fastapi import APIRouter, Request, HTTPException, Query
 from app.agent.agent import agent
 from app.integrations.whatsapp_gateway import wa_gateway
@@ -37,15 +40,18 @@ async def receive_whatsapp(request: Request):
         sender_phone = message.get("from")
 
         if text and sender_phone:
-            logger.info(f"📱 New WA message from {sender_phone}: {text[:30]}...")
+            # 1. יצירת Ingestion Job (כדי שהמידע יישמר ב-Vector Store)
+            job_id = str(uuid.uuid4())
+            await PersistenceManager.create_ingestion_job(
+                IngestionJob(id=job_id, source="WhatsApp", status="PENDING")
+            )
             
-            # הפעלה של ה-Agent (משתמש ב-RAG ובזיכרון)
+            # 2. הרצת ה-Agent (מענה מהיר על בסיס זיכרון קיים)
             result = await agent.query(text, user_id=sender_phone)
-            answer = result["answer_text"]
-
-            # שליחה חזרה דרך ה-Gateway הישיר שלך
-            wa_gateway.send_message(sender_phone, answer)
             
+            # 3. שליחה חזרה
+            wa_gateway.send_message(sender_phone, result["answer_text"])
+                        
         return {"ok": True}
     except Exception as e:
         logger.error(f"❌ WhatsApp Webhook Error: {e}")
