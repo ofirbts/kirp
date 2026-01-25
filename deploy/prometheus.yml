@@ -1,0 +1,15 @@
+# Prometheus configuration for KIRP Enterprise
+
+global:
+  scrape_interval: 10s
+  evaluation_interval: 10s
+
+scrape_configs:
+  - job_name: "kirp-api"
+    static_configs:
+      - targets: ["kirp-api:8000"]
+    metrics_path: "/observability/metrics/snapshot"
+
+  - job_name: "prometheus"
+    static_configs:
+      - targets: ["localhost:9090"]

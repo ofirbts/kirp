@@ -1,0 +1,152 @@
+
+networks:
+  kirp-net:
+    driver: bridge
+
+volumes:
+  mongo_data:
+  qdrant_data:
+  ollama_data:
+
+services:
+  mongodb:
+    image: mongo:7.0
+    container_name: kirp-mongo
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: root
+      MONGO_INITDB_ROOT_PASSWORD: example
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+    networks:
+      - kirp-net
+    healthcheck:
+      test: echo 'db.runCommand("ping").ok' | mongosh localhost:27017/test --quiet
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  qdrant:
+    image: qdrant/qdrant:v1.10.1
+    container_name: kirp-qdrant
+    restart: unless-stopped
+    ports:
+      - "6333:6333"
+    volumes:
+      - qdrant_data:/qdrant/storage
+    networks:
+      - kirp-net
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:6333/collections || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7.2-alpine
+    container_name: kirp-redis
+    restart: unless-stopped
+    command: redis-server --maxmemory 128mb --maxmemory-policy allkeys-lru
+    ports:
+      - "6379:6379"
+    networks:
+      - kirp-net
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  ollama:
+    image: ollama/ollama
+    container_name: kirp-ollama
+    restart: unless-stopped
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    networks:
+      - kirp-net
+
+  kirp-api:
+    build: .
+    container_name: kirp-api
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      MONGO_URI: mongodb://root:example@mongodb:27017/kirp?authSource=admin
+      REDIS_URL: redis://redis:6379/0
+      QDRANT_HOST: qdrant
+      QDRANT_PORT: 6333
+      OPENAI_API_KEY: sk-test-key
+      OLLAMA_URL: http://ollama:11434
+      RUNNING_IN_DOCKER: "true"
+      PYTHONPATH: /app
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      qdrant:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - .:/app
+    networks:
+      - kirp-net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000
+
+  kirp-ui:
+    build: .
+    container_name: kirp-ui
+    restart: unless-stopped
+    ports:
+      - "8501:8501"
+    environment:
+      API_URL: http://kirp-api:8000
+      EXTERNAL_URL: http://localhost:8501
+      PYTHONPATH: /app
+    depends_on:
+      kirp-api:
+        condition: service_healthy
+    volumes:
+      - .:/app
+    networks:
+      - kirp-net
+    command: bash -c "cd /app/app/ui && streamlit run main_ui.py --server.port 8501 --server.address 0.0.0.0 --server.enableCORS false"
+
+  kirp-worker:
+    build: .
+    container_name: kirp-worker
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      PYTHONPATH: /app
+      MONGO_URI: mongodb://root:example@mongodb:27017/kirp?authSource=admin
+      QDRANT_HOST: qdrant
+      QDRANT_PORT: 6333
+      REDIS_URL: redis://redis:6379/0
+      OLLAMA_URL: http://ollama:11434
+      RUNNING_IN_DOCKER: "true"
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      qdrant:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      ollama:
+        condition: service_started
+    networks:
+      - kirp-net
+    command: python -m app.core.worker

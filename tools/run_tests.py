@@ -133,7 +133,7 @@ except Exception as e:
 # ננסה לטעון RAG (אם קיים)
 try:
     from app.rag.retriever import retrieve_context
-    from app.rag.rag_engine import generate_answer
+    from app.rag.rag_engine import rag_engine
     rag_available = True
     print(f"{GREEN}✔ Loaded RAG components (retriever + rag_engine){RESET}")
 except Exception as e:
@@ -276,7 +276,7 @@ if rag_available:
     @test("RAG – generate_answer returns string")
     def _():
         ctx = retrieve_context("KIRP", k=3)
-        ans = generate_answer(ctx, "What is KIRP?")
+        ans = rag_engine.query(ctx, "What is KIRP?")
         assert isinstance(ans, str)
 
 else:

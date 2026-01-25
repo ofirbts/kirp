@@ -1,76 +1,48 @@
-# -------------------------
+# KIRP Enterprise
+.venv/
+venv/
+.env
+.DS_Store
+
 # Python
-# -------------------------
 __pycache__/
-*.py[cod]
+*.pyc
 *.pyo
 *.pyd
-*.pdb
 *.egg-info/
-*.egg
-*.so
-
-# Virtual environments
-venv/
-.venv/
-env/
-ENV/
-*.env
-*.env.*
-
-# Byte-compiled / cache
-.pytest_cache/
-.mypy_cache/
-.cache/
-
-# -------------------------
-# FastAPI / Uvicorn / Logs
-# -------------------------
-*.log
-
-# -------------------------
-# VS Code
-# -------------------------
-.vscode/
-.history/
-
-# -------------------------
-# OS files
-# -------------------------
-.DS_Store
-Thumbs.db
-
-# -------------------------
-# Docker
-# -------------------------
-docker-compose.override.yml
-*.pid
-
-# -------------------------
-# Security / Secrets
-# -------------------------
-.env
-secrets.json
-*.key
-*.pem
-*.crt
-
-# -------------------------
-# Node / JS (אם יש לך)
-# -------------------------
-node_modules/
+.eggs/
 dist/
 build/
-
-# -------------------------
-# Misc
-# -------------------------
-*.sqlite3
-# Databases and environment files
-mongo_data/
-venv/
-
-__pycache__/
-*.log
 .pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+.ruff_cache/
 
+# Logs
+*.log
+
+# MongoDB
+mongo_data/
+mongodb/
+WiredTiger*
+*.wt
+
+# Redis
+redis_data/
+
+# Postgres
+pg_data/
+postgres_data/
+
+# Qdrant
+qdrant_data/
+
+# Kafka / Zookeeper
+kafka_data/
+kafka-logs/
+zookeeper_data/
+zookeeper-logs/
+
+# Docker
+docker-compose.override.yml
