@@ -72,7 +72,12 @@ class AgentFramework:
     ) -> dict[str, Any]:
         """
         Run an agent by name. Delegates to handler if registered.
+        Validates output against JSON schema.
         """
+        # Enforce multi-tenant isolation
+        if not tenant_id or tenant_id == "*":
+            return {"ok": False, "error": "tenant_id is required (multi-tenant isolation)"}
+        
         spec = self.get(agent_name)
         if not spec:
             return {"ok": False, "error": f"Agent not found: {agent_name}"}
@@ -80,12 +85,18 @@ class AgentFramework:
             return {"ok": False, "error": f"Agent {agent_name} not in scope for tenant {tenant_id}"}
         if spec.handler:
             try:
-                return await spec.handler(
+                result = await spec.handler(
                     tenant_id=tenant_id,
                     space_id=space_id,
                     user_id=user_id,
                     context=context,
                 )
+                
+                # Validate and normalize output
+                from src.core.agent_validation import normalize_agent_output
+                result = normalize_agent_output(agent_name, result)
+                
+                return result
             except Exception as e:
                 logger.exception("Agent %s failed: %s", agent_name, e)
                 return {"ok": False, "error": str(e)}

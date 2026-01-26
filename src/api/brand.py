@@ -1,18 +1,22 @@
 """
 Brand API — Personal brand content generation.
 
-Uses compat OrchestratorAgent. Endpoints: POST /brand/generate, GET /brand/memory.
+Uses PresentationAgent with brand_content view type.
+Endpoints: POST /brand/generate, GET /brand/memory.
 """
 
 from __future__ import annotations
 
 import logging
+import os
 from typing import Any
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
-from src.compat.legacy_agents import OrchestratorAgent, BrandContentRequest
+from src.core.rag_engine import RAGEngine
+from src.core.agent_framework import AgentFramework
+from src.agents.presentation import presentation_spec
 
 logger = logging.getLogger(__name__)
 
@@ -22,17 +26,52 @@ router = APIRouter(prefix="/brand", tags=["Brand"])
 class ContentRequest(BaseModel):
     idea: str
     user_id: str = "ofir"
+    tenant_id: str = "default"
+    space_id: str = "private"
 
 
 @router.post("/generate")
 async def generate_content(req: ContentRequest) -> dict[str, Any]:
-    """Generate LinkedIn-style content from idea. Returns JSON."""
+    """
+    Generate LinkedIn-style content from idea using PresentationAgent.
+    Returns JSON with headline, body, CTA.
+    """
     try:
-        orchestrator = OrchestratorAgent()
-        result = await orchestrator.generate(
-            BrandContentRequest(idea=req.idea, user_id=req.user_id),
+        # Initialize components
+        rag = RAGEngine(qdrant_url=os.getenv("QDRANT_URL", "http://localhost:6333"))
+        await rag.connect()
+        
+        af = AgentFramework()
+        af.register(presentation_spec)
+        
+        # Get RAG context for the idea
+        rag_resp = await rag.search(
+            req.idea,
+            tenant_id=req.tenant_id,
+            space_id=req.space_id,
+            user_id=req.user_id,
+            limit=5,
         )
-        return {"ok": True, **result}
+        
+        # Call PresentationAgent with brand_content view type
+        context = {
+            "rag_response": rag_resp,
+            "view_type": "brand_content",
+            "idea": req.idea,
+        }
+        
+        result = await af.run(
+            "PresentationAgent",
+            tenant_id=req.tenant_id,
+            space_id=req.space_id,
+            user_id=req.user_id,
+            context=context,
+        )
+        
+        if result.get("ok"):
+            return {"ok": True, **result}
+        else:
+            raise HTTPException(status_code=500, detail=result.get("error", "Brand generation failed"))
     except Exception as e:
         logger.exception("Brand generate failed")
         raise HTTPException(status_code=500, detail=str(e))

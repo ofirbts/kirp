@@ -16,12 +16,19 @@ logger = logging.getLogger(__name__)
 broker = os.getenv("CELERY_BROKER_URL", os.getenv("REDIS_URL", "redis://localhost:6379/1"))
 backend = os.getenv("CELERY_RESULT_BACKEND", broker)
 
+# Log broker/backend for diagnostics
+logger.info("Celery broker: %s", broker)
+logger.info("Celery backend: %s", backend)
+
 celery_app = Celery(
     "kirp",
     broker=broker,
     backend=backend,
-    include=["src.workers.tasks", "src.workers.celery_tasks"],
+    include=["src.workers.tasks"],
 )
+
+# Note: Tasks are auto-discovered by Celery when the module is loaded
+# No need to import them here (would cause circular import with tasks.py)
 celery_app.conf.update(
     task_serializer="json",
     accept_content=["json"],
@@ -31,8 +38,8 @@ celery_app.conf.update(
     task_routes={
         "src.workers.tasks.ingest_task": {"queue": "ingest"},
         "src.workers.tasks.whatsapp_send_task": {"queue": "whatsapp"},
-        "src.workers.celery_tasks.daily_intelligence_task": {"queue": "scheduled"},
-        "src.workers.celery_tasks.self_improvement_task": {"queue": "scheduled"},
+        "src.workers.tasks.daily_intelligence_task": {"queue": "scheduled"},
+        "src.workers.tasks.self_improvement_task": {"queue": "scheduled"},
     },
     beat_schedule={
         "daily-intelligence-08:00": {

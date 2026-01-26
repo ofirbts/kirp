@@ -61,6 +61,13 @@ class EventPipeline:
         sensitivity: Sensitivity = Sensitivity.PRIVATE,
     ) -> UUID:
         """
+        Execute full pipeline with reasoning-aware context and improved sequencing.
+        Enforces multi-tenant isolation.
+        """
+        # Enforce multi-tenant isolation
+        if not tenant_id or tenant_id == "*":
+            raise ValueError("tenant_id is required (multi-tenant isolation)")
+        """
         Execute full pipeline: ingest -> store -> embed -> Qdrant -> metadata -> publish
         -> trigger agents -> governance -> execute -> emit.
         """
@@ -85,44 +92,168 @@ class EventPipeline:
         await self._events.ingest(ev)
 
         # 3. Generate embedding -> Qdrant
-        emb = await self._rag.embed(content)
-        ev.embedding = emb
-        points = [{"id": str(ev.id), "embedding": emb, "content": content, "source": source, "user_id": user_id}]
-        await self._rag.upsert(points, tenant_id=tenant_id, space_id=space_id)
+        try:
+            emb = await self._rag.embed(content)
+            ev.embedding = emb
+            points = [{"id": str(ev.id), "embedding": emb, "content": content, "source": source, "user_id": user_id}]
+            await self._rag.upsert(points, tenant_id=tenant_id, space_id=space_id)
+        except Exception as e:
+            logger.warning("Embedding generation failed for event %s: %s. Continuing without embedding.", ev.id, e)
+            # Continue without embedding - event is still stored
 
-        # 4. Store metadata -> Postgres (via schema_engine; optional for raw ingest)
-        # Skip if no schema nodes extracted; schema_structure agent can do it later.
-
-        # 5. Publish event -> Kafka / Redis Streams (JSON-safe payload)
-        await self._event_bus.connect()
-        await self._event_bus.publish("kirp-events", {
-            "type": "ingest",
-            "data": ev.to_json_payload(),
-            "trace_id": trace_id,
-        })
-
-        # 6. Trigger agents
-        for spec in self._agents.list_by_trigger("ingest"):
-            rag_resp = await self._rag.search(content, tenant_id=tenant_id, space_id=space_id, user_id=user_id, limit=5)
-            ctx = {"rag_response": rag_resp, "events": [ev], "trace_id": trace_id}
-            agent_result = await self._agents.run(spec.name, tenant_id=tenant_id, space_id=space_id, user_id=user_id, context=ctx)
-            # If agent requires approval, emit approval event
-            if agent_result.get("requires_approval"):
-                approval_ev = Event(
-                    id=uuid4(),
+        # 4. Extract and store schema nodes via SchemaStructureAgent
+        schema_nodes: list[Any] = []
+        try:
+            # Get existing schema nodes for context
+            schema_nodes = await self._schema.list_nodes(tenant_id=tenant_id, space_id=space_id, limit=100)
+            
+            # Trigger SchemaStructureAgent to extract new nodes from this event
+            schema_agent_spec = self._agents.get("SchemaStructureAgent")
+            if schema_agent_spec:
+                rag_resp = await self._rag.search(content, tenant_id=tenant_id, space_id=space_id, user_id=user_id, limit=5)
+                schema_ctx = {
+                    "rag_response": rag_resp,
+                    "events": [ev],
+                    "trace_id": trace_id,
+                    "schema_engine": self._schema,
+                    "schema_nodes": schema_nodes,
+                }
+                schema_result = await self._agents.run(
+                    "SchemaStructureAgent",
                     tenant_id=tenant_id,
                     space_id=space_id,
                     user_id=user_id,
-                    source="governance",
-                    content=f"Approval required for {spec.name}",
-                    metadata={"agent": spec.name, "result": agent_result, "original_trace": trace_id},
-                    embedding=[],
-                    timestamp=datetime.now(timezone.utc),
-                    sensitivity=sensitivity,
-                    event_type="human_approval_required",
-                    trace_id=trace_id,
+                    context=schema_ctx,
                 )
-                await self._events.ingest(approval_ev)
+                if schema_result.get("ok"):
+                    # Refresh schema nodes after extraction
+                    schema_nodes = await self._schema.list_nodes(tenant_id=tenant_id, space_id=space_id, limit=100)
+                    logger.info("Schema extraction completed: %d nodes upserted", schema_result.get("nodes_upserted", 0))
+        except Exception as e:
+            logger.warning("Schema extraction failed for event %s: %s. Continuing.", ev.id, e)
+            # Continue - schema extraction is best-effort
+
+        # 5. Publish event -> Kafka / Redis Streams (JSON-safe payload)
+        try:
+            await self._event_bus.connect()
+            await self._event_bus.publish("kirp-events", {
+                "type": "ingest",
+                "data": ev.to_json_payload(),
+                "trace_id": trace_id,
+            })
+        except Exception as e:
+            logger.warning("Event bus publish failed for event %s: %s. Continuing.", ev.id, e)
+            # Continue - event is stored, bus publish is best-effort
+        
+        # 6. Trigger agents with reasoning-aware context
+        # Build enriched context with multi-hop RAG and schema relationships
+        reasoning_context: dict[str, Any] = {
+            "original_content": content,
+            "trace_id": trace_id,
+            "schema_engine": self._schema,
+            "schema_nodes": schema_nodes,
+        }
+        
+        # Get RAG context with multi-hop reasoning for better context
+        try:
+            rag_resp = await self._rag.search(
+                content,
+                tenant_id=tenant_id,
+                space_id=space_id,
+                user_id=user_id,
+                limit=10,  # More context for reasoning
+                use_multihop=True,  # Enable multi-hop for better context
+            )
+            reasoning_context["rag_response"] = rag_resp
+            
+            # Build reasoning chain: extract key concepts from RAG
+            if rag_resp.results:
+                key_concepts = [r.text[:100] for r in rag_resp.results[:5]]
+                reasoning_context["key_concepts"] = key_concepts
+        except Exception as e:
+            logger.warning("RAG search failed for agent context: %s", e)
+            # Fallback to empty RAG response
+            from src.core.rag_engine import RAGResponse, RetrievalResult
+            reasoning_context["rag_response"] = RAGResponse(
+                results=[],
+                context_text="",
+                confidence=0.0,
+                query_scopes={"tenant_id": tenant_id, "space_id": space_id, "user_id": user_id},
+            )
+        
+        # Add event history for reasoning
+        try:
+            recent_events = await self._events.list(
+                tenant_id=tenant_id,
+                space_id=space_id,
+                user_id=user_id,
+                limit=10,
+            )
+            reasoning_context["recent_events"] = recent_events
+        except Exception as e:
+            logger.warning("Failed to fetch recent events: %s", e)
+            reasoning_context["recent_events"] = [ev]
+        
+        # Trigger agents in priority order (schema first, then analysis, then presentation)
+        agent_priority = {
+            "SchemaStructureAgent": 1,
+            "PatternAnalyzerAgent": 2,
+            "RiskOpportunityAgent": 2,
+            "ForecasterAgent": 2,
+            "TodayTomorrowPlannerAgent": 3,
+            "PresentationAgent": 4,
+            "SelfImprovementAgent": 5,
+        }
+        
+        triggered_agents = self._agents.list_by_trigger("ingest")
+        triggered_agents.sort(key=lambda s: agent_priority.get(s.name, 99))
+        
+        for spec in triggered_agents:
+            try:
+                # Build agent-specific context
+                agent_ctx = {
+                    **reasoning_context,
+                    "events": [ev],
+                }
+                
+                agent_result = await self._agents.run(
+                    spec.name,
+                    tenant_id=tenant_id,
+                    space_id=space_id,
+                    user_id=user_id,
+                    context=agent_ctx,
+                )
+                
+                # If SchemaStructureAgent created nodes, update schema_nodes list
+                if spec.name == "SchemaStructureAgent" and agent_result.get("ok"):
+                    created_nodes = agent_result.get("nodes_upserted", 0)
+                    if created_nodes > 0:
+                        # Refresh schema nodes from engine
+                        try:
+                            schema_nodes = await self._schema.list_nodes(tenant_id=tenant_id, space_id=space_id)
+                        except Exception as e:
+                            logger.warning("Failed to refresh schema nodes: %s", e)
+                
+                # If agent requires approval, emit approval event
+                if agent_result.get("requires_approval"):
+                    approval_ev = Event(
+                        id=uuid4(),
+                        tenant_id=tenant_id,
+                        space_id=space_id,
+                        user_id=user_id,
+                        source="governance",
+                        content=f"Approval required for {spec.name}",
+                        metadata={"agent": spec.name, "result": agent_result, "original_trace": trace_id},
+                        embedding=[],
+                        timestamp=datetime.now(timezone.utc),
+                        sensitivity=sensitivity,
+                        event_type="human_approval_required",
+                        trace_id=trace_id,
+                    )
+                    await self._events.ingest(approval_ev)
+            except Exception as e:
+                logger.error("Agent %s failed for event %s: %s", spec.name, ev.id, e)
+                # Continue with other agents - don't fail entire pipeline
 
         # 7. Governance check
         check = await self._governance.check(

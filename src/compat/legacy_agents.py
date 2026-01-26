@@ -1,19 +1,27 @@
 # src/compat/legacy_agents.py
 
 """
-Compatibility layer for legacy KIRP agents.
-Allows the new architecture to run even if old modules are missing.
+Legacy Agent Compatibility Layer — DEPRECATED
+
+This module is kept for backward compatibility but is no longer used.
+All functionality has been migrated to:
+- OrchestratorAgent → PresentationAgent (brand_content view type)
+- CommandExecutorAgent → MetaAgent (command routing)
+
+This file will be removed in a future version.
 """
 
 from dataclasses import dataclass
 from typing import Any, Dict
+import warnings
 
 
 # -----------------------------
-#  BRAND / CONTENT ORCHESTRATOR
+#  BRAND / CONTENT ORCHESTRATOR (DEPRECATED)
 # -----------------------------
 @dataclass
 class BrandContentRequest:
+    """Deprecated: Use PresentationAgent with view_type='brand_content' instead."""
     idea: str
     user_id: str | None = None
     tone: str | None = "professional"
@@ -22,13 +30,18 @@ class BrandContentRequest:
 
 class OrchestratorAgent:
     """
-    Stub orchestrator for brand/content generation.
-    The new system can replace this later with a real LLM/RAG pipeline.
+    DEPRECATED: Use PresentationAgent with view_type='brand_content' instead.
+    
+    This stub is kept for backward compatibility only.
     """
 
     async def generate(self, request: BrandContentRequest) -> Dict[str, Any]:
+        warnings.warn(
+            "OrchestratorAgent is deprecated. Use PresentationAgent with view_type='brand_content' instead.",
+            DeprecationWarning,
+            stacklevel=2
+        )
         idea = request.idea.strip()
-
         return {
             "idea": idea,
             "headline": f"🚀 {idea}",
@@ -46,19 +59,26 @@ class OrchestratorAgent:
 
 
 # -----------------------------
-#  COMMAND EXECUTOR (LEGACY)
+#  COMMAND EXECUTOR (DEPRECATED)
 # -----------------------------
 class CommandExecutorAgent:
     """
-    Stub executor for legacy command execution.
+    DEPRECATED: Use MetaAgent for command routing instead.
+    
+    This stub is kept for backward compatibility only.
     """
 
     async def process_task(self, event: dict) -> bool:
+        warnings.warn(
+            "CommandExecutorAgent is deprecated. Use MetaAgent for command routing instead.",
+            DeprecationWarning,
+            stacklevel=2
+        )
         print(f"[Executor] Received event: {event}")
         return True
 
 
 command_executor_spec = {
     "name": "command_executor",
-    "description": "Stub executor for legacy compatibility",
+    "description": "Deprecated: Use MetaAgent instead",
 }

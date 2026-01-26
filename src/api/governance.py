@@ -41,7 +41,7 @@ async def get_pending_approvals(limit: int = Query(200, le=1000)) -> dict[str, A
     store = await _get_event_store()
     # Query events with event_type=human_approval_required that haven't been resolved
     # Check for resolution events (governance_approval/governance_rejection) to filter
-    all_events = await store.list(tenant_id="*", limit=limit * 2)
+    all_events = await store.list(tenant_id="*", limit=limit * 2, allow_all_tenants=True)
     approval_events = [e for e in all_events if e.event_type == "human_approval_required"]
     resolution_ids = {
         e.metadata.get("original_event_id")
@@ -144,8 +144,8 @@ async def get_audit_log(
     if tenant_id:
         events = await store.list(tenant_id=tenant_id, limit=limit)
     else:
-        # Get from all tenants (TODO: implement cross-tenant query)
-        events = await store.list(tenant_id="*", limit=limit)
+        # Get from all tenants (admin operation)
+        events = await store.list(tenant_id="*", limit=limit, allow_all_tenants=True)
 
     if event_type:
         events = [e for e in events if e.event_type == event_type]
@@ -171,7 +171,7 @@ async def policy_simulate(
 
     # TODO: Call policy_engine to calculate real risk/impact
     simulated_risk = 0.37  # placeholder
-    impacted_events = await store.list(tenant_id="*", limit=100)
+    impacted_events = await store.list(tenant_id="*", limit=100, allow_all_tenants=True)
     approval_events = [e for e in impacted_events if e.event_type == "human_approval_required"]
 
     return {

@@ -188,8 +188,78 @@ def run() -> None:
 
     with tab_flow:
         st.subheader("Live Event Flow")
-        st.info("Connect to Kafka / Redis Streams for live events.")
         st.markdown("Pipeline: **Event → RAG → Agent → Governance → Execution → Event**")
+        
+        # Live event stream
+        if st.button("Start Live Stream"):
+            st.session_state["live_stream_active"] = True
+        
+        if st.button("Stop Live Stream"):
+            st.session_state["live_stream_active"] = False
+        
+        if st.session_state.get("live_stream_active"):
+            # Fetch recent events
+            import time
+            from datetime import datetime, timedelta
+            
+            placeholder = st.empty()
+            
+            # Poll for events
+            since = datetime.now() - timedelta(minutes=5)
+            events_data = _get("/governance/audit", params={
+                "limit": 50,
+                "event_type": None,
+            })
+            
+            if isinstance(events_data, dict):
+                events = events_data.get("events", [])
+                
+                # Filter recent events
+                recent_events = []
+                for ev in events:
+                    ev_time = ev.get("timestamp")
+                    if ev_time:
+                        try:
+                            if isinstance(ev_time, str):
+                                ev_dt = datetime.fromisoformat(ev_time.replace("Z", "+00:00"))
+                            else:
+                                ev_dt = ev_time
+                            if ev_dt >= since:
+                                recent_events.append(ev)
+                        except Exception:
+                            pass
+                
+                # Display events
+                with placeholder.container():
+                    st.metric("Recent Events (5min)", len(recent_events))
+                    
+                    # Event timeline
+                    for ev in recent_events[:20]:  # Show last 20
+                        ev_type = ev.get("event_type", "unknown")
+                        ev_time = ev.get("timestamp", "")
+                        ev_content = ev.get("content", "")[:100]
+                        trace_id = ev.get("trace_id", "")
+                        
+                        with st.expander(f"**{ev_type}** — {ev_time[:19] if ev_time else 'N/A'}"):
+                            st.write(f"**Content:** {ev_content}")
+                            st.caption(f"Trace: `{trace_id}` | Tenant: {ev.get('tenant_id', 'N/A')} | Space: {ev.get('space_id', 'N/A')}")
+                            if ev.get("metadata"):
+                                st.json(ev.get("metadata"))
+                
+                # Auto-refresh
+                time.sleep(2)
+                st.rerun()
+        else:
+            st.info("Click 'Start Live Stream' to view real-time events.")
+            
+            # Show recent events snapshot
+            events_data = _get("/governance/audit", params={"limit": 10})
+            if isinstance(events_data, dict):
+                events = events_data.get("events", [])[:5]
+                if events:
+                    st.subheader("Recent Events Snapshot")
+                    for ev in events:
+                        st.text(f"[{ev.get('event_type', 'unknown')}] {ev.get('content', '')[:80]}")
 
     st.sidebar.markdown("### 🧠 KIRP v1")
     st.sidebar.markdown("Event → RAG → Agent → Governance → Execution → Event")

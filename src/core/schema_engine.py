@@ -8,38 +8,22 @@ Used by agents (e.g. SchemaStructureAgent) and UI views.
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass
+import uuid
 from datetime import datetime, timezone
-from enum import Enum
 from typing import Any
+
+from sqlalchemy import select, update, and_, or_
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from src.models.schema import SchemaNode, SchemaEntity
 
 logger = logging.getLogger(__name__)
 
 
-class SchemaEntity(str, Enum):
-    TASK = "task"
-    PROJECT = "project"
-    LIFE_AREA = "life_area"
-    CATEGORY = "category"
-
-
-@dataclass
-class SchemaNode:
-    """Single schema entity (task, project, etc.)."""
-
-    id: str
-    entity: SchemaEntity
-    tenant_id: str
-    space_id: str
-    title: str
-    metadata: dict[str, Any]
-    created_at: datetime
-    updated_at: datetime
-
-
 class SchemaEngine:
     """
-    Manages structured schemas. Metadata stored in PostgreSQL (via repository).
+    Manages structured schemas. Full CRUD operations with PostgreSQL.
+    Multi-tenant, event-sourced compatible.
     """
 
     def __init__(self, postgres_uri: str) -> None:
@@ -50,7 +34,6 @@ class SchemaEngine:
         """Initialize SQLAlchemy async engine + session factory."""
         try:
             from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
-            from sqlalchemy.orm import declarative_base
             engine = create_async_engine(self._postgres_uri, echo=False)
             self._session_factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
             logger.info("SchemaEngine connected to PostgreSQL")
@@ -58,22 +41,238 @@ class SchemaEngine:
             logger.error("SchemaEngine connection failed: %s", e)
             raise
 
-    async def upsert_node(self, node: SchemaNode) -> str:
-        """Insert or update a schema node."""
+    async def _get_session(self) -> AsyncSession:
+        """Get async session."""
         if self._session_factory is None:
             await self.connect()
-        # TODO: SQLAlchemy models + upsert logic
-        logger.info("SchemaEngine upsert: %s %s", node.entity.value, node.id)
-        return node.id
+        return self._session_factory()
+
+    async def upsert_node(
+        self,
+        tenant_id: str,
+        space_id: str,
+        entity: SchemaEntity,
+        title: str,
+        node_id: str | None = None,
+        description: str | None = None,
+        parent_id: str | None = None,
+        status: str | None = None,
+        priority: str | None = None,
+        due_date: datetime | None = None,
+        metadata: dict[str, Any] | None = None,
+    ) -> str:
+        """
+        Insert or update a schema node.
+        Returns the node ID (UUID string).
+        """
+        async with await self._get_session() as session:
+            try:
+                # Convert string IDs to UUIDs
+                node_uuid = uuid.UUID(node_id) if node_id else uuid.uuid4()
+                parent_uuid = uuid.UUID(parent_id) if parent_id else None
+                
+                # Check if node exists
+                stmt = select(SchemaNode).where(
+                    and_(
+                        SchemaNode.id == node_uuid,
+                        SchemaNode.tenant_id == tenant_id,
+                        SchemaNode.deleted_at.is_(None)
+                    )
+                )
+                result = await session.execute(stmt)
+                existing = result.scalar_one_or_none()
+                
+                if existing:
+                    # Update existing node
+                    existing.title = title
+                    existing.description = description
+                    existing.parent_id = parent_uuid
+                    existing.status = status
+                    existing.priority = priority
+                    existing.due_date = due_date
+                    if metadata:
+                        existing.extra = {**(existing.extra or {}), **metadata}
+                    existing.updated_at = datetime.now(timezone.utc)
+                    await session.commit()
+                    # Invalidate cache
+                    from src.core.cache import invalidate_cache
+                    await invalidate_cache("schema_nodes", tenant_id)
+                    logger.info("SchemaEngine updated node: %s %s", entity.value, node_uuid)
+                    return str(node_uuid)
+                else:
+                    # Create new node
+                    new_node = SchemaNode(
+                        id=node_uuid,
+                        tenant_id=tenant_id,
+                        space_id=space_id,
+                        entity=entity.value,
+                        title=title,
+                        description=description,
+                        parent_id=parent_uuid,
+                        status=status,
+                        priority=priority,
+                        due_date=due_date,
+                        extra=metadata or {},
+                        created_at=datetime.now(timezone.utc),
+                        updated_at=datetime.now(timezone.utc),
+                    )
+                    session.add(new_node)
+                    await session.commit()
+                    # Invalidate cache
+                    from src.core.cache import invalidate_cache
+                    await invalidate_cache("schema_nodes", tenant_id)
+                    logger.info("SchemaEngine created node: %s %s", entity.value, node_uuid)
+                    return str(node_uuid)
+            except Exception as e:
+                await session.rollback()
+                logger.error("SchemaEngine upsert failed: %s", e)
+                raise
+
+    async def get_node(self, node_id: str, tenant_id: str) -> dict[str, Any] | None:
+        """Get a single schema node by ID."""
+        async with await self._get_session() as session:
+            try:
+                node_uuid = uuid.UUID(node_id)
+                stmt = select(SchemaNode).where(
+                    and_(
+                        SchemaNode.id == node_uuid,
+                        SchemaNode.tenant_id == tenant_id,
+                        SchemaNode.deleted_at.is_(None)
+                    )
+                )
+                result = await session.execute(stmt)
+                node = result.scalar_one_or_none()
+                return node.to_dict() if node else None
+            except Exception as e:
+                logger.error("SchemaEngine get_node failed: %s", e)
+                return None
 
     async def list_nodes(
         self,
         tenant_id: str,
         space_id: str | None = None,
         entity: SchemaEntity | None = None,
-    ) -> list[SchemaNode]:
-        """List schema nodes with optional filters."""
-        if self._session_factory is None:
-            await self.connect()
-        # TODO: Query from DB
-        return []
+        parent_id: str | None = None,
+        status: str | None = None,
+        include_deleted: bool = False,
+        limit: int = 1000,
+        use_cache: bool = True,
+    ) -> list[dict[str, Any]]:
+        """
+        List schema nodes with optional filters.
+        Returns list of node dictionaries.
+        Uses caching for performance.
+        """
+        # Check cache
+        if use_cache:
+            from src.core.cache import get_cached, set_cached, _cache_key, CACHE_TTL_SCHEMA
+            cache_key = _cache_key("schema_nodes", tenant_id, space_id, entity, parent_id, status, include_deleted, limit)
+            cached = await get_cached(cache_key)
+            if cached is not None:
+                return cached
+        
+        async with await self._get_session() as session:
+            try:
+                conditions = [SchemaNode.tenant_id == tenant_id]
+                
+                if space_id:
+                    conditions.append(SchemaNode.space_id == space_id)
+                
+                if entity:
+                    conditions.append(SchemaNode.entity == entity.value)
+                
+                if parent_id:
+                    parent_uuid = uuid.UUID(parent_id)
+                    conditions.append(SchemaNode.parent_id == parent_uuid)
+                elif parent_id is False:  # Explicitly request root nodes
+                    conditions.append(SchemaNode.parent_id.is_(None))
+                
+                if status:
+                    conditions.append(SchemaNode.status == status)
+                
+                if not include_deleted:
+                    conditions.append(SchemaNode.deleted_at.is_(None))
+                
+                stmt = select(SchemaNode).where(and_(*conditions)).limit(limit)
+                result = await session.execute(stmt)
+                nodes = result.scalars().all()
+                node_dicts = [node.to_dict() for node in nodes]
+                
+                # Cache result
+                if use_cache:
+                    from src.core.cache import set_cached, _cache_key, CACHE_TTL_SCHEMA
+                    cache_key = _cache_key("schema_nodes", tenant_id, space_id, entity, parent_id, status, include_deleted, limit)
+                    await set_cached(cache_key, node_dicts, CACHE_TTL_SCHEMA)
+                
+                return node_dicts
+            except Exception as e:
+                logger.error("SchemaEngine list_nodes failed: %s", e)
+                return []
+
+    async def delete_node(self, node_id: str, tenant_id: str, soft: bool = True) -> bool:
+        """
+        Delete a schema node (soft delete by default).
+        Returns True if successful.
+        """
+        async with await self._get_session() as session:
+            try:
+                node_uuid = uuid.UUID(node_id)
+                stmt = select(SchemaNode).where(
+                    and_(
+                        SchemaNode.id == node_uuid,
+                        SchemaNode.tenant_id == tenant_id,
+                        SchemaNode.deleted_at.is_(None)
+                    )
+                )
+                result = await session.execute(stmt)
+                node = result.scalar_one_or_none()
+                
+                if not node:
+                    return False
+                
+                if soft:
+                    # Soft delete
+                    node.deleted_at = datetime.now(timezone.utc)
+                    node.updated_at = datetime.now(timezone.utc)
+                else:
+                    # Hard delete
+                    await session.delete(node)
+                
+                await session.commit()
+                logger.info("SchemaEngine deleted node: %s (soft=%s)", node_id, soft)
+                return True
+            except Exception as e:
+                await session.rollback()
+                logger.error("SchemaEngine delete_node failed: %s", e)
+                return False
+
+    async def get_node_tree(
+        self,
+        tenant_id: str,
+        space_id: str | None = None,
+        root_id: str | None = None,
+    ) -> dict[str, Any]:
+        """
+        Get a tree structure of nodes (with children).
+        Returns a dictionary with root nodes and their children.
+        """
+        # Get all nodes
+        all_nodes = await self.list_nodes(tenant_id=tenant_id, space_id=space_id, include_deleted=False)
+        
+        # Build tree
+        node_map = {node["id"]: {**node, "children": []} for node in all_nodes}
+        roots = []
+        
+        for node in all_nodes:
+            if node["parent_id"]:
+                if node["parent_id"] in node_map:
+                    node_map[node["parent_id"]]["children"].append(node_map[node["id"]])
+            else:
+                roots.append(node_map[node["id"]])
+        
+        if root_id:
+            # Return specific subtree
+            return node_map.get(root_id, {})
+        else:
+            # Return all roots
+            return {"roots": roots, "count": len(all_nodes)}

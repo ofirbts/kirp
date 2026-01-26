@@ -1,0 +1,792 @@
+name: kirp
+services:
+  cassandra:
+    container_name: kirp-cassandra
+    environment:
+      CASSANDRA_CLUSTER_NAME: KIRPCluster
+      CASSANDRA_DC: datacenter1
+      CASSANDRA_ENDPOINT_SNITCH: GossipingPropertyFileSnitch
+      CASSANDRA_RACK: rack1
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - nodetool status | grep -E '^UN' || exit 1
+      timeout: 10s
+      interval: 30s
+      retries: 5
+      start_period: 1m0s
+    image: cassandra:4.1
+    networks:
+      kirp-net: null
+    ports:
+      - mode: ingress
+        target: 9042
+        published: "9042"
+        protocol: tcp
+    restart: always
+    volumes:
+      - type: volume
+        source: cassandra_data
+        target: /var/lib/cassandra
+        volume: {}
+  elasticsearch:
+    container_name: kirp-elasticsearch
+    environment:
+      ES_JAVA_OPTS: -Xms512m -Xmx512m
+      discovery.type: single-node
+      xpack.security.enabled: "false"
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - curl -f http://localhost:9200/_cluster/health || exit 1
+      timeout: 10s
+      interval: 30s
+      retries: 5
+      start_period: 1m0s
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.10.2
+    networks:
+      kirp-net: null
+    ports:
+      - mode: ingress
+        target: 9200
+        published: "9200"
+        protocol: tcp
+  grafana:
+    container_name: kirp-grafana
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: admin
+    image: grafana/grafana:latest
+    networks:
+      kirp-net: null
+    ports:
+      - mode: ingress
+        target: 3000
+        published: "3000"
+        protocol: tcp
+    volumes:
+      - type: volume
+        source: grafana_data
+        target: /var/lib/grafana
+        volume: {}
+  kafka:
+    container_name: kirp-kafka
+    depends_on:
+      zookeeper:
+        condition: service_started
+        required: true
+    environment:
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:9093
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      KAFKA_BROKER_ID: "1"
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: "1"
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - kafka-broker-api-versions --bootstrap-server localhost:9092 || exit 1
+      timeout: 10s
+      interval: 30s
+      retries: 5
+      start_period: 1m0s
+    image: confluentinc/cp-kafka:7.5.0
+    networks:
+      kirp-net: null
+    ports:
+      - mode: ingress
+        target: 9092
+        published: "9092"
+        protocol: tcp
+      - mode: ingress
+        target: 9093
+        published: "9093"
+        protocol: tcp
+  kirp-agent-processor:
+    build:
+      context: /home/ofir/projects/kirp
+      dockerfile: Dockerfile.agent
+    command:
+      - python
+      - -m
+      - src.workers.kafka_processor
+    container_name: kirp-agent-processor
+    depends_on:
+      kafka:
+        condition: service_healthy
+        required: true
+      kirp-api:
+        condition: service_healthy
+        required: true
+    environment:
+      ANTHROPIC_API_KEY: ""
+      API_HOST: 0.0.0.0
+      API_PORT: "8000"
+      API_URL: http://kirp-api:8000
+      AWS_ACCESS_KEY_ID: AKIA6PS436XZUSCVMAGZrOKJZp
+      AWS_REGION: us-east-1
+      AWS_SECRET_ACCESS_KEY: mcnFxzWxSUgRm2cWYIeFH+QWLSRmuxNPPOrOKJZp
+      BOOTCAMP_CASSANDRA_DATACENTER: datacenter1
+      BOOTCAMP_CASSANDRA_HOST: node128.codingbc.com
+      BOOTCAMP_CASSANDRA_KEYSPACE: tiny_keyspace
+      BOOTCAMP_CASSANDRA_PORT: "9042"
+      BOOTCAMP_KAFKA_BOOTSTRAP: node128.codingbc.com:9092
+      BOOTCAMP_MONGO_DB_NAME: kirp_bootcamp
+      BOOTCAMP_MONGO_URI: mongodb://root:bootcamp@node128.codingbc.com:27000/admin?retryWrites=true&w=majority&connectTimeout=10000
+      BOOTCAMP_POSTGRES_DB: ofir_basidsprig
+      BOOTCAMP_POSTGRES_HOST: node128.codingbc.com
+      BOOTCAMP_POSTGRES_PASSWORD: Nov2017890#
+      BOOTCAMP_POSTGRES_PORT: "7878"
+      BOOTCAMP_POSTGRES_USER: postgres
+      BOOTCAMP_REDIS_HOST: node128.codingbc.com
+      BOOTCAMP_REDIS_PORT: "6000"
+      CASSANDRA_DATACENTER: datacenter1
+      CASSANDRA_HOST: cassandra
+      CASSANDRA_KEYSPACE: kirp_keyspace
+      CASSANDRA_PORT: "9042"
+      CELERY_BROKER_URL: redis://redis:6379/1
+      CELERY_RESULT_BACKEND: redis://redis:6379/1
+      DASHBOARD_PORT: "8501"
+      ELASTICSEARCH_HOST: elasticsearch
+      ELASTICSEARCH_PORT: "9200"
+      EMBEDDING_MODEL: text-embedding-3-small
+      EMBEDDING_PROVIDER: openai
+      ENV: production
+      ENVIRONMENT: local
+      EVENT_BUS_PROVIDER: kafka
+      EXTERNAL_URL: http://localhost:8501
+      GOOGLE_CLIENT_ID: 971736642876-120gn7nihtm30s4aopsdvm53tt81kn2q.apps.googleusercontent.com
+      GOOGLE_CLIENT_SECRET: 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
+      GOOGLE_CREDENTIALS_PATH: google_credentials.json
+      GOOGLE_REDIRECT_URI: http://localhost:8501
+      GRAFANA_PORT: "3000"
+      JWT_ALGORITHM: HS256
+      JWT_EXPIRE_MINUTES: "60"
+      JWT_SECRET: abShiuJ1UDqROlZK9E+7LXmpOAhVHr2SRxNpxYLi3c0VVqVgseX6qiemSWt8+qWV
+      KAFKA_BOOTSTRAP: kafka:9092
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      KIRP_ENCRYPTION_KEY: ""
+      LLM_PROVIDER: openai
+      LOG_LEVEL: INFO
+      MONGO_DB_NAME: kirp
+      MONGO_URI: mongodb://root:example@mongodb:27017/kirp?authSource=admin
+      NGROK_AUTHTOKEN: 380mRoVMH0iW0qnV3xIRsHW857q_57TufZPEAqXWeRJdG1ZqV
+      NOTION_DATABASE_ID: 2e0abc9b19ee8076a746e004d3be28ae
+      NOTION_TASKS_DB_ID: 2e0abc9b19ee8076a746e004d3be28ae
+      NOTION_TOKEN: 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
+      OLLAMA_MODEL: llama3
+      OLLAMA_URL: http://ollama:11434
+      OPA_URL: http://opa:8181
+      OPENAI_API_KEY: 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
+      OTEL_EXPORTER_OTLP_ENDPOINT: ""
+      POSTGRES_DB: kirp
+      POSTGRES_HOST: postgres
+      POSTGRES_PASSWORD: kirp_password
+      POSTGRES_PORT: "5432"
+      POSTGRES_URI: postgresql+asyncpg://kirp_user:kirp_password@postgres:5432/kirp
+      POSTGRES_USER: kirp_user
+      PROMETHEUS_MULTIPROC_DIR: /tmp/prometheus
+      PROMETHEUS_PORT: "9090"
+      PYTHONPATH: /app
+      QDRANT_API_KEY: ""
+      QDRANT_COLLECTION: kirp_vectors
+      QDRANT_HOST: qdrant
+      QDRANT_PORT: "6333"
+      QDRANT_URL: http://qdrant:6333
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+      REDIS_URL: redis://redis:6379/0
+      SLACK_BOT_TOKEN: ""
+      SMS_KEY: J2IX1eEa9
+      SMS_PASS: "66534228"
+      SMS_USER: "0525236451"
+      TWILIO_ACCOUNT_SID: AC2c12235aba0ab58cca546d366859c595
+      TWILIO_AUTH_TOKEN: 5a76571c1d3382080f79763e747762c7
+      TWILIO_NUMBER: whatsapp:+14155238886
+      USE_LOCAL_LLM: "true"
+      VAULT_ADDR: http://localhost:8200
+      WHATSAPP_PHONE_ID: mock_phone_id
+      WHATSAPP_PROVIDER: twilio
+      WHATSAPP_TOKEN: kirp_secure_2026
+      WHATSAPP_VERIFY_TOKEN: kirp_secure_token
+    networks:
+      kirp-net: null
+    restart: unless-stopped
+  kirp-api:
+    build:
+      context: /home/ofir/projects/kirp
+      dockerfile: Dockerfile.api
+    command:
+      - uvicorn
+      - src.main:app
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8000"
+    container_name: kirp-api
+    depends_on:
+      kafka:
+        condition: service_healthy
+        required: true
+      mongodb:
+        condition: service_healthy
+        required: true
+      opa:
+        condition: service_started
+        required: true
+      postgres:
+        condition: service_healthy
+        required: true
+      qdrant:
+        condition: service_healthy
+        required: true
+      redis:
+        condition: service_healthy
+        required: true
+    environment:
+      ANTHROPIC_API_KEY: ""
+      API_HOST: 0.0.0.0
+      API_PORT: "8000"
+      API_URL: http://kirp-api:8000
+      AWS_ACCESS_KEY_ID: AKIA6PS436XZUSCVMAGZrOKJZp
+      AWS_REGION: us-east-1
+      AWS_SECRET_ACCESS_KEY: mcnFxzWxSUgRm2cWYIeFH+QWLSRmuxNPPOrOKJZp
+      BOOTCAMP_CASSANDRA_DATACENTER: datacenter1
+      BOOTCAMP_CASSANDRA_HOST: node128.codingbc.com
+      BOOTCAMP_CASSANDRA_KEYSPACE: tiny_keyspace
+      BOOTCAMP_CASSANDRA_PORT: "9042"
+      BOOTCAMP_KAFKA_BOOTSTRAP: node128.codingbc.com:9092
+      BOOTCAMP_MONGO_DB_NAME: kirp_bootcamp
+      BOOTCAMP_MONGO_URI: mongodb://root:bootcamp@node128.codingbc.com:27000/admin?retryWrites=true&w=majority&connectTimeout=10000
+      BOOTCAMP_POSTGRES_DB: ofir_basidsprig
+      BOOTCAMP_POSTGRES_HOST: node128.codingbc.com
+      BOOTCAMP_POSTGRES_PASSWORD: Nov2017890#
+      BOOTCAMP_POSTGRES_PORT: "7878"
+      BOOTCAMP_POSTGRES_USER: postgres
+      BOOTCAMP_REDIS_HOST: node128.codingbc.com
+      BOOTCAMP_REDIS_PORT: "6000"
+      CASSANDRA_DATACENTER: datacenter1
+      CASSANDRA_HOST: cassandra
+      CASSANDRA_KEYSPACE: kirp_keyspace
+      CASSANDRA_PORT: "9042"
+      CELERY_BROKER_URL: redis://redis:6379/1
+      CELERY_RESULT_BACKEND: redis://redis:6379/1
+      DASHBOARD_PORT: "8501"
+      ELASTICSEARCH_HOST: elasticsearch
+      ELASTICSEARCH_PORT: "9200"
+      EMBEDDING_MODEL: text-embedding-3-small
+      EMBEDDING_PROVIDER: openai
+      ENV: production
+      ENVIRONMENT: local
+      EVENT_BUS_PROVIDER: kafka
+      EXTERNAL_URL: http://localhost:8501
+      GOOGLE_CLIENT_ID: 971736642876-120gn7nihtm30s4aopsdvm53tt81kn2q.apps.googleusercontent.com
+      GOOGLE_CLIENT_SECRET: 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
+      GOOGLE_CREDENTIALS_PATH: google_credentials.json
+      GOOGLE_REDIRECT_URI: http://localhost:8501
+      GRAFANA_PORT: "3000"
+      JWT_ALGORITHM: HS256
+      JWT_EXPIRE_MINUTES: "60"
+      JWT_SECRET: abShiuJ1UDqROlZK9E+7LXmpOAhVHr2SRxNpxYLi3c0VVqVgseX6qiemSWt8+qWV
+      KAFKA_BOOTSTRAP: kafka:9092
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      KIRP_ENCRYPTION_KEY: ""
+      LLM_PROVIDER: openai
+      LOG_LEVEL: INFO
+      MONGO_DB_NAME: kirp
+      MONGO_URI: mongodb://root:example@mongodb:27017/kirp?authSource=admin
+      NGROK_AUTHTOKEN: 380mRoVMH0iW0qnV3xIRsHW857q_57TufZPEAqXWeRJdG1ZqV
+      NOTION_DATABASE_ID: 2e0abc9b19ee8076a746e004d3be28ae
+      NOTION_TASKS_DB_ID: 2e0abc9b19ee8076a746e004d3be28ae
+      NOTION_TOKEN: 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
+      OLLAMA_MODEL: llama3
+      OLLAMA_URL: http://ollama:11434
+      OPA_URL: http://opa:8181
+      OPENAI_API_KEY: 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
+      OTEL_EXPORTER_OTLP_ENDPOINT: ""
+      POSTGRES_DB: kirp
+      POSTGRES_HOST: postgres
+      POSTGRES_PASSWORD: kirp_password
+      POSTGRES_PORT: "5432"
+      POSTGRES_URI: postgresql+asyncpg://kirp_user:kirp_password@postgres:5432/kirp
+      POSTGRES_USER: kirp_user
+      PROMETHEUS_MULTIPROC_DIR: /tmp/prometheus
+      PROMETHEUS_PORT: "9090"
+      PYTHONPATH: /app
+      QDRANT_API_KEY: ""
+      QDRANT_COLLECTION: kirp_vectors
+      QDRANT_HOST: qdrant
+      QDRANT_PORT: "6333"
+      QDRANT_URL: http://qdrant:6333
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+      REDIS_URL: redis://redis:6379/0
+      SLACK_BOT_TOKEN: ""
+      SMS_KEY: J2IX1eEa9
+      SMS_PASS: "66534228"
+      SMS_USER: "0525236451"
+      TWILIO_ACCOUNT_SID: AC2c12235aba0ab58cca546d366859c595
+      TWILIO_AUTH_TOKEN: 5a76571c1d3382080f79763e747762c7
+      TWILIO_NUMBER: whatsapp:+14155238886
+      USE_LOCAL_LLM: "true"
+      VAULT_ADDR: http://localhost:8200
+      WHATSAPP_PHONE_ID: mock_phone_id
+      WHATSAPP_PROVIDER: twilio
+      WHATSAPP_TOKEN: kirp_secure_2026
+      WHATSAPP_VERIFY_TOKEN: kirp_secure_token
+    networks:
+      kirp-net: null
+    ports:
+      - mode: ingress
+        target: 8000
+        published: "8000"
+        protocol: tcp
+    restart: unless-stopped
+  kirp-dashboard:
+    build:
+      context: /home/ofir/projects/kirp
+      dockerfile: Dockerfile.dashboard
+    command:
+      - streamlit
+      - run
+      - src/ui/master_dashboard.py
+      - --server.port
+      - "8501"
+      - --server.address
+      - 0.0.0.0
+    container_name: kirp-dashboard
+    depends_on:
+      kirp-api:
+        condition: service_healthy
+        required: true
+    environment:
+      ANTHROPIC_API_KEY: ""
+      API_HOST: 0.0.0.0
+      API_PORT: "8000"
+      API_URL: http://kirp-api:8000
+      AWS_ACCESS_KEY_ID: AKIA6PS436XZUSCVMAGZrOKJZp
+      AWS_REGION: us-east-1
+      AWS_SECRET_ACCESS_KEY: mcnFxzWxSUgRm2cWYIeFH+QWLSRmuxNPPOrOKJZp
+      BOOTCAMP_CASSANDRA_DATACENTER: datacenter1
+      BOOTCAMP_CASSANDRA_HOST: node128.codingbc.com
+      BOOTCAMP_CASSANDRA_KEYSPACE: tiny_keyspace
+      BOOTCAMP_CASSANDRA_PORT: "9042"
+      BOOTCAMP_KAFKA_BOOTSTRAP: node128.codingbc.com:9092
+      BOOTCAMP_MONGO_DB_NAME: kirp_bootcamp
+      BOOTCAMP_MONGO_URI: mongodb://root:bootcamp@node128.codingbc.com:27000/admin?retryWrites=true&w=majority&connectTimeout=10000
+      BOOTCAMP_POSTGRES_DB: ofir_basidsprig
+      BOOTCAMP_POSTGRES_HOST: node128.codingbc.com
+      BOOTCAMP_POSTGRES_PASSWORD: Nov2017890#
+      BOOTCAMP_POSTGRES_PORT: "7878"
+      BOOTCAMP_POSTGRES_USER: postgres
+      BOOTCAMP_REDIS_HOST: node128.codingbc.com
+      BOOTCAMP_REDIS_PORT: "6000"
+      CASSANDRA_DATACENTER: datacenter1
+      CASSANDRA_HOST: cassandra
+      CASSANDRA_KEYSPACE: kirp_keyspace
+      CASSANDRA_PORT: "9042"
+      CELERY_BROKER_URL: redis://redis:6379/1
+      CELERY_RESULT_BACKEND: redis://redis:6379/1
+      DASHBOARD_PORT: "8501"
+      ELASTICSEARCH_HOST: elasticsearch
+      ELASTICSEARCH_PORT: "9200"
+      EMBEDDING_MODEL: text-embedding-3-small
+      EMBEDDING_PROVIDER: openai
+      ENV: production
+      ENVIRONMENT: local
+      EVENT_BUS_PROVIDER: kafka
+      EXTERNAL_URL: http://localhost:8501
+      GOOGLE_CLIENT_ID: 971736642876-120gn7nihtm30s4aopsdvm53tt81kn2q.apps.googleusercontent.com
+      GOOGLE_CLIENT_SECRET: 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
+      GOOGLE_CREDENTIALS_PATH: google_credentials.json
+      GOOGLE_REDIRECT_URI: http://localhost:8501
+      GRAFANA_PORT: "3000"
+      JWT_ALGORITHM: HS256
+      JWT_EXPIRE_MINUTES: "60"
+      JWT_SECRET: abShiuJ1UDqROlZK9E+7LXmpOAhVHr2SRxNpxYLi3c0VVqVgseX6qiemSWt8+qWV
+      KAFKA_BOOTSTRAP: kafka:9092
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      KIRP_ENCRYPTION_KEY: ""
+      LLM_PROVIDER: openai
+      LOG_LEVEL: INFO
+      MONGO_DB_NAME: kirp
+      MONGO_URI: mongodb://root:example@mongodb:27017/kirp?authSource=admin
+      NGROK_AUTHTOKEN: 380mRoVMH0iW0qnV3xIRsHW857q_57TufZPEAqXWeRJdG1ZqV
+      NOTION_DATABASE_ID: 2e0abc9b19ee8076a746e004d3be28ae
+      NOTION_TASKS_DB_ID: 2e0abc9b19ee8076a746e004d3be28ae
+      NOTION_TOKEN: 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
+      OLLAMA_MODEL: llama3
+      OLLAMA_URL: http://ollama:11434
+      OPA_URL: http://localhost:8181
+      OPENAI_API_KEY: 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
+      OTEL_EXPORTER_OTLP_ENDPOINT: ""
+      POSTGRES_DB: kirp
+      POSTGRES_HOST: postgres
+      POSTGRES_PASSWORD: kirp_password
+      POSTGRES_PORT: "5432"
+      POSTGRES_URI: postgresql://kirp_user:kirp_password@postgres:5432/kirp
+      POSTGRES_USER: kirp_user
+      PROMETHEUS_MULTIPROC_DIR: /tmp/prometheus
+      PROMETHEUS_PORT: "9090"
+      PYTHONPATH: /app
+      QDRANT_API_KEY: ""
+      QDRANT_COLLECTION: kirp_vectors
+      QDRANT_HOST: qdrant
+      QDRANT_PORT: "6333"
+      QDRANT_URL: http://qdrant:6333
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+      REDIS_URL: redis://redis:6379/0
+      SLACK_BOT_TOKEN: ""
+      SMS_KEY: J2IX1eEa9
+      SMS_PASS: "66534228"
+      SMS_USER: "0525236451"
+      TWILIO_ACCOUNT_SID: AC2c12235aba0ab58cca546d366859c595
+      TWILIO_AUTH_TOKEN: 5a76571c1d3382080f79763e747762c7
+      TWILIO_NUMBER: whatsapp:+14155238886
+      USE_LOCAL_LLM: "true"
+      VAULT_ADDR: http://localhost:8200
+      WHATSAPP_PHONE_ID: mock_phone_id
+      WHATSAPP_PROVIDER: twilio
+      WHATSAPP_TOKEN: kirp_secure_2026
+      WHATSAPP_VERIFY_TOKEN: kirp_secure_token
+    networks:
+      kirp-net: null
+    ports:
+      - mode: ingress
+        target: 8501
+        published: "8501"
+        protocol: tcp
+    restart: unless-stopped
+  kirp-worker:
+    build:
+      context: /home/ofir/projects/kirp
+      dockerfile: Dockerfile.worker
+    command:
+      - celery
+      - -A
+      - src.workers.celery_app
+      - worker
+      - -l
+      - info
+      - -c
+      - "4"
+    container_name: kirp-worker
+    depends_on:
+      kafka:
+        condition: service_healthy
+        required: true
+      kirp-api:
+        condition: service_healthy
+        required: true
+      opa:
+        condition: service_started
+        required: true
+      redis:
+        condition: service_healthy
+        required: true
+    environment:
+      ANTHROPIC_API_KEY: ""
+      API_HOST: 0.0.0.0
+      API_PORT: "8000"
+      API_URL: http://kirp-api:8000
+      AWS_ACCESS_KEY_ID: AKIA6PS436XZUSCVMAGZrOKJZp
+      AWS_REGION: us-east-1
+      AWS_SECRET_ACCESS_KEY: mcnFxzWxSUgRm2cWYIeFH+QWLSRmuxNPPOrOKJZp
+      BOOTCAMP_CASSANDRA_DATACENTER: datacenter1
+      BOOTCAMP_CASSANDRA_HOST: node128.codingbc.com
+      BOOTCAMP_CASSANDRA_KEYSPACE: tiny_keyspace
+      BOOTCAMP_CASSANDRA_PORT: "9042"
+      BOOTCAMP_KAFKA_BOOTSTRAP: node128.codingbc.com:9092
+      BOOTCAMP_MONGO_DB_NAME: kirp_bootcamp
+      BOOTCAMP_MONGO_URI: mongodb://root:bootcamp@node128.codingbc.com:27000/admin?retryWrites=true&w=majority&connectTimeout=10000
+      BOOTCAMP_POSTGRES_DB: ofir_basidsprig
+      BOOTCAMP_POSTGRES_HOST: node128.codingbc.com
+      BOOTCAMP_POSTGRES_PASSWORD: Nov2017890#
+      BOOTCAMP_POSTGRES_PORT: "7878"
+      BOOTCAMP_POSTGRES_USER: postgres
+      BOOTCAMP_REDIS_HOST: node128.codingbc.com
+      BOOTCAMP_REDIS_PORT: "6000"
+      CASSANDRA_DATACENTER: datacenter1
+      CASSANDRA_HOST: cassandra
+      CASSANDRA_KEYSPACE: kirp_keyspace
+      CASSANDRA_PORT: "9042"
+      CELERY_BROKER_URL: redis://redis:6379/1
+      CELERY_RESULT_BACKEND: redis://redis:6379/1
+      DASHBOARD_PORT: "8501"
+      ELASTICSEARCH_HOST: elasticsearch
+      ELASTICSEARCH_PORT: "9200"
+      EMBEDDING_MODEL: text-embedding-3-small
+      EMBEDDING_PROVIDER: openai
+      ENV: production
+      ENVIRONMENT: local
+      EVENT_BUS_PROVIDER: kafka
+      EXTERNAL_URL: http://localhost:8501
+      GOOGLE_CLIENT_ID: 971736642876-120gn7nihtm30s4aopsdvm53tt81kn2q.apps.googleusercontent.com
+      GOOGLE_CLIENT_SECRET: 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
+      GOOGLE_CREDENTIALS_PATH: google_credentials.json
+      GOOGLE_REDIRECT_URI: http://localhost:8501
+      GRAFANA_PORT: "3000"
+      JWT_ALGORITHM: HS256
+      JWT_EXPIRE_MINUTES: "60"
+      JWT_SECRET: abShiuJ1UDqROlZK9E+7LXmpOAhVHr2SRxNpxYLi3c0VVqVgseX6qiemSWt8+qWV
+      KAFKA_BOOTSTRAP: kafka:9092
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      KIRP_ENCRYPTION_KEY: ""
+      LLM_PROVIDER: openai
+      LOG_LEVEL: INFO
+      MONGO_DB_NAME: kirp
+      MONGO_URI: mongodb://root:example@mongodb:27017/kirp?authSource=admin
+      NGROK_AUTHTOKEN: 380mRoVMH0iW0qnV3xIRsHW857q_57TufZPEAqXWeRJdG1ZqV
+      NOTION_DATABASE_ID: 2e0abc9b19ee8076a746e004d3be28ae
+      NOTION_TASKS_DB_ID: 2e0abc9b19ee8076a746e004d3be28ae
+      NOTION_TOKEN: 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
+      OLLAMA_MODEL: llama3
+      OLLAMA_URL: http://ollama:11434
+      OPA_URL: http://opa:8181
+      OPENAI_API_KEY: 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
+      OTEL_EXPORTER_OTLP_ENDPOINT: ""
+      POSTGRES_DB: kirp
+      POSTGRES_HOST: postgres
+      POSTGRES_PASSWORD: kirp_password
+      POSTGRES_PORT: "5432"
+      POSTGRES_URI: postgresql+asyncpg://kirp_user:kirp_password@postgres:5432/kirp
+      POSTGRES_USER: kirp_user
+      PROMETHEUS_MULTIPROC_DIR: /tmp/prometheus
+      PROMETHEUS_PORT: "9090"
+      PYTHONPATH: /app
+      QDRANT_API_KEY: ""
+      QDRANT_COLLECTION: kirp_vectors
+      QDRANT_HOST: qdrant
+      QDRANT_PORT: "6333"
+      QDRANT_URL: http://qdrant:6333
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+      REDIS_URL: redis://redis:6379/0
+      SLACK_BOT_TOKEN: ""
+      SMS_KEY: J2IX1eEa9
+      SMS_PASS: "66534228"
+      SMS_USER: "0525236451"
+      TWILIO_ACCOUNT_SID: AC2c12235aba0ab58cca546d366859c595
+      TWILIO_AUTH_TOKEN: 5a76571c1d3382080f79763e747762c7
+      TWILIO_NUMBER: whatsapp:+14155238886
+      USE_LOCAL_LLM: "true"
+      VAULT_ADDR: http://localhost:8200
+      WHATSAPP_PHONE_ID: mock_phone_id
+      WHATSAPP_PROVIDER: twilio
+      WHATSAPP_TOKEN: kirp_secure_2026
+      WHATSAPP_VERIFY_TOKEN: kirp_secure_token
+    networks:
+      kirp-net: null
+    restart: unless-stopped
+  mongo-express:
+    container_name: kirp-mongo-express
+    depends_on:
+      mongodb:
+        condition: service_started
+        required: true
+    environment:
+      ME_CONFIG_MONGODB_ADMINPASSWORD: example
+      ME_CONFIG_MONGODB_ADMINUSERNAME: root
+      ME_CONFIG_MONGODB_SERVER: mongodb
+    image: mongo-express:latest
+    networks:
+      kirp-net: null
+    ports:
+      - mode: ingress
+        target: 8081
+        published: "8081"
+        protocol: tcp
+    restart: always
+  mongodb:
+    container_name: kirp-mongodb
+    environment:
+      MONGO_INITDB_ROOT_PASSWORD: example
+      MONGO_INITDB_ROOT_USERNAME: root
+    healthcheck:
+      test:
+        - CMD
+        - mongosh
+        - --eval
+        - db.adminCommand('ping')
+      timeout: 5s
+      interval: 10s
+      retries: 5
+    image: mongo:7
+    networks:
+      kirp-net: null
+    ports:
+      - mode: ingress
+        target: 27017
+        published: "27017"
+        protocol: tcp
+    restart: always
+    volumes:
+      - type: volume
+        source: mongo_data
+        target: /data/db
+        volume: {}
+  opa:
+    command:
+      - run
+      - --server
+      - --log-level=info
+      - --set=decision_logs.console=true
+    container_name: kirp-opa
+    image: openpolicyagent/opa:latest
+    networks:
+      kirp-net: null
+    ports:
+      - mode: ingress
+        target: 8181
+        published: "8181"
+        protocol: tcp
+    restart: always
+    volumes:
+      - type: bind
+        source: /home/ofir/projects/kirp/deploy/opa/policies
+        target: /policies
+        bind:
+          create_host_path: true
+      - type: volume
+        source: opa_data
+        target: /data
+        volume: {}
+  postgres:
+    container_name: kirp-postgres
+    environment:
+      POSTGRES_DB: kirp
+      POSTGRES_PASSWORD: kirp_password
+      POSTGRES_USER: kirp_user
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - pg_isready -U kirp_user
+      timeout: 5s
+      interval: 10s
+      retries: 5
+    image: postgres:16-alpine
+    networks:
+      kirp-net: null
+    ports:
+      - mode: ingress
+        target: 5432
+        published: "5432"
+        protocol: tcp
+    restart: always
+    volumes:
+      - type: volume
+        source: postgres_data
+        target: /var/lib/postgresql/data
+        volume: {}
+  prometheus:
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+    container_name: kirp-prometheus
+    image: prom/prometheus:latest
+    networks:
+      kirp-net: null
+    ports:
+      - mode: ingress
+        target: 9090
+        published: "9090"
+        protocol: tcp
+    volumes:
+      - type: bind
+        source: /home/ofir/projects/kirp/deploy/prometheus.yml
+        target: /etc/prometheus/prometheus.yml
+        bind:
+          create_host_path: true
+      - type: volume
+        source: prometheus_data
+        target: /prometheus
+        volume: {}
+  qdrant:
+    build:
+      context: /home/ofir/projects/kirp
+      dockerfile: deploy/Dockerfile.qdrant
+    container_name: kirp-qdrant
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - curl -sf http://localhost:6333/healthz || exit 1
+      timeout: 5s
+      interval: 10s
+      retries: 5
+      start_period: 20s
+    image: kirp-qdrant:local
+    networks:
+      kirp-net: null
+    ports:
+      - mode: ingress
+        target: 6333
+        published: "6333"
+        protocol: tcp
+      - mode: ingress
+        target: 6334
+        published: "6334"
+        protocol: tcp
+    restart: always
+    volumes:
+      - type: volume
+        source: qdrant_data
+        target: /qdrant/storage
+        volume: {}
+  redis:
+    command:
+      - redis-server
+      - --maxmemory
+      - 512mb
+      - --maxmemory-policy
+      - allkeys-lru
+    container_name: kirp-redis
+    healthcheck:
+      test:
+        - CMD
+        - redis-cli
+        - ping
+      timeout: 5s
+      interval: 10s
+      retries: 5
+    image: redis:7-alpine
+    networks:
+      kirp-net: null
+    ports:
+      - mode: ingress
+        target: 6379
+        published: "6379"
+        protocol: tcp
+    restart: always
+  zookeeper:
+    container_name: kirp-zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: "2181"
+      ZOOKEEPER_TICK_TIME: "2000"
+    image: confluentinc/cp-zookeeper:7.5.0
+    networks:
+      kirp-net: null
+    ports:
+      - mode: ingress
+        target: 2181
+        published: "2181"
+        protocol: tcp
+networks:
+  kirp-net:
+    name: kirp_kirp-net
+    driver: bridge
+volumes:
+  cassandra_data:
+    name: kirp_cassandra_data
+  grafana_data:
+    name: kirp_grafana_data
+  mongo_data:
+    name: kirp_mongo_data
+  opa_data:
+    name: kirp_opa_data
+  postgres_data:
+    name: kirp_postgres_data
+  prometheus_data:
+    name: kirp_prometheus_data
+  qdrant_data:
+    name: kirp_qdrant_data

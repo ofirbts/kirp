@@ -1,0 +1,38 @@
+KIRP Enterprise — Short Working Rules for Cursor
+(Concise, strict, and safe)
+1. Architecture Rules (Do Not Break)
+Keep the structure exactly as:
+core/ engines, agents/ handlers, api/ routers, workers/ background tasks, ui/ dashboard.
+No new top‑level folders.
+No changes to docker-compose.yml or .env unless explicitly requested.
+2. Event‑Sourcing & Multi‑Tenancy
+No direct DB mutations. All changes must be events.
+Always propagate tenant_id, space_id, user_id.
+All external actions must go through Governance.
+3. RAG + Agents
+RAG context must be passed consistently.
+No direct LLM calls outside agents/.
+All new agents must use AgentFramework.register().
+4. Schema Engine
+Until fully implemented:
+No raw SQL.
+No assumptions about schema persistence.
+Use only the provided placeholders.
+5. Legacy Integration
+Use old KIRP code only as inspiration, not copy‑paste.
+Modernize and integrate into the new architecture.
+6. Allowed Work (Green Light)
+Implement Schema Engine (models, migrations, queries).
+Implement EventPipeline fully.
+Improve RAG (no zero vectors, better API usage).
+Upgrade agents and context handling.
+Migrate legacy agents into AgentFramework.
+7. Safety Checklist
+Before any change, verify:
+[ ] No imports or APIs were broken
+[ ] Event‑sourcing preserved
+[ ] Multi‑tenancy preserved
+[ ] Governance enforced
+[ ] No infra changes
+[ ] No duplicate logic
+[ ] Output validated (Pydantic preferred)

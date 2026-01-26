@@ -35,7 +35,6 @@ class GovernanceCheck:
     requires_approval: bool
     policy_id: str | None = None
     risk_score: float = 0.0
-    risk_score: float = 0.0
 
 
 class GovernanceEngine:

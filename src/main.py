@@ -73,7 +73,7 @@ async def get_schema_engine() -> Any:
     global _schema_engine
     if _schema_engine is None:
         from src.core.schema_engine import SchemaEngine
-        _schema_engine = SchemaEngine(os.getenv("POSTGRES_URI", "postgresql+asyncpg://kirp:kirp@localhost:5432/kirp"))
+        _schema_engine = SchemaEngine(os.getenv("POSTGRES_URI", "postgresql+asyncpg://kirp_user:kirp_password@localhost:5432/kirp"))
         await _schema_engine.connect()
     return _schema_engine
 
@@ -90,26 +90,9 @@ async def get_agent_framework() -> Any:
     global _agent_framework
     if _agent_framework is None:
         from src.core.agent_framework import AgentFramework
-        from src.agents import (
-            pattern_analyzer_spec,
-            planner_spec,
-            forecaster_spec,
-            risk_opportunity_spec,
-            schema_structure_spec,
-            presentation_spec,
-            self_improvement_spec,
-        )
+        from src.core.agent_registry import register_all_agents
         _agent_framework = AgentFramework()
-        for spec in (
-            pattern_analyzer_spec,
-            planner_spec,
-            forecaster_spec,
-            risk_opportunity_spec,
-            schema_structure_spec,
-            presentation_spec,
-            self_improvement_spec,
-        ):
-            _agent_framework.register(spec)
+        register_all_agents(_agent_framework)
     return _agent_framework
 
 
@@ -250,13 +233,14 @@ async def insights(tenant_id: str, user_id: str) -> list[dict[str, Any]]:
 
 
 # Include routers
-from src.api import governance, observability, whatsapp_os, brand
+from src.api import governance, observability, whatsapp_os, brand, auth
 
 app.include_router(governance.router)
 app.include_router(observability.router)
 app.include_router(whatsapp_os.router)
 app.include_router(brand.router)
 app.include_router(command.router)
+app.include_router(auth.router)
 
 
 if __name__ == "__main__":

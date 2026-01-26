@@ -32,34 +32,15 @@ def ingest_task(self: Any, payload: dict[str, Any]) -> dict[str, Any]:
         from src.core.rag_engine import RAGEngine
         from src.core.schema_engine import SchemaEngine
         from src.core.governance import GovernanceEngine
-        from src.core.agent_framework import AgentFramework
-        from src.agents import (
-            pattern_analyzer_spec,
-            planner_spec,
-            forecaster_spec,
-            risk_opportunity_spec,
-            schema_structure_spec,
-            presentation_spec,
-            self_improvement_spec,
-        )
+        from src.core.agent_registry import get_agent_framework_with_all_agents
         store = EventStore(os.getenv("MONGO_URI", "mongodb://root:example@localhost:27017/kirp?authSource=admin"))
         await store.connect()
         rag = RAGEngine(qdrant_url=os.getenv("QDRANT_URL", "http://localhost:6333"))
         await rag.connect()
-        schema = SchemaEngine(os.getenv("POSTGRES_URI", "postgresql+asyncpg://kirp:kirp@localhost:5432/kirp"))
+        schema = SchemaEngine(os.getenv("POSTGRES_URI", "postgresql+asyncpg://kirp_user:kirp_password@localhost:5432/kirp"))
         await schema.connect()
         gov = GovernanceEngine(os.getenv("OPA_URL"))
-        af = AgentFramework()
-        for spec in (
-            pattern_analyzer_spec,
-            planner_spec,
-            forecaster_spec,
-            risk_opportunity_spec,
-            schema_structure_spec,
-            presentation_spec,
-            self_improvement_spec,
-        ):
-            af.register(spec)
+        af = get_agent_framework_with_all_agents()
         pipe = EventPipeline(store, rag, schema, gov, af)
         ev_id = await pipe.run(tenant_id=tenant_id, space_id=space_id, user_id=user_id, source=source, content=content)
         return {"ok": True, "event_id": str(ev_id)}
@@ -94,4 +75,93 @@ def whatsapp_send_task(self: Any, to: str, text: str, user_id: str = "system") -
         return out
     except Exception as e:
         logger.exception("whatsapp_send_task failed: %s", e)
+        return {"ok": False, "error": str(e)}
+
+
+@celery_app.task(bind=True, name="daily_intelligence_task")
+def daily_intelligence_task(self: Any, user_id: str, tenant_id: str = "default", space_id: str = "private") -> dict[str, Any]:
+    """
+    Generate and send daily intelligence via WhatsApp.
+    Scheduled at 08:00 via celery beat.
+    """
+    import asyncio
+    
+    async def _run() -> dict[str, Any]:
+        from src.api.whatsapp_os import daily_intelligence
+        try:
+            result = await daily_intelligence(user_id=user_id, tenant_id=tenant_id, space_id=space_id)
+            return result
+        except Exception as e:
+            logger.exception("daily_intelligence_task failed: %s", e)
+            return {"ok": False, "error": str(e), "message_sent": False}
+    
+    try:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        out = loop.run_until_complete(_run())
+        loop.close()
+        return out
+    except Exception as e:
+        logger.exception("daily_intelligence_task failed: %s", e)
+        return {"ok": False, "error": str(e), "message_sent": False}
+
+
+@celery_app.task(bind=True, name="self_improvement_task")
+def self_improvement_task(self: Any, tenant_id: str = "default") -> dict[str, Any]:
+    """
+    Run self-improvement analysis on recent events and logs.
+    Scheduled at 02:00 via celery beat.
+    """
+    import asyncio
+    
+    async def _run() -> dict[str, Any]:
+        from src.core.event_store import EventStore
+        from src.core.rag_engine import RAGEngine
+        from src.core.agent_registry import get_agent_framework_with_all_agents
+        
+        try:
+            store = EventStore(os.getenv("MONGO_URI", "mongodb://root:example@localhost:27017/kirp?authSource=admin"))
+            await store.connect()
+            rag = RAGEngine(qdrant_url=os.getenv("QDRANT_URL", "http://localhost:6333"))
+            await rag.connect()
+            
+            af = get_agent_framework_with_all_agents()
+            
+            # Get recent events for analysis
+            events = await store.list(tenant_id=tenant_id, limit=100)
+            if not events:
+                return {"ok": True, "suggestions": [], "message": "No events to analyze"}
+            
+            # Get RAG context
+            rag_resp = await rag.search("recent activity patterns", tenant_id=tenant_id, limit=10)
+            
+            # Build context with logs/metrics (placeholder for now)
+            ctx = {
+                "rag_response": rag_resp,
+                "events": events,
+                "logs": [],  # TODO: Collect from observability
+                "metrics": {},  # TODO: Collect from metrics collector
+            }
+            
+            result = await af.run(
+                "SelfImprovementAgent",
+                tenant_id=tenant_id,
+                space_id="private",
+                user_id="system",
+                context=ctx
+            )
+            
+            return result
+        except Exception as e:
+            logger.exception("self_improvement_task failed: %s", e)
+            return {"ok": False, "error": str(e)}
+    
+    try:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        out = loop.run_until_complete(_run())
+        loop.close()
+        return out
+    except Exception as e:
+        logger.exception("self_improvement_task failed: %s", e)
         return {"ok": False, "error": str(e)}

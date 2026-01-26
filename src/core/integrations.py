@@ -16,18 +16,29 @@ logger = logging.getLogger(__name__)
 
 
 # === MongoDB ===
+_mongo_clients: dict[str, Any] = {}  # Connection pooling
+
 @lru_cache
 def get_mongo_client(use_bootcamp: bool = False):
-    """Get MongoDB client. Cached singleton."""
+    """Get MongoDB client with connection pooling. Cached singleton."""
+    cache_key = "bootcamp" if use_bootcamp else "default"
+    if cache_key in _mongo_clients:
+        return _mongo_clients[cache_key]
+    
     uri = os.getenv("BOOTCAMP_MONGO_URI" if use_bootcamp else "MONGO_URI", "")
     if not uri:
         raise ValueError("MONGO_URI not set")
     try:
         from motor.motor_asyncio import AsyncIOMotorClient
-        return AsyncIOMotorClient(uri)
+        # Connection pooling via maxPoolSize
+        client = AsyncIOMotorClient(uri, maxPoolSize=50, minPoolSize=5)
+        _mongo_clients[cache_key] = client
+        return client
     except ImportError:
         from pymongo import MongoClient
-        return MongoClient(uri)
+        client = MongoClient(uri, maxPoolSize=50, minPoolSize=5)
+        _mongo_clients[cache_key] = client
+        return client
 
 
 async def get_mongo_db(use_bootcamp: bool = False):
@@ -73,9 +84,15 @@ def get_redis_async(use_bootcamp: bool = False):
 
 
 # === PostgreSQL ===
+_postgres_engines: dict[str, Any] = {}  # Connection pooling
+
 @lru_cache
 def get_postgres_engine(use_bootcamp: bool = False):
-    """Get SQLAlchemy engine for PostgreSQL."""
+    """Get SQLAlchemy engine for PostgreSQL with connection pooling."""
+    cache_key = "bootcamp" if use_bootcamp else "default"
+    if cache_key in _postgres_engines:
+        return _postgres_engines[cache_key]
+    
     if use_bootcamp:
         host = os.getenv("BOOTCAMP_POSTGRES_HOST", "node128.codingbc.com")
         port = os.getenv("BOOTCAMP_POSTGRES_PORT", "7878")
@@ -91,7 +108,17 @@ def get_postgres_engine(use_bootcamp: bool = False):
     url = f"postgresql+psycopg2://{user}:{password}@{host}:{port}/{db}"
     try:
         from sqlalchemy import create_engine
-        return create_engine(url, echo=False, future=True)
+        # Connection pooling
+        engine = create_engine(
+            url,
+            echo=False,
+            future=True,
+            pool_size=20,
+            max_overflow=10,
+            pool_pre_ping=True,  # Verify connections
+        )
+        _postgres_engines[cache_key] = engine
+        return engine
     except ImportError:
         logger.warning("sqlalchemy not installed")
         return None

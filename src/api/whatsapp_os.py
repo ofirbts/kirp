@@ -45,19 +45,8 @@ async def _get_components() -> tuple[EventStore, RAGEngine, AgentFramework, Meta
     await store.connect()
     rag = RAGEngine(qdrant_url=os.getenv("QDRANT_URL", "http://qdrant:6333"))
     await rag.connect()
-    from src.core.agent_framework import AgentFramework
-    from src.agents import (
-        pattern_analyzer_spec,
-        planner_spec,
-        forecaster_spec,
-        risk_opportunity_spec,
-        schema_structure_spec,
-        presentation_spec,
-        self_improvement_spec,
-    )
-    af = AgentFramework()
-    for spec in (pattern_analyzer_spec, planner_spec, forecaster_spec, risk_opportunity_spec, schema_structure_spec, presentation_spec, self_improvement_spec):
-        af.register(spec)
+    from src.core.agent_registry import get_agent_framework_with_all_agents
+    af = get_agent_framework_with_all_agents()
     meta = MetaAgent(af)
     wa = WhatsAppIntegration()
     wa.connect()

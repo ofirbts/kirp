@@ -12,6 +12,9 @@ volumes:
   prometheus_data:
   grafana_data:
   opa_data:
+  zookeeper_data:
+  zookeeper_logs:
+  kafka_data:
 
 services:
   # === MongoDB ===
@@ -58,17 +61,20 @@ services:
       POSTGRES_DB: kirp
       POSTGRES_USER: kirp_user
       POSTGRES_PASSWORD: kirp_password
+      POSTGRES_INITDB_ARGS: "-E UTF8"
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      - ./deploy/postgres-init:/docker-entrypoint-initdb.d:ro
     networks:
       - kirp-net
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U kirp_user"]
+      test: ["CMD-SHELL", "pg_isready -U kirp_user -d kirp && psql -U kirp_user -d kirp -c 'SELECT 1'"]
       interval: 10s
       timeout: 5s
       retries: 5
+      start_period: 10s
 
   # === Redis ===
   redis:
@@ -112,31 +118,50 @@ services:
   zookeeper:
     image: confluentinc/cp-zookeeper:7.5.0
     container_name: kirp-zookeeper
+    restart: always
     environment:
       ZOOKEEPER_CLIENT_PORT: 2181
       ZOOKEEPER_TICK_TIME: 2000
     ports:
       - "2181:2181"
+    volumes:
+      - zookeeper_data:/var/lib/zookeeper/data
+      - zookeeper_logs:/var/lib/zookeeper/log
     networks:
       - kirp-net
-
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8080/commands/stat || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+      
   # === Kafka ===
   kafka:
     image: confluentinc/cp-kafka:7.5.0
     container_name: kirp-kafka
+    restart: always
     depends_on:
-      - zookeeper
+      zookeeper:
+        condition: service_healthy
     ports:
       - "9092:9092"
       - "9093:9093"
     environment:
       KAFKA_BROKER_ID: 1
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+
+      # FIXED — REQUIRED
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,PLAINTEXT_HOST://0.0.0.0:9093
       KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:9093
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
       KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
       KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      KAFKA_LOG_DIRS: /var/lib/kafka/data
+    volumes:
+      - kafka_data:/var/lib/kafka/data
     networks:
       - kirp-net
     healthcheck:
@@ -144,7 +169,7 @@ services:
       interval: 30s
       timeout: 10s
       retries: 5
-      start_period: 60s
+      start_period: 90s
 
   # === Cassandra ===
   cassandra:
@@ -238,7 +263,7 @@ services:
   kirp-api:
     build:
       context: .
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile.api
     container_name: kirp-api
     restart: unless-stopped
     ports:
@@ -264,7 +289,7 @@ services:
       redis: { condition: service_healthy }
       kafka: { condition: service_healthy }
       opa: { condition: service_started }
-    command: uvicorn src.main:app --host 0.0.0.0 --port 8000
+    command: sh -c "echo 'Waiting for PostgreSQL...' && sleep 2 && alembic upgrade head && echo 'Migrations complete, starting API...' && uvicorn src.main:app --host 0.0.0.0 --port 8000"
     networks:
       - kirp-net
     healthcheck:
@@ -278,7 +303,7 @@ services:
   kirp-worker:
     build:
       context: .
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile.worker
     container_name: kirp-worker
     restart: unless-stopped
     env_file: .env
@@ -305,7 +330,7 @@ services:
   kirp-agent-processor:
     build:
       context: .
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile.agent
     container_name: kirp-agent-processor
     restart: unless-stopped
     env_file: .env
@@ -328,7 +353,7 @@ services:
   kirp-dashboard:
     build:
       context: .
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile.dashboard
     container_name: kirp-dashboard
     restart: unless-stopped
     ports:
@@ -339,7 +364,8 @@ services:
       EXTERNAL_URL: http://localhost:8501
       PYTHONPATH: /app
     depends_on:
-      kirp-api: { condition: service_healthy }
+      kirp-api:
+        condition: service_healthy
     command: streamlit run src/ui/master_dashboard.py --server.port 8501 --server.address 0.0.0.0
     networks:
       - kirp-net

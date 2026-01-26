@@ -152,8 +152,18 @@ class EventStore:
         user_id: str | None = None,
         limit: int = 100,
         since: datetime | None = None,
+        allow_all_tenants: bool = False,  # Only for admin/system operations
     ) -> list[Event]:
-        """List events with tenant/space/user scoping. Use tenant_id='*' for all tenants."""
+        """
+        List events with tenant/space/user scoping.
+        Enforces multi-tenant isolation (tenant_id='*' only allowed if allow_all_tenants=True).
+        """
+        # Enforce multi-tenant isolation
+        if not tenant_id or (tenant_id == "*" and not allow_all_tenants):
+            if tenant_id == "*":
+                raise ValueError("tenant_id='*' not allowed (multi-tenant isolation). Use allow_all_tenants=True for admin operations.")
+            raise ValueError("tenant_id is required (multi-tenant isolation)")
+        
         if self._db is None:
             await self.connect()
         q: dict[str, Any] = {}
