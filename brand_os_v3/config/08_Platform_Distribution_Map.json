@@ -1,0 +1,72 @@
+{
+  "$schema": "brand_os_v3_distribution",
+  "version": "3.0",
+  "name": "Platform Distribution Map",
+  "description": "Per-platform rules, limits, and variants for publishing.",
+  "schema": {
+    "platforms": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "enabled": { "type": "boolean" },
+          "max_length": { "type": "integer" },
+          "min_length": { "type": "integer" },
+          "format": { "type": "string", "enum": ["text_with_hashtags", "concise_with_hashtags", "conversational"] }
+        }
+      }
+    }
+  },
+  "platforms": {
+    "linkedin": {
+      "enabled": true,
+      "max_length": 3000,
+      "min_length": 50,
+      "format": "text_with_hashtags",
+      "hashtag_rules": { "max": 5, "placement": "end", "required": false },
+      "image_rules": { "supported": true, "aspect_ratio": "1.91:1", "max_size_mb": 5 },
+      "best_posting_times": ["08:00", "12:00", "17:00"],
+      "tone_modifier": "slightly_more_formal",
+      "cta_style": "professional"
+    },
+    "twitter": {
+      "enabled": true,
+      "max_length": 280,
+      "min_length": 10,
+      "format": "concise_with_hashtags",
+      "hashtag_rules": { "max": 3, "placement": "end", "required": false },
+      "image_rules": { "supported": true, "aspect_ratio": "16:9", "max_size_mb": 5 },
+      "best_posting_times": ["09:00", "14:00", "19:00"],
+      "tone_modifier": "punchy",
+      "cta_style": "direct"
+    },
+    "whatsapp": {
+      "enabled": true,
+      "max_length": 1000,
+      "min_length": 20,
+      "format": "conversational",
+      "hashtag_rules": { "max": 0, "placement": "none", "required": false },
+      "image_rules": { "supported": true, "aspect_ratio": "1:1", "max_size_mb": 16 },
+      "best_posting_times": ["10:00", "18:00"],
+      "tone_modifier": "warm_and_short",
+      "cta_style": "soft"
+    }
+  },
+  "rules": {
+    "derive_from_master": true,
+    "master_platform": "linkedin",
+    "length_ratio": { "twitter": 0.1, "whatsapp": 0.4 }
+  },
+  "thresholds": {
+    "min_content_length": 10,
+    "max_hashtags_linkedin": 5,
+    "max_hashtags_twitter": 3
+  },
+  "output_schema": {
+    "platform": "string",
+    "content": "string",
+    "hashtags": "array",
+    "image_prompt": "string",
+    "scheduled_slot": "string"
+  }
+}

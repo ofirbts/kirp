@@ -1,0 +1,55 @@
+{
+  "$schema": "brand_os_v3_content_memory",
+  "version": "3.0",
+  "name": "Content Memory Log",
+  "description": "What we have already said and how it performed; prevents repetition and informs improvement.",
+  "schema": {
+    "performance_schema": {
+      "type": "object",
+      "properties": {
+        "impressions": { "type": "number" },
+        "engagement_rate": { "type": "number" },
+        "clicks": { "type": "number" },
+        "shares": { "type": "number" },
+        "composite_score": { "type": "number" }
+      }
+    },
+    "recommendation_enum": { "type": "string", "enum": ["proceed", "rephrase", "avoid"] }
+  },
+  "storage": {
+    "backend": "vector_and_metadata",
+    "metadata_fields": ["platform", "topic", "published_at", "performance_score", "trace_id"],
+    "retention_days": 365,
+    "dedup_window_days": 30
+  },
+  "performance_schema": {
+    "impressions": "number",
+    "engagement_rate": "number",
+    "clicks": "number",
+    "shares": "number",
+    "composite_score": "number"
+  },
+  "rules": {
+    "check_similarity_before_publish": true,
+    "similarity_threshold_max": 0.85,
+    "avoid_repeat_topic_within_days": 14,
+    "boost_angles_that_performed_well": true,
+    "flag_underperformers_for_review": true
+  },
+  "thresholds": {
+    "composite_score_good": 0.7,
+    "composite_score_poor": 0.3,
+    "min_engagement_to_remember": 0.1
+  },
+  "output_schema": {
+    "similar_past_content": "array",
+    "recommendation": "proceed|rephrase|avoid",
+    "suggested_angle_tweaks": "array",
+    "timestamp": "string"
+  },
+  "examples": {
+    "recommendation_proceed": "proceed",
+    "recommendation_rephrase": "rephrase",
+    "recommendation_avoid": "avoid"
+  }
+}

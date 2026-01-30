@@ -1,0 +1,56 @@
+{
+  "id": "GROWTH_ANALYST",
+  "layer": "memory",
+  "role": "Log the run and (when performance data exists) update Content Memory with outcomes for future improvement.",
+  "responsibilities": [
+    "Record the full workflow output (platform, content, visual, trace_id, timestamp).",
+    "When performance data is available: compute composite_score and store in Content Memory.",
+    "Output a short summary and any recommendations for next time."
+  ],
+  "input_schema": {
+    "type": "object",
+    "required": ["workflow_output", "trace_id"],
+    "properties": {
+      "workflow_output": { "type": "object" },
+      "trace_id": { "type": "string" },
+      "performance_data": {
+        "type": "object",
+        "properties": {
+          "impressions": { "type": "number" },
+          "engagement_rate": { "type": "number" },
+          "clicks": { "type": "number" },
+          "shares": { "type": "number" }
+        }
+      }
+    }
+  },
+  "output_schema": {
+    "type": "object",
+    "required": ["logged", "composite_score", "summary", "recommendations", "timestamp"],
+    "properties": {
+      "logged": { "type": "boolean" },
+      "composite_score": { "type": "number", "nullable": true },
+      "summary": { "type": "string" },
+      "recommendations": { "type": "array", "items": { "type": "string" } },
+      "timestamp": { "type": "string", "format": "date-time" }
+    }
+  },
+  "prompt_template": "You are the Growth Analyst for Brand OS v3. You log the workflow output and optionally compute performance.\n\nInput:\n- Workflow output (platform, content, visual, all agent outputs): {{workflow_output}}\n- Trace ID: {{trace_id}}\n- Performance data (optional): {{performance_data}}\n\nOutput a JSON object with:\n1. logged: true (assume write to Content Memory succeeded).\n2. composite_score: if performance_data provided, compute a 0–1 score (e.g. weighted average of engagement_rate, clicks, shares normalized). Else null.\n3. summary: 1–2 sentences describing what was produced and (if any) how it performed.\n4. recommendations: array of strings (e.g. 'Use statistic hook next time for this topic', 'Shorten CTA for twitter').\n5. timestamp: current ISO timestamp.\n\nUse Content Memory Log rules: min_engagement_to_remember, composite_score_good/poor. Recommendations should inform future CONTEXT_SCANNER and STRATEGIC_PLANNER runs.",
+  "failure_modes": [
+    "Performance data missing: set composite_score to null, summary to content-only description.",
+    "Write failure: set logged to false, include reason in summary.",
+    "Invalid performance_data: set composite_score to null, note in recommendations."
+  ],
+  "gatekeeper_logic": null,
+  "example_input": {
+    "workflow_output": { "platform": "linkedin", "content": { "full_text": "What if you could ship twice as fast..." }, "visual": { "prompt": "Professional B2B image...", "alt_text": "Laptop showing pipeline dashboard." } },
+    "trace_id": "tr_a1b2c3d4"
+  },
+  "example_output": {
+    "logged": true,
+    "composite_score": null,
+    "summary": "LinkedIn post produced; identity and CTO gates passed. No performance data yet.",
+    "recommendations": ["Consider statistic hook for next DevOps post."],
+    "timestamp": "2025-01-30T12:00:07.000Z"
+  }
+}

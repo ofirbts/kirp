@@ -1,0 +1,245 @@
+# Brand OS v3 — KIRP Agent Specs
+# YAML definitions for all Brand OS agents with governance tags
+# Valid YAML, fully generated, self-contained
+
+version: "3.0"
+name: brand_os_v3_agent_specs
+
+agents:
+  CONTEXT_SCANNER:
+    name: CONTEXT_SCANNER
+    version: "3.0"
+    role: "Scan the external world for signals, trends, and constraints."
+    layer: world_context
+    input_schema:
+      type: object
+      required: [tenant_id, platform, topic_hint]
+      properties:
+        tenant_id: { type: string }
+        platform: { type: string, enum: [linkedin, twitter, whatsapp] }
+        topic_hint: { type: string }
+        date_range_days: { type: integer, default: 7 }
+        max_signals: { type: integer, default: 5 }
+    output_schema:
+      type: object
+      required: [relevant_signals, recommended_angle, risks, opportunities, timestamp]
+      properties:
+        relevant_signals: { type: array }
+        recommended_angle: { type: string }
+        risks: { type: array, items: { type: string } }
+        opportunities: { type: array, items: { type: string } }
+        timestamp: { type: string, format: date-time }
+    governance_tags:
+      - read_only_external
+      - tenant_required
+      - no_publish
+
+  STRATEGIC_PLANNER:
+    name: STRATEGIC_PLANNER
+    version: "3.0"
+    role: "Turn world context and brand identity into a content strategy brief."
+    layer: cognitive
+    input_schema:
+      type: object
+      required: [context_brief, platform, identity_core]
+      properties:
+        context_brief: { type: object }
+        platform: { type: string, enum: [linkedin, twitter, whatsapp] }
+        identity_core: { type: object }
+        hook_preference: { type: string, nullable: true }
+    output_schema:
+      type: object
+      required: [headline, key_message, hook_type, hook_text, cta, platform_notes, timestamp]
+      properties:
+        headline: { type: string }
+        key_message: { type: string }
+        hook_type: { type: string }
+        hook_text: { type: string }
+        cta: { type: string }
+        platform_notes: { type: object }
+        timestamp: { type: string, format: date-time }
+    governance_tags:
+      - read_context_and_identity
+      - tenant_required
+      - no_publish
+
+  TECHNICAL_STORYTELLER:
+    name: TECHNICAL_STORYTELLER
+    version: "3.0"
+    role: "Draft the full post from the strategic brief in brand voice."
+    layer: content
+    input_schema:
+      type: object
+      required: [content_brief, platform, voice_engine]
+      properties:
+        content_brief: { type: object }
+        platform: { type: string, enum: [linkedin, twitter, whatsapp] }
+        voice_engine: { type: object }
+        max_length: { type: integer }
+        include_hashtags: { type: boolean, default: true }
+        suggested_fixes: { type: array, items: { type: string } }
+    output_schema:
+      type: object
+      required: [body, hook, cta, hashtags, full_text, word_count, timestamp]
+      properties:
+        body: { type: string }
+        hook: { type: string }
+        cta: { type: string }
+        hashtags: { type: array, items: { type: string } }
+        full_text: { type: string }
+        word_count: { type: integer }
+        timestamp: { type: string, format: date-time }
+    governance_tags:
+      - content_author
+      - tenant_required
+      - gatekeeper_downstream
+
+  HUMAN_EDGE:
+    name: HUMAN_EDGE
+    version: "3.0"
+    role: "Add the human edge: one concrete detail and warmth."
+    layer: content
+    input_schema:
+      type: object
+      required: [draft, platform, identity_core]
+      properties:
+        draft: { type: object }
+        platform: { type: string, enum: [linkedin, twitter, whatsapp] }
+        identity_core: { type: object }
+        concrete_detail_hint: { type: string, nullable: true }
+    output_schema:
+      type: object
+      required: [body, hook, cta, hashtags, full_text, concrete_detail_used, human_edge_notes, timestamp]
+      properties:
+        body: { type: string }
+        hook: { type: string }
+        cta: { type: string }
+        hashtags: { type: array }
+        full_text: { type: string }
+        concrete_detail_used: { type: string }
+        human_edge_notes: { type: string }
+        timestamp: { type: string, format: date-time }
+    governance_tags:
+      - content_author
+      - tenant_required
+      - gatekeeper_downstream
+
+  IDENTITY_GUARDIAN:
+    name: IDENTITY_GUARDIAN
+    version: "3.0"
+    role: "Gatekeeper: ensure draft is on-brand; approve or reject with fixes."
+    layer: gatekeeper
+    input_schema:
+      type: object
+      required: [draft, identity_core, voice_engine]
+      properties:
+        draft: { type: object }
+        identity_core: { type: object }
+        voice_engine: { type: object }
+        threshold: { type: number, default: 0.75 }
+    output_schema:
+      type: object
+      required: [approved, score, reasons, suggested_fixes, timestamp]
+      properties:
+        approved: { type: boolean }
+        score: { type: number }
+        reasons: { type: array, items: { type: string } }
+        suggested_fixes: { type: array, items: { type: string } }
+        timestamp: { type: string, format: date-time }
+    governance_tags:
+      - gatekeeper
+      - tenant_required
+      - audit_required
+
+  SKEPTICAL_CTO:
+    name: SKEPTICAL_CTO
+    version: "3.0"
+    role: "Gatekeeper: ensure claims are defensible; approve or reject with fixes."
+    layer: gatekeeper
+    input_schema:
+      type: object
+      required: [draft, identity_core]
+      properties:
+        draft: { type: object }
+        identity_core: { type: object }
+        threshold: { type: number, default: 1.0 }
+    output_schema:
+      type: object
+      required: [approved, claims_checked, issues, suggested_fixes, timestamp]
+      properties:
+        approved: { type: boolean }
+        claims_checked: { type: array, items: { type: string } }
+        issues: { type: array, items: { type: string } }
+        suggested_fixes: { type: array, items: { type: string } }
+        timestamp: { type: string, format: date-time }
+    governance_tags:
+      - gatekeeper
+      - tenant_required
+      - audit_required
+
+  VISUAL_GENERATOR:
+    name: VISUAL_GENERATOR
+    version: "3.0"
+    role: "Generate visual brief (image prompt, aspect ratio, alt text) from approved copy."
+    layer: distribution
+    input_schema:
+      type: object
+      required: [approved_draft, platform, visual_identity]
+      properties:
+        approved_draft: { type: object }
+        platform: { type: string, enum: [linkedin, twitter, whatsapp] }
+        visual_identity: { type: object }
+        topic_hint: { type: string, nullable: true }
+    output_schema:
+      type: object
+      required: [prompt, aspect_ratio, platform, alt_text, timestamp]
+      properties:
+        prompt: { type: string }
+        aspect_ratio: { type: string }
+        platform: { type: string }
+        alt_text: { type: string }
+        timestamp: { type: string, format: date-time }
+    governance_tags:
+      - distribution
+      - tenant_required
+      - no_claim_verification
+
+  GROWTH_ANALYST:
+    name: GROWTH_ANALYST
+    version: "3.0"
+    role: "Log workflow output and optional performance; output summary and recommendations."
+    layer: memory
+    input_schema:
+      type: object
+      required: [workflow_output, trace_id]
+      properties:
+        workflow_output: { type: object }
+        trace_id: { type: string }
+        performance_data:
+          type: object
+          properties:
+            impressions: { type: number }
+            engagement_rate: { type: number }
+            clicks: { type: number }
+            shares: { type: number }
+    output_schema:
+      type: object
+      required: [logged, composite_score, summary, recommendations, timestamp]
+      properties:
+        logged: { type: boolean }
+        composite_score: { type: number, nullable: true }
+        summary: { type: string }
+        recommendations: { type: array, items: { type: string } }
+        timestamp: { type: string, format: date-time }
+    governance_tags:
+      - memory_write
+      - tenant_required
+      - audit_required
+
+examples:
+  CONTEXT_SCANNER:
+    input: { tenant_id: acme, platform: linkedin, topic_hint: "CI/CD pipeline efficiency" }
+    output: { relevant_signals: [], recommended_angle: "Lead with speed and scale.", risks: [], opportunities: ["DevOps efficiency"], timestamp: "2025-01-30T12:00:00.000Z" }
+  IDENTITY_GUARDIAN:
+    input: { draft: { full_text: "What if you could ship twice as fast..." }, identity_core: {}, voice_engine: {}, threshold: 0.75 }
+    output: { approved: true, score: 0.88, reasons: ["Voice aligned"], suggested_fixes: [], timestamp: "2025-01-30T12:00:04.000Z" }

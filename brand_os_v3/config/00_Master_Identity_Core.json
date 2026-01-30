@@ -1,0 +1,91 @@
+{
+  "$schema": "brand_os_v3_identity",
+  "version": "3.0",
+  "name": "Master Identity Core",
+  "description": "Single source of truth for brand identity: who we are, what we stand for, and how we show up.",
+  "schema": {
+    "identity": {
+      "type": "object",
+      "required": ["brand_name", "mission", "values", "archetype"],
+      "properties": {
+        "brand_name": { "type": "string" },
+        "tagline": { "type": "string" },
+        "mission": { "type": "string" },
+        "vision": { "type": "string" },
+        "values": { "type": "array", "items": { "type": "string" } },
+        "archetype": { "type": "string", "enum": ["Creator", "Sage", "Caregiver", "Ruler", "Jester", "Everyman", "Hero", "Outlaw", "Magician", "Lover", "Explorer", "Innocent"] },
+        "personality_traits": {
+          "type": "object",
+          "properties": {
+            "warmth": { "type": "number", "minimum": 0, "maximum": 1 },
+            "authority": { "type": "number", "minimum": 0, "maximum": 1 },
+            "playfulness": { "type": "number", "minimum": 0, "maximum": 1 },
+            "urgency": { "type": "number", "minimum": 0, "maximum": 1 },
+            "clarity": { "type": "number", "minimum": 0, "maximum": 1 }
+          }
+        },
+        "boundaries": {
+          "type": "object",
+          "properties": {
+            "topics_we_own": { "type": "array", "items": { "type": "string" } },
+            "topics_we_avoid": { "type": "array", "items": { "type": "string" } },
+            "tone_floor": { "type": "string", "enum": ["professional", "conversational", "casual"] },
+            "tone_ceiling": { "type": "string", "enum": ["professional", "conversational", "casual"] },
+            "forbidden_claims": { "type": "array", "items": { "type": "string" } }
+          }
+        }
+      }
+    }
+  },
+  "identity": {
+    "brand_name": "Acme Intelligence",
+    "tagline": "Ship faster. Stay aligned.",
+    "mission": "We help engineering teams ship reliably without adding headcount.",
+    "vision": "Every team has a single source of truth for builds, deploys, and governance.",
+    "values": ["clarity", "speed", "integrity", "simplicity"],
+    "archetype": "Creator",
+    "archetype_options": ["Creator", "Sage", "Caregiver", "Ruler", "Jester", "Everyman", "Hero", "Outlaw", "Magician", "Lover", "Explorer", "Innocent"],
+    "personality_traits": {
+      "warmth": 0.7,
+      "authority": 0.6,
+      "playfulness": 0.3,
+      "urgency": 0.4,
+      "clarity": 0.9
+    },
+    "boundaries": {
+      "topics_we_own": ["CI/CD", "pipeline automation", "developer experience", "governance", "deployment"],
+      "topics_we_avoid": ["politics", "competitor bashing", "unverifiable claims", "sensationalism"],
+      "tone_floor": "professional",
+      "tone_ceiling": "conversational",
+      "forbidden_claims": ["best in the world", "number one", "everyone uses", "guaranteed results"]
+    }
+  },
+  "voice": {
+    "do": ["Use short sentences.", "Lead with the benefit.", "Use active voice.", "Include one concrete example or number when possible."],
+    "dont": ["No jargon unless defined.", "No superlatives without proof.", "No passive-aggressive tone.", "No emoji overload."],
+    "sentence_length_preference": "mixed",
+    "vocabulary_level": "accessible",
+    "signature_phrases": ["Ship it.", "One pipeline.", "Built for teams."],
+    "avoid_phrases": ["best-in-class", "game-changing", "revolutionary", "disrupt"]
+  },
+  "rules": {
+    "max_post_length_by_platform": {
+      "linkedin": 3000,
+      "twitter": 280,
+      "whatsapp": 1000
+    },
+    "min_engagement_quality_score": 0.6,
+    "identity_check_required_before_publish": true,
+    "gatekeeper_order": ["IDENTITY_GUARDIAN", "SKEPTICAL_CTO"]
+  },
+  "thresholds": {
+    "identity_alignment_min": 0.75,
+    "voice_score_min": 0.7
+  },
+  "examples": {
+    "good_headline": "How we cut deployment time by 40% without adding headcount",
+    "bad_headline": "We are the best platform in the world for DevOps",
+    "good_cta": "Try the free tier—no credit card required.",
+    "bad_cta": "Click here to learn more!!!"
+  }
+}

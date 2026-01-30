@@ -1,0 +1,62 @@
+{
+  "$schema": "brand_os_v3_agent_mesh",
+  "version": "3.0",
+  "name": "Agent Mesh Protocol",
+  "description": "How agents communicate, hand off, and resolve conflicts.",
+  "schema": {
+    "handoff_schema": {
+      "type": "object",
+      "required": ["from_agent", "to_agent", "payload_type", "payload", "trace_id", "timestamp"],
+      "properties": {
+        "from_agent": { "type": "string" },
+        "to_agent": { "type": "string" },
+        "payload_type": { "type": "string" },
+        "payload": { "type": "object" },
+        "trace_id": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" }
+      }
+    }
+  },
+  "agents": [
+    { "id": "CONTEXT_SCANNER", "layer": "world_context", "runs_first": true },
+    { "id": "STRATEGIC_PLANNER", "layer": "cognitive", "depends_on": ["CONTEXT_SCANNER"] },
+    { "id": "TECHNICAL_STORYTELLER", "layer": "content", "depends_on": ["STRATEGIC_PLANNER"] },
+    { "id": "HUMAN_EDGE", "layer": "content", "depends_on": ["TECHNICAL_STORYTELLER"] },
+    { "id": "IDENTITY_GUARDIAN", "layer": "gatekeeper", "depends_on": ["HUMAN_EDGE"] },
+    { "id": "SKEPTICAL_CTO", "layer": "gatekeeper", "depends_on": ["IDENTITY_GUARDIAN"] },
+    { "id": "VISUAL_GENERATOR", "layer": "distribution", "depends_on": ["SKEPTICAL_CTO"] },
+    { "id": "GROWTH_ANALYST", "layer": "memory", "depends_on": ["VISUAL_GENERATOR"] }
+  ],
+  "handoff_schema": {
+    "from_agent": "string",
+    "to_agent": "string",
+    "payload_type": "string",
+    "payload": "object",
+    "trace_id": "string",
+    "timestamp": "string"
+  },
+  "rules": {
+    "strict_order": true,
+    "gatekeeper_override_on_reject": true,
+    "max_revision_rounds_per_gatekeeper": 2
+  },
+  "conflict_resolution": {
+    "strategy": "gatekeeper_override",
+    "order": ["IDENTITY_GUARDIAN", "SKEPTICAL_CTO"],
+    "on_reject": "return_to_previous_agent",
+    "max_revision_rounds": 2
+  },
+  "timeouts": {
+    "per_agent_seconds": 60,
+    "total_workflow_seconds": 300
+  },
+  "thresholds": {
+    "identity_approval_min": 0.75,
+    "cto_issues_max": 0
+  },
+  "logging": {
+    "log_every_handoff": true,
+    "log_gatekeeper_decisions": true,
+    "log_failures": true
+  }
+}

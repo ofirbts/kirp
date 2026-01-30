@@ -1,0 +1,71 @@
+{
+  "$schema": "brand_os_v3_voice",
+  "version": "3.0",
+  "name": "Voice Engine",
+  "description": "Tone, style, and linguistic rules that keep all content on-brand.",
+  "schema": {
+    "tone_axes": {
+      "type": "object",
+      "properties": {
+        "formal_casual": { "type": "number", "minimum": 0, "maximum": 1 },
+        "serious_playful": { "type": "number", "minimum": 0, "maximum": 1 },
+        "reserved_enthusiastic": { "type": "number", "minimum": 0, "maximum": 1 },
+        "submissive_dominant": { "type": "number", "minimum": 0, "maximum": 1 },
+        "literal_metaphorical": { "type": "number", "minimum": 0, "maximum": 1 }
+      }
+    },
+    "style_rules": {
+      "type": "object",
+      "properties": {
+        "prefer_active_voice": { "type": "boolean" },
+        "max_sentence_length": { "type": "integer" },
+        "preferred_first_person": { "type": "string", "enum": ["we", "I", "you"] },
+        "contraction_usage": { "type": "string", "enum": ["none", "moderate", "full"] },
+        "hedging_allowed": { "type": "boolean" },
+        "hedging_max_per_post": { "type": "integer" }
+      }
+    }
+  },
+  "tone_axes": {
+    "formal_casual": 0.4,
+    "serious_playful": 0.25,
+    "reserved_enthusiastic": 0.5,
+    "submissive_dominant": 0.6,
+    "literal_metaphorical": 0.35
+  },
+  "style_rules": {
+    "prefer_active_voice": true,
+    "max_sentence_length": 25,
+    "preferred_first_person": "we",
+    "contraction_usage": "moderate",
+    "punctuation_intensity": "standard",
+    "hedging_allowed": false,
+    "hedging_max_per_post": 0
+  },
+  "vocabulary": {
+    "tier_one": ["ship", "pipeline", "deploy", "build", "team", "automation"],
+    "tier_two": ["orchestration", "governance", "artifact", "workflow"],
+    "banned": ["best-in-class", "game-changing", "revolutionary", "disrupt", "synergy"],
+    "replacements": {
+      "utilize": "use",
+      "leverage": "use",
+      "facilitate": "enable"
+    }
+  },
+  "thresholds": {
+    "readability_target_flesch": 55,
+    "readability_min": 45,
+    "readability_max": 70,
+    "sentiment_neutrality_min": 0.3,
+    "brand_voice_score_min": 0.75
+  },
+  "platform_modifiers": {
+    "linkedin": { "formal_casual_offset": 0.1, "max_hashtags": 5 },
+    "twitter": { "formal_casual_offset": -0.1, "max_hashtags": 3 },
+    "whatsapp": { "formal_casual_offset": -0.2, "max_hashtags": 0 }
+  },
+  "examples": {
+    "high_voice_score": "We shipped the feature on Tuesday. Early users are already reporting fewer support tickets.",
+    "low_voice_score": "It is possible that one might consider that our solution could potentially be beneficial in certain scenarios."
+  }
+}

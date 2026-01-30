@@ -122,6 +122,9 @@ services:
     environment:
       ZOOKEEPER_CLIENT_PORT: 2181
       ZOOKEEPER_TICK_TIME: 2000
+      ZOO_4LW_COMMANDS_WHITELIST: "ruok,stat,conf,isro,mntr,srvr"
+      ZOO_CFG_EXTRA: |
+        4lw.commands.whitelist=ruok,stat,conf,isro,mntr,srvr
     ports:
       - "2181:2181"
     volumes:
@@ -130,12 +133,13 @@ services:
     networks:
       - kirp-net
     healthcheck:
-      test: ["CMD-SHELL", "curl -sf http://localhost:8080/commands/stat || exit 1"]
+      # Confluent image only enables 4lw "srvr"; use it and check response contains Mode
+      test: ["CMD-SHELL", "bash -c 'exec 3<>/dev/tcp/localhost/2181 && echo srvr >&3 && cat <&3 | grep -q Mode'"]
       interval: 10s
       timeout: 5s
       retries: 5
       start_period: 20s
-      
+
   # === Kafka ===
   kafka:
     image: confluentinc/cp-kafka:7.5.0
@@ -249,8 +253,10 @@ services:
     command:
       - "run"
       - "--server"
+      - "--addr=0.0.0.0:8181"
       - "--log-level=info"
       - "--set=decision_logs.console=true"
+      - "/policies"
     volumes:
       - ./deploy/opa/policies:/policies
       - opa_data:/data
@@ -293,11 +299,11 @@ services:
     networks:
       - kirp-net
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      test: ["CMD-SHELL", "curl -sf http://localhost:8000/health || exit 1"]
       interval: 30s
       timeout: 10s
-      retries: 3
-      start_period: 40s
+      retries: 10
+      start_period: 120s
 
   # === Celery Worker ===
   kirp-worker:
@@ -361,6 +367,7 @@ services:
     env_file: .env
     environment:
       API_URL: http://kirp-api:8000
+      NEXT_PUBLIC_API_URL: http://kirp-api:8000
       EXTERNAL_URL: http://localhost:8501
       PYTHONPATH: /app
     depends_on:

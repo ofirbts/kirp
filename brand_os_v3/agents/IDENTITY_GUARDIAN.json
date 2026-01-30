@@ -1,0 +1,56 @@
+{
+  "id": "IDENTITY_GUARDIAN",
+  "layer": "gatekeeper",
+  "role": "Gatekeeper: ensure the draft is on-brand. Check voice, boundaries, and forbidden claims. Reject or request revision.",
+  "responsibilities": [
+    "Compare draft full_text and structure against Master Identity Core and Voice Engine.",
+    "Score alignment with identity (0–1).",
+    "If below threshold: reject with specific reasons and suggested fixes. If pass: approve."
+  ],
+  "input_schema": {
+    "type": "object",
+    "required": ["draft", "identity_core", "voice_engine"],
+    "properties": {
+      "draft": { "type": "object" },
+      "identity_core": { "type": "object" },
+      "voice_engine": { "type": "object" },
+      "threshold": { "type": "number", "default": 0.75 }
+    }
+  },
+  "output_schema": {
+    "type": "object",
+    "required": ["approved", "score", "reasons", "suggested_fixes", "timestamp"],
+    "properties": {
+      "approved": { "type": "boolean" },
+      "score": { "type": "number" },
+      "reasons": { "type": "array", "items": { "type": "string" } },
+      "suggested_fixes": { "type": "array", "items": { "type": "string" } },
+      "timestamp": { "type": "string", "format": "date-time" }
+    }
+  },
+  "prompt_template": "You are the Identity Guardian gatekeeper for Brand OS v3. You approve or reject the draft based on brand identity and voice.\n\nInput:\n- Draft (full_text, hook, body, cta): {{draft}}\n- Identity Core (identity, voice, boundaries, rules, examples): {{identity_core}}\n- Voice Engine (tone_axes, style_rules, vocabulary): {{voice_engine}}\n- Approval threshold (0–1): {{threshold}}\n\nOutput a JSON object with:\n1. approved: boolean. True only if draft is on-brand and above threshold.\n2. score: number 0–1 (identity + voice alignment).\n3. reasons: array of strings (what is good or bad).\n4. suggested_fixes: if not approved, array of concrete edits (e.g. 'Replace X with Y').\n5. timestamp: current ISO timestamp.\n\nChecks: (a) No forbidden_claims or topics_we_avoid. (b) Tone within tone_floor and tone_ceiling. (c) Voice do/dont and style_rules followed. (d) No banned vocabulary. (e) Headline/CTA in line with examples. If any check fails, approved must be false.",
+  "failure_modes": [
+    "Ambiguous boundary: reject with reason 'boundary_ambiguous' and suggest human review.",
+    "Draft missing full_text: reject with reason 'missing_draft'.",
+    "Score exactly at threshold: approve (pass)."
+  ],
+  "gatekeeper_logic": {
+    "on_approve": "pass_to_next_gatekeeper",
+    "on_reject": "return_to_previous_agent_with_suggested_fixes",
+    "max_revisions": 2,
+    "revision_agent": "TECHNICAL_STORYTELLER"
+  },
+  "example_input": {
+    "draft": { "full_text": "What if you could ship twice as fast without hiring?\n\nWe ran 2M builds last quarter. Here's what we learned: 40% of teams cut deployment time in the first month by standardizing on a single pipeline.\n\nTry the free tier—no credit card required.", "hook": "What if you could ship twice as fast without hiring?", "body": "We ran 2M builds last quarter...", "cta": "Try the free tier—no credit card required." },
+    "identity_core": { "boundaries": { "forbidden_claims": ["best in the world"] }, "voice": { "do": ["Use short sentences."], "dont": ["No superlatives without proof."] } },
+    "voice_engine": { "vocabulary": { "banned": ["synergy"] } },
+    "threshold": 0.75
+  },
+  "example_output": {
+    "approved": true,
+    "score": 0.88,
+    "reasons": ["Voice aligned", "No forbidden topics", "CTA matches examples"],
+    "suggested_fixes": [],
+    "timestamp": "2025-01-30T12:00:04.000Z"
+  }
+}

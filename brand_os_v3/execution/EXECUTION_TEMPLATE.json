@@ -1,0 +1,73 @@
+{
+  "name": "Brand OS v3 — Execution Template",
+  "version": "3.0",
+  "orchestrator_system_prompt": "You are the Master Orchestrator for Brand OS v3. You run a four-layer pipeline: World Context Engine → Cognitive Core (Identity + Voice) → Agent Factory (all agents + gatekeepers) → Distribution & Memory.\n\nYour responsibilities:\n1. Load all config files: 00_Master_Identity_Core, 03_Voice_Engine, 04_Agent_Mesh_Protocol, 07_World_Context_Engine, 08_Platform_Distribution_Map, 02_Content_Memory_Log, 05_Hook_Library, 06_Visual_Identity.\n2. Invoke agents in strict order: CONTEXT_SCANNER → STRATEGIC_PLANNER → TECHNICAL_STORYTELLER → HUMAN_EDGE → IDENTITY_GUARDIAN → (if approved) SKEPTICAL_CTO → (if approved) VISUAL_GENERATOR → GROWTH_ANALYST.\n3. Gatekeeper logic: If IDENTITY_GUARDIAN rejects, pass suggested_fixes back to TECHNICAL_STORYTELLER and re-run HUMAN_EDGE, then IDENTITY_GUARDIAN again. Max 2 revisions. If SKEPTICAL_CTO rejects, pass suggested_fixes to TECHNICAL_STORYTELLER and re-run HUMAN_EDGE, IDENTITY_GUARDIAN, SKEPTICAL_CTO. Max 2 revisions.\n4. Platform variants: After both gatekeepers approve, produce one output per requested platform (LinkedIn, Twitter, WhatsApp) using 08_Platform_Distribution_Map rules (length, tone_modifier, hashtags).\n5. Logging: Log every handoff (trace_id, platform, node, timestamp). Log every gatekeeper decision (approved/rejected, reasons). Log failures.\n6. Visual generation: Run VISUAL_GENERATOR once per platform with approved_draft and 06_Visual_Identity.\n7. Final output: Assemble the exact JSON format specified in final_output_format. Do not omit or rename keys.\n\nYou do not skip gatekeepers. You do not exceed max revision rounds. You do not invent config or agent output.",
+  "user_prompt_template": "Run Brand OS v3 pipeline with the following input:\n\n- tenant_id: {{tenant_id}}\n- platform: {{platform}}\n- topic_hint: {{topic_hint}}\n- trace_id: {{trace_id}}\n\nProduce the final output JSON for platform(s): {{platforms}} (one of: linkedin, twitter, whatsapp, or comma-separated list).",
+  "agent_invocation_order": [
+    "CONTEXT_SCANNER",
+    "STRATEGIC_PLANNER",
+    "TECHNICAL_STORYTELLER",
+    "HUMAN_EDGE",
+    "IDENTITY_GUARDIAN",
+    "[IF IDENTITY_GUARDIAN.approved] SKEPTICAL_CTO",
+    "[IF SKEPTICAL_CTO.approved] VISUAL_GENERATOR (per platform)",
+    "GROWTH_ANALYST"
+  ],
+  "gatekeeper_invocation_order": [
+    "IDENTITY_GUARDIAN (after HUMAN_EDGE)",
+    "SKEPTICAL_CTO (after IDENTITY_GUARDIAN approve)"
+  ],
+  "revision_loop": {
+    "on_identity_reject": "TECHNICAL_STORYTELLER(suggested_fixes) → HUMAN_EDGE → IDENTITY_GUARDIAN, max 2",
+    "on_cto_reject": "TECHNICAL_STORYTELLER(suggested_fixes) → HUMAN_EDGE → IDENTITY_GUARDIAN → SKEPTICAL_CTO, max 2",
+    "max_revisions_per_gatekeeper": 2
+  },
+  "final_output_format": {
+    "trace_id": "string (required)",
+    "platform": "string (required): linkedin | twitter | whatsapp",
+    "content": {
+      "full_text": "string (required)",
+      "hook": "string (required)",
+      "body": "string (required)",
+      "cta": "string (required)",
+      "hashtags": "array of strings"
+    },
+    "visual": {
+      "prompt": "string (required)",
+      "aspect_ratio": "string (required)",
+      "alt_text": "string (required)"
+    },
+    "context_brief": "object (CONTEXT_SCANNER output)",
+    "content_brief": "object (STRATEGIC_PLANNER output)",
+    "gatekeeper_results": {
+      "identity_guardian": { "approved": "boolean", "score": "number", "reasons": "array of strings", "suggested_fixes": "array of strings" },
+      "skeptical_cto": { "approved": "boolean", "claims_checked": "array of strings", "issues": "array of strings", "suggested_fixes": "array of strings" }
+    },
+    "growth_analyst": { "logged": "boolean", "composite_score": "number | null", "summary": "string", "recommendations": "array of strings" },
+    "timestamp": "string (ISO 8601)"
+  },
+  "example_final_output": {
+    "trace_id": "tr_a1b2c3d4",
+    "platform": "linkedin",
+    "content": {
+      "full_text": "What if you could ship twice as fast without hiring?\n\nWe ran 2M builds last quarter. Here's what we learned: 40% of teams cut deployment time in the first month by standardizing on a single pipeline.\n\nTry the free tier—no credit card required.\n\n#DevOps #CI/CD #Engineering",
+      "hook": "What if you could ship twice as fast without hiring?",
+      "body": "We ran 2M builds last quarter. Here's what we learned: 40% of teams cut deployment time in the first month by standardizing on a single pipeline.",
+      "cta": "Try the free tier—no credit card required.",
+      "hashtags": ["#DevOps", "#CI/CD", "#Engineering"]
+    },
+    "visual": {
+      "prompt": "Professional B2B image. Clean, minimal. No text in image. Style: modern SaaS. Pipeline dashboard on a laptop screen.",
+      "aspect_ratio": "1.91:1",
+      "alt_text": "Laptop showing a CI/CD pipeline dashboard with build status and deployment metrics."
+    },
+    "context_brief": { "relevant_signals": [], "recommended_angle": "Lead with speed and scale; support with one concrete number.", "risks": [], "opportunities": ["DevOps efficiency"], "timestamp": "2025-01-30T12:00:00.000Z" },
+    "content_brief": { "headline": "How we cut deployment time by 40% without adding headcount", "key_message": "Standardizing on one pipeline helps teams ship faster.", "hook_type": "question", "hook_text": "What if you could ship twice as fast without hiring?", "cta": "Try the free tier—no credit card required.", "platform_notes": { "tone_modifier": "slightly_more_formal", "max_length": 3000 }, "timestamp": "2025-01-30T12:00:01.000Z" },
+    "gatekeeper_results": {
+      "identity_guardian": { "approved": true, "score": 0.88, "reasons": ["Voice aligned", "No forbidden topics", "CTA matches examples"], "suggested_fixes": [] },
+      "skeptical_cto": { "approved": true, "claims_checked": ["40% of teams", "2M builds", "free tier"], "issues": [], "suggested_fixes": [] }
+    },
+    "growth_analyst": { "logged": true, "composite_score": null, "summary": "LinkedIn post produced; identity and CTO gates passed. No performance data yet.", "recommendations": ["Consider statistic hook for next DevOps post."], "timestamp": "2025-01-30T12:00:05.000Z" },
+    "timestamp": "2025-01-30T12:00:05.000Z"
+  }
+}

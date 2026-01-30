@@ -1,0 +1,50 @@
+{
+  "id": "VISUAL_GENERATOR",
+  "layer": "distribution",
+  "role": "Generate the visual brief (image prompt + aspect ratio + alt text) from the approved copy and Visual Identity.",
+  "responsibilities": [
+    "Consume approved draft and Visual Identity config.",
+    "Produce an image generation prompt that matches brand (clean, minimal, no text unless branded).",
+    "Output aspect ratio and alt text per platform."
+  ],
+  "input_schema": {
+    "type": "object",
+    "required": ["approved_draft", "platform", "visual_identity"],
+    "properties": {
+      "approved_draft": { "type": "object" },
+      "platform": { "type": "string", "enum": ["linkedin", "twitter", "whatsapp"] },
+      "visual_identity": { "type": "object" },
+      "topic_hint": { "type": "string", "default": null }
+    }
+  },
+  "output_schema": {
+    "type": "object",
+    "required": ["prompt", "aspect_ratio", "platform", "alt_text", "timestamp"],
+    "properties": {
+      "prompt": { "type": "string" },
+      "aspect_ratio": { "type": "string" },
+      "platform": { "type": "string" },
+      "alt_text": { "type": "string" },
+      "timestamp": { "type": "string", "format": "date-time" }
+    }
+  },
+  "prompt_template": "You are the Visual Generator for Brand OS v3. You create the image brief from approved copy and Visual Identity.\n\nInput:\n- Approved draft (full_text, headline): {{approved_draft}}\n- Platform: {{platform}}\n- Visual Identity (brand, imagery, generation_prompts, rules): {{visual_identity}}\n- Topic hint (optional): {{topic_hint}}\n\nOutput a JSON object with:\n1. prompt: image generation prompt (max 500 chars). Use default_prefix from generation_prompts. No text in image unless branded. Style: clean, minimal, modern SaaS. Reflect post topic without literally illustrating the headline.\n2. aspect_ratio: from visual_identity.imagery.aspect_ratios_by_platform for this platform.\n3. platform: same as input.\n4. alt_text: accessibility description (required by rules).\n5. timestamp: current ISO timestamp.\n\nRules: No text overlay unless branded. Watermark none. Alt text required.",
+  "failure_modes": [
+    "Visual Identity missing aspect_ratio for platform: use 1.91:1 as default.",
+    "Topic too abstract: generate a generic professional image prompt.",
+    "Prompt too long: truncate to 500 chars at word boundary."
+  ],
+  "gatekeeper_logic": null,
+  "example_input": {
+    "approved_draft": { "full_text": "What if you could ship twice as fast without hiring?\n\nWe ran 2M builds last quarter...", "headline": "How we cut deployment time by 40% without adding headcount" },
+    "platform": "linkedin",
+    "visual_identity": { "imagery": { "aspect_ratios_by_platform": { "linkedin": "1.91:1" } }, "generation_prompts": { "default_prefix": "Professional B2B image. Clean, minimal. No text in image. Style: modern SaaS." } }
+  },
+  "example_output": {
+    "prompt": "Professional B2B image. Clean, minimal. No text in image. Style: modern SaaS. Pipeline dashboard on a laptop screen.",
+    "aspect_ratio": "1.91:1",
+    "platform": "linkedin",
+    "alt_text": "Laptop showing a CI/CD pipeline dashboard with build status and deployment metrics.",
+    "timestamp": "2025-01-30T12:00:06.000Z"
+  }
+}

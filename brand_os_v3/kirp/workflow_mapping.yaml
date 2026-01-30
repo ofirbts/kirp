@@ -1,0 +1,141 @@
+# Brand OS v3 — KIRP Workflow Mapping
+# Maps Brand OS agents and events to KIRP event types and routing
+# Valid YAML, fully generated, self-contained
+
+version: "3.0"
+name: brand_os_v3_workflow_mapping
+
+event_triggers:
+  brand_os_run_started:
+    description: "Brand OS v3 pipeline run started"
+    source: orchestrator
+    payload_schema:
+      trace_id: string
+      tenant_id: string
+      platform: string
+      topic_hint: string
+      timestamp: string
+    kirp_event_type: brand_os.run.started
+    routing: [audit_log, event_store]
+
+  brand_os_agent_completed:
+    description: "A Brand OS agent completed successfully"
+    source: agent
+    payload_schema:
+      trace_id: string
+      tenant_id: string
+      agent_id: string
+      platform: string
+      output_summary: string
+      timestamp: string
+    kirp_event_type: brand_os.agent.completed
+    routing: [audit_log, event_store]
+
+  brand_os_gatekeeper_decision:
+    description: "Gatekeeper (IDENTITY_GUARDIAN or SKEPTICAL_CTO) made a decision"
+    source: gatekeeper
+    payload_schema:
+      trace_id: string
+      tenant_id: string
+      agent_id: string
+      approved: boolean
+      score: number
+      reasons: array
+      suggested_fixes: array
+      timestamp: string
+    kirp_event_type: brand_os.gatekeeper.decision
+    routing: [audit_log, event_store, governance]
+
+  brand_os_run_completed:
+    description: "Brand OS v3 pipeline run completed (final output ready)"
+    source: orchestrator
+    payload_schema:
+      trace_id: string
+      tenant_id: string
+      platform: string
+      content_preview: string
+      gatekeeper_results: object
+      growth_analyst: object
+      timestamp: string
+    kirp_event_type: brand_os.run.completed
+    routing: [audit_log, event_store, content_memory]
+
+  brand_os_run_failed:
+    description: "Brand OS v3 pipeline run failed (timeout, agent error, max revisions exceeded)"
+    source: orchestrator
+    payload_schema:
+      trace_id: string
+      tenant_id: string
+      platform: string
+      failure_reason: string
+      last_agent_id: string
+      timestamp: string
+    kirp_event_type: brand_os.run.failed
+    routing: [audit_log, event_store, dlq]
+
+routing_rules:
+  audit_log:
+    condition: always
+    fields: [trace_id, tenant_id, agent_id, action, timestamp, result]
+  event_store:
+    condition: always
+    partition_by: [tenant_id, trace_id]
+  governance:
+    condition: event_type == brand_os.gatekeeper.decision
+    enforce: governance_policy.brand_os_v3_governance
+  content_memory:
+    condition: event_type == brand_os.run.completed
+    action: append_to_content_memory
+  dlq:
+    condition: event_type == brand_os.run.failed
+    action: move_to_dlq
+
+agent_to_kirp_event:
+  CONTEXT_SCANNER: brand_os.agent.completed
+  STRATEGIC_PLANNER: brand_os.agent.completed
+  TECHNICAL_STORYTELLER: brand_os.agent.completed
+  HUMAN_EDGE: brand_os.agent.completed
+  IDENTITY_GUARDIAN: brand_os.gatekeeper.decision
+  SKEPTICAL_CTO: brand_os.gatekeeper.decision
+  VISUAL_GENERATOR: brand_os.agent.completed
+  GROWTH_ANALYST: brand_os.agent.completed
+
+audit_fields:
+  required:
+    - trace_id
+    - tenant_id
+    - platform
+    - agent_id
+    - timestamp
+    - action
+  optional:
+    - score
+    - approved
+    - revision_round
+    - output_summary
+
+examples:
+  run_started:
+    trace_id: tr_a1b2c3d4
+    tenant_id: acme
+    platform: linkedin
+    topic_hint: "CI/CD pipeline efficiency"
+    timestamp: "2025-01-30T12:00:00.000Z"
+    kirp_event_type: brand_os.run.started
+  gatekeeper_decision:
+    trace_id: tr_a1b2c3d4
+    tenant_id: acme
+    agent_id: IDENTITY_GUARDIAN
+    approved: true
+    score: 0.88
+    reasons: ["Voice aligned", "No forbidden topics"]
+    suggested_fixes: []
+    timestamp: "2025-01-30T12:00:04.000Z"
+    kirp_event_type: brand_os.gatekeeper.decision
+  run_completed:
+    trace_id: tr_a1b2c3d4
+    tenant_id: acme
+    platform: linkedin
+    content_preview: "What if you could ship twice as fast without hiring?..."
+    timestamp: "2025-01-30T12:00:07.000Z"
+    kirp_event_type: brand_os.run.completed

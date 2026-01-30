@@ -11,8 +11,10 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends, Query
 
+from src.core.contracts import get_contracts
+from src.core.event_store import EventStore
 from src.observability.metrics import MetricsCollector
 
 logger = logging.getLogger(__name__)
@@ -34,17 +36,11 @@ async def get_metrics_snapshot() -> dict[str, Any]:
     
     metrics = MetricsCollector("kirp")
     
-    # Collect metrics (if Prometheus available)
-    snapshot = {
-        "counters": {},
-        "gauges": {},
-        "histograms": {},
+    # Basic snapshot structure; details are populated via Prometheus scraping.
+    return {
         "last_updated": datetime.now(timezone.utc).isoformat(),
+        "namespaces": ["kirp_http", "kirp_pipeline", "kirp_worker", "kirp_rag"],
     }
-    
-    # In production, this would query Prometheus or metrics store
-    # For now, return structure
-    return snapshot
 
 
 @router.get("/metrics/prometheus")
@@ -59,19 +55,33 @@ async def get_prometheus_metrics() -> str:
         return "# Prometheus client not available\n"
 
 
+@router.get("/contracts")
+async def get_data_contracts() -> dict[str, Any]:
+    """
+    Expose versioned JSON Schemas for key API models.
+
+    This acts as a data-contract endpoint for external systems.
+    """
+    return get_contracts()
+
+
 @router.get("/health")
-async def get_health() -> dict[str, Any]:
-    """Detailed system health with all services."""
+async def get_health(
+    tenant_id: str | None = Query(None, description="Optional tenant ID for response tagging / correlation"),
+) -> dict[str, Any]:
+    """Detailed system health with all services. Optionally tag response with tenant_id for per-tenant correlation."""
     import os
     import time
     from datetime import datetime, timezone
-    
+
     health: dict[str, Any] = {
         "status": "healthy",
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "services": {},
         "checks": {},
     }
+    if tenant_id:
+        health["tenant_id"] = tenant_id
     
     # Check MongoDB
     try:
@@ -121,12 +131,13 @@ async def get_health() -> dict[str, Any]:
     
     # Check PostgreSQL
     try:
+        from sqlalchemy import text
         from src.core.integrations import get_postgres_engine
         start = time.time()
         engine = get_postgres_engine()
         if engine:
             with engine.connect() as conn:
-                conn.execute("SELECT 1")
+                conn.execute(text("SELECT 1"))
         latency = time.time() - start
         health["services"]["postgresql"] = {"status": "ok", "latency_ms": latency * 1000}
         health["checks"]["postgresql"] = True
@@ -154,3 +165,45 @@ async def get_health() -> dict[str, Any]:
         health["status"] = "degraded" if any(health["checks"].values()) else "unhealthy"
 
     return health
+
+
+@router.get("/tenant-analytics")
+async def get_tenant_analytics(
+    tenant_id: str | None = Query(None, description="Optional tenant filter; empty = all tenants"),
+    hours: int = Query(24, ge=1, le=168),
+) -> dict[str, Any]:
+    """
+    Simple multi-tenant analytics over the event store.
+
+    Returns approximate event counts over a recent time window.
+    """
+    from datetime import datetime, timedelta, timezone
+    from motor.motor_asyncio import AsyncIOMotorClient
+    import os
+
+    uri = os.getenv("MONGO_URI", "mongodb://root:example@mongodb:27017/kirp?authSource=admin")
+    client = AsyncIOMotorClient(uri)
+    db = client["kirp"]
+
+    since = datetime.now(timezone.utc) - timedelta(hours=hours)
+    match_stage: dict[str, Any] = {"timestamp": {"$gte": since}}
+    if tenant_id:
+        match_stage["tenant_id"] = tenant_id
+
+    pipeline = [
+        {"$match": match_stage},
+        {"$group": {"_id": "$tenant_id", "count": {"$sum": 1}}},
+        {"$sort": {"count": -1}},
+    ]
+    rows = await db.events.aggregate(pipeline).to_list(length=100)
+    client.close()
+
+    data = [
+        {"tenant_id": r["_id"], "event_count": r["count"]}
+        for r in rows
+    ]
+    return {
+        "window_hours": hours,
+        "tenant_id": tenant_id,
+        "data": data,
+    }

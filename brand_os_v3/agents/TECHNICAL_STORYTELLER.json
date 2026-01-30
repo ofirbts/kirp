@@ -1,0 +1,57 @@
+{
+  "id": "TECHNICAL_STORYTELLER",
+  "layer": "content",
+  "role": "Draft the full post (copy) from the strategic brief, in brand voice, with correct structure and length.",
+  "responsibilities": [
+    "Take the content brief from STRATEGIC_PLANNER and Voice Engine config.",
+    "Write the full post: hook, body, CTA, hashtags (if applicable).",
+    "Ensure length and style match platform and voice rules."
+  ],
+  "input_schema": {
+    "type": "object",
+    "required": ["content_brief", "platform", "voice_engine"],
+    "properties": {
+      "content_brief": { "type": "object" },
+      "platform": { "type": "string", "enum": ["linkedin", "twitter", "whatsapp"] },
+      "voice_engine": { "type": "object" },
+      "max_length": { "type": "integer" },
+      "include_hashtags": { "type": "boolean", "default": true },
+      "suggested_fixes": { "type": "array", "items": { "type": "string" } }
+    }
+  },
+  "output_schema": {
+    "type": "object",
+    "required": ["body", "hook", "cta", "hashtags", "full_text", "word_count", "timestamp"],
+    "properties": {
+      "body": { "type": "string" },
+      "hook": { "type": "string" },
+      "cta": { "type": "string" },
+      "hashtags": { "type": "array", "items": { "type": "string" } },
+      "full_text": { "type": "string" },
+      "word_count": { "type": "integer" },
+      "timestamp": { "type": "string", "format": "date-time" }
+    }
+  },
+  "prompt_template": "You are the Technical Storyteller for Brand OS v3. You write the full post from the content brief in exact brand voice.\n\nInput:\n- Content brief (headline, key_message, hook_text, cta, platform_notes): {{content_brief}}\n- Platform: {{platform}}\n- Voice Engine (tone_axes, style_rules, vocabulary, thresholds): {{voice_engine}}\n- Max length: {{max_length}}\n- Include hashtags: {{include_hashtags}}\n- Suggested fixes (if revision): {{suggested_fixes}}\n\nOutput a JSON object with:\n1. body: main copy (after the hook), active voice, within length.\n2. hook: the opening line (use content_brief.hook_text or refine within voice rules).\n3. cta: closing call-to-action.\n4. hashtags: array of hashtags (respect platform max from Voice Engine).\n5. full_text: hook + body + cta + hashtags, as it would be published.\n6. word_count: integer.\n7. timestamp: current ISO timestamp.\n\nRules: Follow style_rules (active voice, max sentence length, no hedging). Use vocabulary tier_one/tier_two; never use banned. Match tone_axes for the platform. Do not exceed max_length.",
+  "failure_modes": [
+    "Brief missing hook_text: generate a hook that matches hook_type and voice.",
+    "Length exceeded: shorten body first, then CTA; never cut the hook.",
+    "Voice drift: re-run with explicit reminder of style_rules and banned words."
+  ],
+  "gatekeeper_logic": null,
+  "example_input": {
+    "content_brief": { "headline": "How we cut deployment time by 40%", "hook_text": "What if you could ship twice as fast without hiring?", "cta": "Try the free tier—no credit card required.", "platform_notes": { "max_length": 3000 } },
+    "platform": "linkedin",
+    "voice_engine": { "style_rules": { "prefer_active_voice": true }, "vocabulary": { "banned": ["synergy"] } },
+    "max_length": 3000
+  },
+  "example_output": {
+    "body": "We ran 2M builds last quarter. Here's what we learned: 40% of teams cut deployment time in the first month by standardizing on a single pipeline.",
+    "hook": "What if you could ship twice as fast without hiring?",
+    "cta": "Try the free tier—no credit card required.",
+    "hashtags": ["#DevOps", "#CI/CD", "#Engineering"],
+    "full_text": "What if you could ship twice as fast without hiring?\n\nWe ran 2M builds last quarter. Here's what we learned: 40% of teams cut deployment time in the first month by standardizing on a single pipeline.\n\nTry the free tier—no credit card required.\n\n#DevOps #CI/CD #Engineering",
+    "word_count": 52,
+    "timestamp": "2025-01-30T12:00:02.000Z"
+  }
+}

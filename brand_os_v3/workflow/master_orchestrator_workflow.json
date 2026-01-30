@@ -1,0 +1,105 @@
+{
+  "name": "Brand OS v3 — Master Orchestrator Workflow",
+  "version": "3.0",
+  "description": "n8n-style workflow: World Context Engine → Cognitive Core (Identity + Voice) → Agent Factory (all agents + gatekeepers) → Distribution & Memory.",
+  "trigger": {
+    "type": "webhook_or_manual",
+    "input_schema": {
+      "type": "object",
+      "required": ["tenant_id", "platform", "topic_hint", "trace_id"],
+      "properties": {
+        "tenant_id": { "type": "string" },
+        "platform": { "type": "string", "enum": ["linkedin", "twitter", "whatsapp"] },
+        "topic_hint": { "type": "string" },
+        "trace_id": { "type": "string" }
+      }
+    }
+  },
+  "nodes": [
+    { "id": "start", "type": "trigger", "name": "Start", "position": [0, 0], "parameters": {} },
+    { "id": "load_config", "type": "code", "name": "Load Config", "position": [200, 0], "parameters": { "load": ["00_Master_Identity_Core", "03_Voice_Engine", "04_Agent_Mesh_Protocol", "07_World_Context_Engine", "08_Platform_Distribution_Map", "02_Content_Memory_Log", "05_Hook_Library", "06_Visual_Identity"] } },
+    { "id": "context_scanner", "type": "agent", "name": "CONTEXT_SCANNER", "position": [400, 0], "parameters": { "agent_id": "CONTEXT_SCANNER", "input_map": { "tenant_id": "={{ $json.tenant_id }}", "platform": "={{ $json.platform }}", "topic_hint": "={{ $json.topic_hint }}" } } },
+    { "id": "strategic_planner", "type": "agent", "name": "STRATEGIC_PLANNER", "position": [600, 0], "parameters": { "agent_id": "STRATEGIC_PLANNER", "input_map": { "context_brief": "={{ $node.context_scanner.json.output }}", "platform": "={{ $json.platform }}", "identity_core": "={{ $node.load_config.json.00_Master_Identity_Core }}" } } },
+    { "id": "technical_storyteller", "type": "agent", "name": "TECHNICAL_STORYTELLER", "position": [800, 0], "parameters": { "agent_id": "TECHNICAL_STORYTELLER", "input_map": { "content_brief": "={{ $node.strategic_planner.json.output }}", "platform": "={{ $json.platform }}", "voice_engine": "={{ $node.load_config.json.03_Voice_Engine }}", "max_length": "={{ $node.load_config.json.08_Platform_Distribution_Map.platforms[$json.platform].max_length }}" } } },
+    { "id": "human_edge", "type": "agent", "name": "HUMAN_EDGE", "position": [1000, 0], "parameters": { "agent_id": "HUMAN_EDGE", "input_map": { "draft": "={{ $node.technical_storyteller.json.output }}", "platform": "={{ $json.platform }}", "identity_core": "={{ $node.load_config.json.00_Master_Identity_Core }}" } } },
+    { "id": "identity_guardian", "type": "gatekeeper", "name": "IDENTITY_GUARDIAN", "position": [1200, 0], "parameters": { "agent_id": "IDENTITY_GUARDIAN", "input_map": { "draft": "={{ $node.human_edge.json.output }}", "identity_core": "={{ $node.load_config.json.00_Master_Identity_Core }}", "voice_engine": "={{ $node.load_config.json.03_Voice_Engine }}" } } },
+    { "id": "gatekeeper_identity_decision", "type": "if", "name": "Identity Approved?", "position": [1400, 0], "parameters": { "condition": "={{ $node.identity_guardian.json.output.approved === true }}" } },
+    { "id": "return_to_storyteller_identity", "type": "agent", "name": "TECHNICAL_STORYTELLER (revision)", "position": [1400, 200], "parameters": { "agent_id": "TECHNICAL_STORYTELLER", "input_map": { "content_brief": "={{ $node.strategic_planner.json.output }}", "platform": "={{ $json.platform }}", "voice_engine": "={{ $node.load_config.json.03_Voice_Engine }}", "suggested_fixes": "={{ $node.identity_guardian.json.output.suggested_fixes }}" } } },
+    { "id": "skeptical_cto", "type": "gatekeeper", "name": "SKEPTICAL_CTO", "position": [1600, 0], "parameters": { "agent_id": "SKEPTICAL_CTO", "input_map": { "draft": "={{ $node.identity_guardian.json.output.approved ? $node.human_edge.json.output : $node.return_to_storyteller_identity.json.output }}", "identity_core": "={{ $node.load_config.json.00_Master_Identity_Core }}" } } },
+    { "id": "gatekeeper_cto_decision", "type": "if", "name": "CTO Approved?", "position": [1800, 0], "parameters": { "condition": "={{ $node.skeptical_cto.json.output.approved === true }}" } },
+    { "id": "return_to_storyteller_cto", "type": "agent", "name": "TECHNICAL_STORYTELLER (CTO revision)", "position": [1800, 200], "parameters": { "agent_id": "TECHNICAL_STORYTELLER", "input_map": { "content_brief": "={{ $node.strategic_planner.json.output }}", "platform": "={{ $json.platform }}", "voice_engine": "={{ $node.load_config.json.03_Voice_Engine }}", "suggested_fixes": "={{ $node.skeptical_cto.json.output.suggested_fixes }}" } } },
+    { "id": "platform_variant_linkedin", "type": "code", "name": "Variant: LinkedIn", "position": [2000, -200], "parameters": { "platform": "linkedin", "max_length": 3000 } },
+    { "id": "platform_variant_twitter", "type": "code", "name": "Variant: Twitter", "position": [2000, 0], "parameters": { "platform": "twitter", "max_length": 280 } },
+    { "id": "platform_variant_whatsapp", "type": "code", "name": "Variant: WhatsApp", "position": [2000, 200], "parameters": { "platform": "whatsapp", "max_length": 1000 } },
+    { "id": "visual_generator", "type": "agent", "name": "VISUAL_GENERATOR", "position": [2200, 0], "parameters": { "agent_id": "VISUAL_GENERATOR", "input_map": { "approved_draft": "={{ $node.skeptical_cto.json.output.approved ? $node.human_edge.json.output : $node.return_to_storyteller_cto.json.output }}", "platform": "={{ $json.platform }}", "visual_identity": "={{ $node.load_config.json.06_Visual_Identity }}" } } },
+    { "id": "logging", "type": "code", "name": "Log Handoff", "position": [2400, 0], "parameters": { "log_every_handoff": true, "log_gatekeeper_decisions": true } },
+    { "id": "growth_analyst", "type": "agent", "name": "GROWTH_ANALYST", "position": [2600, 0], "parameters": { "agent_id": "GROWTH_ANALYST", "input_map": { "workflow_output": "={{ $node.visual_generator.json }}", "trace_id": "={{ $json.trace_id }}" } } },
+    { "id": "final_output", "type": "code", "name": "Final Output JSON", "position": [2800, 0], "parameters": { "output_schema": "brand_os_v3_final" } }
+  ],
+  "connections": {
+    "start": ["load_config"],
+    "load_config": ["context_scanner"],
+    "context_scanner": ["strategic_planner"],
+    "strategic_planner": ["technical_storyteller"],
+    "technical_storyteller": ["human_edge"],
+    "human_edge": ["identity_guardian"],
+    "identity_guardian": ["gatekeeper_identity_decision"],
+    "gatekeeper_identity_decision": { "true": ["skeptical_cto"], "false": ["return_to_storyteller_identity"] },
+    "return_to_storyteller_identity": ["human_edge"],
+    "skeptical_cto": ["gatekeeper_cto_decision"],
+    "gatekeeper_cto_decision": { "true": ["platform_variant_linkedin", "platform_variant_twitter", "platform_variant_whatsapp"], "false": ["return_to_storyteller_cto"] },
+    "return_to_storyteller_cto": ["human_edge"],
+    "platform_variant_linkedin": ["visual_generator"],
+    "platform_variant_twitter": ["visual_generator"],
+    "platform_variant_whatsapp": ["visual_generator"],
+    "visual_generator": ["logging"],
+    "logging": ["growth_analyst"],
+    "growth_analyst": ["final_output"]
+  },
+  "flow_order": ["start", "load_config", "context_scanner", "strategic_planner", "technical_storyteller", "human_edge", "identity_guardian", "gatekeeper_identity_decision", "skeptical_cto", "gatekeeper_cto_decision", "visual_generator", "logging", "growth_analyst", "final_output"],
+  "gatekeeper_loops": [
+    { "gatekeeper": "IDENTITY_GUARDIAN", "on_reject": "return_to_agent", "revision_agent": "TECHNICAL_STORYTELLER", "max_revisions": 2 },
+    { "gatekeeper": "SKEPTICAL_CTO", "on_reject": "return_to_agent", "revision_agent": "TECHNICAL_STORYTELLER", "max_revisions": 2 }
+  ],
+  "platform_variants": {
+    "linkedin": { "node": "platform_variant_linkedin", "max_length": 3000, "tone_modifier": "slightly_more_formal" },
+    "twitter": { "node": "platform_variant_twitter", "max_length": 280, "tone_modifier": "punchy" },
+    "whatsapp": { "node": "platform_variant_whatsapp", "max_length": 1000, "tone_modifier": "warm_and_short" }
+  },
+  "logging": { "log_every_handoff": true, "log_gatekeeper_decisions": true, "log_failures": true },
+  "visual_generation": { "node": "visual_generator", "runs_after": "gatekeeper_cto_decision true", "input": "approved_draft + platform + visual_identity", "output": "prompt, aspect_ratio, platform, alt_text" },
+  "final_output_schema": {
+    "trace_id": "string",
+    "platform": "string",
+    "content": { "full_text": "string", "hook": "string", "body": "string", "cta": "string", "hashtags": "array" },
+    "visual": { "prompt": "string", "aspect_ratio": "string", "alt_text": "string" },
+    "context_brief": "object",
+    "content_brief": "object",
+    "gatekeeper_results": { "identity_guardian": "object", "skeptical_cto": "object" },
+    "growth_analyst": "object",
+    "timestamp": "string"
+  },
+  "example_workflow_run": {
+    "input": { "tenant_id": "acme", "platform": "linkedin", "topic_hint": "CI/CD pipeline efficiency", "trace_id": "tr_a1b2c3d4" },
+    "steps": [
+      { "node": "start", "output": { "tenant_id": "acme", "platform": "linkedin", "topic_hint": "CI/CD pipeline efficiency", "trace_id": "tr_a1b2c3d4" } },
+      { "node": "context_scanner", "output": { "relevant_signals": [], "recommended_angle": "Lead with speed and scale; support with one concrete number.", "risks": [], "opportunities": ["DevOps efficiency"], "timestamp": "2025-01-30T12:00:00.000Z" } },
+      { "node": "strategic_planner", "output": { "headline": "How we cut deployment time by 40% without adding headcount", "hook_type": "question", "hook_text": "What if you could ship twice as fast without hiring?", "cta": "Try the free tier—no credit card required.", "timestamp": "2025-01-30T12:00:01.000Z" } },
+      { "node": "technical_storyteller", "output": { "full_text": "What if you could ship twice as fast without hiring?\n\nWe ran 2M builds last quarter. Here's what we learned: 40% of teams cut deployment time in the first month by standardizing on a single pipeline.\n\nTry the free tier—no credit card required.\n\n#DevOps #CI/CD #Engineering", "word_count": 52, "timestamp": "2025-01-30T12:00:02.000Z" } },
+      { "node": "human_edge", "output": { "full_text": "What if you could ship twice as fast without hiring?\n\nWe ran 2M builds last quarter. Here's what we learned: 40% of teams cut deployment time in the first month by standardizing on a single pipeline.\n\nTry the free tier—no credit card required.", "concrete_detail_used": "Added 'Here's what we learned' and 'by standardizing on a single pipeline'.", "timestamp": "2025-01-30T12:00:03.000Z" } },
+      { "node": "identity_guardian", "output": { "approved": true, "score": 0.88, "reasons": ["Voice aligned", "No forbidden topics", "CTA matches examples"], "suggested_fixes": [], "timestamp": "2025-01-30T12:00:04.000Z" } },
+      { "node": "skeptical_cto", "output": { "approved": true, "claims_checked": ["40% of teams", "2M builds", "free tier"], "issues": [], "suggested_fixes": [], "timestamp": "2025-01-30T12:00:05.000Z" } },
+      { "node": "visual_generator", "output": { "prompt": "Professional B2B image. Clean, minimal. No text in image. Style: modern SaaS. Pipeline dashboard on a laptop screen.", "aspect_ratio": "1.91:1", "platform": "linkedin", "alt_text": "Laptop showing a CI/CD pipeline dashboard with build status and deployment metrics.", "timestamp": "2025-01-30T12:00:06.000Z" } },
+      { "node": "growth_analyst", "output": { "logged": true, "composite_score": null, "summary": "LinkedIn post produced; identity and CTO gates passed. No performance data yet.", "recommendations": ["Consider statistic hook for next DevOps post."], "timestamp": "2025-01-30T12:00:07.000Z" } }
+    ],
+    "final_output": {
+      "trace_id": "tr_a1b2c3d4",
+      "platform": "linkedin",
+      "content": { "full_text": "What if you could ship twice as fast without hiring?\n\nWe ran 2M builds last quarter. Here's what we learned: 40% of teams cut deployment time in the first month by standardizing on a single pipeline.\n\nTry the free tier—no credit card required.\n\n#DevOps #CI/CD #Engineering", "hook": "What if you could ship twice as fast without hiring?", "body": "We ran 2M builds last quarter. Here's what we learned: 40% of teams cut deployment time in the first month by standardizing on a single pipeline.", "cta": "Try the free tier—no credit card required.", "hashtags": ["#DevOps", "#CI/CD", "#Engineering"] },
+      "visual": { "prompt": "Professional B2B image. Clean, minimal. No text in image. Style: modern SaaS. Pipeline dashboard on a laptop screen.", "aspect_ratio": "1.91:1", "alt_text": "Laptop showing a CI/CD pipeline dashboard with build status and deployment metrics." },
+      "gatekeeper_results": { "identity_guardian": { "approved": true, "score": 0.88 }, "skeptical_cto": { "approved": true, "issues": [] } },
+      "growth_analyst": { "logged": true, "summary": "LinkedIn post produced; identity and CTO gates passed.", "recommendations": ["Consider statistic hook for next DevOps post."] },
+      "timestamp": "2025-01-30T12:00:07.000Z"
+    }
+  }
+}

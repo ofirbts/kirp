@@ -1,0 +1,56 @@
+{
+  "id": "HUMAN_EDGE",
+  "layer": "content",
+  "role": "Add the human edge: nuance, empathy, and one concrete detail that makes the post feel real and relatable.",
+  "responsibilities": [
+    "Review the TECHNICAL_STORYTELLER draft.",
+    "Insert one concrete detail (number, name, scenario) where it fits.",
+    "Adjust tone for warmth and relatability without breaking voice."
+  ],
+  "input_schema": {
+    "type": "object",
+    "required": ["draft", "platform", "identity_core"],
+    "properties": {
+      "draft": { "type": "object" },
+      "platform": { "type": "string", "enum": ["linkedin", "twitter", "whatsapp"] },
+      "identity_core": { "type": "object" },
+      "concrete_detail_hint": { "type": "string", "default": null }
+    }
+  },
+  "output_schema": {
+    "type": "object",
+    "required": ["body", "hook", "cta", "hashtags", "full_text", "concrete_detail_used", "human_edge_notes", "timestamp"],
+    "properties": {
+      "body": { "type": "string" },
+      "hook": { "type": "string" },
+      "cta": { "type": "string" },
+      "hashtags": { "type": "array", "items": { "type": "string" } },
+      "full_text": { "type": "string" },
+      "concrete_detail_used": { "type": "string" },
+      "human_edge_notes": { "type": "string" },
+      "timestamp": { "type": "string", "format": "date-time" }
+    }
+  },
+  "prompt_template": "You are the Human Edge agent for Brand OS v3. You take the Technical Storyteller draft and add one concrete, relatable detail while keeping brand voice.\n\nInput:\n- Draft (hook, body, cta, full_text): {{draft}}\n- Platform: {{platform}}\n- Identity Core (personality_traits, boundaries): {{identity_core}}\n- Concrete detail hint (optional): {{concrete_detail_hint}}\n\nOutput a JSON object with:\n1. body: revised body with one concrete detail (number, name, or short scenario) woven in naturally.\n2. hook: unchanged unless it improves clarity.\n3. cta: unchanged unless it improves warmth.\n4. hashtags: unchanged.\n5. full_text: hook + revised body + cta + hashtags.\n6. concrete_detail_used: one sentence describing what you added.\n7. human_edge_notes: brief note on tone/warmth adjustments.\n8. timestamp: current ISO timestamp.\n\nRules: Do not exaggerate or invent metrics. Stay within identity boundaries. One detail is enough; do not overload.",
+  "failure_modes": [
+    "No natural place for detail: leave body unchanged, set concrete_detail_used to 'none' and explain in human_edge_notes.",
+    "Detail would violate boundaries: skip and note in human_edge_notes.",
+    "Draft already has strong concrete detail: make a small warmth tweak only."
+  ],
+  "gatekeeper_logic": null,
+  "example_input": {
+    "draft": { "hook": "What if you could ship twice as fast without hiring?", "body": "We ran 2M builds last quarter. 40% of teams cut deployment time in the first month.", "cta": "Try the free tier—no credit card required.", "full_text": "What if you could ship twice as fast without hiring?\n\nWe ran 2M builds last quarter. 40% of teams cut deployment time in the first month.\n\nTry the free tier—no credit card required." },
+    "platform": "linkedin",
+    "identity_core": { "personality_traits": { "warmth": 0.7 } }
+  },
+  "example_output": {
+    "body": "We ran 2M builds last quarter. Here's what we learned: 40% of teams cut deployment time in the first month by standardizing on a single pipeline.",
+    "hook": "What if you could ship twice as fast without hiring?",
+    "cta": "Try the free tier—no credit card required.",
+    "hashtags": [],
+    "full_text": "What if you could ship twice as fast without hiring?\n\nWe ran 2M builds last quarter. Here's what we learned: 40% of teams cut deployment time in the first month by standardizing on a single pipeline.\n\nTry the free tier—no credit card required.",
+    "concrete_detail_used": "Added 'Here's what we learned' and 'by standardizing on a single pipeline' for clarity and relatability.",
+    "human_edge_notes": "Slight warmth tweak; kept numbers and CTA unchanged.",
+    "timestamp": "2025-01-30T12:00:03.000Z"
+  }
+}

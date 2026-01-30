@@ -40,6 +40,10 @@ celery_app.conf.update(
         "src.workers.tasks.whatsapp_send_task": {"queue": "whatsapp"},
         "src.workers.tasks.daily_intelligence_task": {"queue": "scheduled"},
         "src.workers.tasks.self_improvement_task": {"queue": "scheduled"},
+        "src.workers.tasks.demo_data_generator_task": {"queue": "scheduled"},
+        "src.workers.tasks.refresh_missing_embeddings_task": {"queue": "scheduled"},
+        "src.workers.tasks.agent_run_task": {"queue": "agents"},
+        "src.workers.tasks.drain_agent_queue_task": {"queue": "agents"},
     },
     beat_schedule={
         "daily-intelligence-08:00": {
@@ -51,6 +55,17 @@ celery_app.conf.update(
             "task": "self_improvement_task",
             "schedule": crontab(hour=2, minute=0),
             "args": ("default",),
+        },
+        # Embedding refresh: periodically fill in missing vectors (no demo data).
+        "refresh-embeddings-hourly": {
+            "task": "refresh_missing_embeddings_task",
+            "schedule": crontab(minute=0),  # hourly
+            "args": ("default-tenant", None, 500),
+        },
+        "drain-agent-queue": {
+            "task": "drain_agent_queue_task",
+            "schedule": 10.0,  # every 10 seconds
+            "args": (),
         },
     },
 )

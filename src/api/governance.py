@@ -34,14 +34,20 @@ async def _get_event_store() -> EventStore:
 
 
 @router.get("/approvals")
-async def get_pending_approvals(limit: int = Query(200, le=1000)) -> dict[str, Any]:
+async def get_pending_approvals(
+    limit: int = Query(200, le=1000),
+    tenant_id: str | None = Query(None),
+) -> dict[str, Any]:
     """
     Get all events waiting for approval (human_approval_required).
     """
     store = await _get_event_store()
-    # Query events with event_type=human_approval_required that haven't been resolved
-    # Check for resolution events (governance_approval/governance_rejection) to filter
-    all_events = await store.list(tenant_id="*", limit=limit * 2, allow_all_tenants=True)
+    # Multi-tenant safety: default to per-tenant view unless explicitly requested.
+    if tenant_id:
+        all_events = await store.list(tenant_id=tenant_id, limit=limit * 2)
+    else:
+        # Admin operation across tenants; requires explicit allow_all_tenants=True.
+        all_events = await store.list(tenant_id="*", limit=limit * 2, allow_all_tenants=True)
     approval_events = [e for e in all_events if e.event_type == "human_approval_required"]
     resolution_ids = {
         e.metadata.get("original_event_id")
@@ -142,9 +148,10 @@ async def get_audit_log(
     """
     store = await _get_event_store()
     if tenant_id:
+        # Strict per-tenant audit view.
         events = await store.list(tenant_id=tenant_id, limit=limit)
     else:
-        # Get from all tenants (admin operation)
+        # Explicit admin-wide audit view (all tenants).
         events = await store.list(tenant_id="*", limit=limit, allow_all_tenants=True)
 
     if event_type:

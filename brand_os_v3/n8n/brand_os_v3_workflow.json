@@ -1,0 +1,248 @@
+{
+  "name": "Brand OS v3 — Master Orchestrator",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "a1000001-0001-4000-8000-000000000001",
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [0, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const tenant_id = $input.first().json.tenant_id || 'default';\nconst platform = $input.first().json.platform || 'linkedin';\nconst topic_hint = $input.first().json.topic_hint || 'CI/CD';\nconst trace_id = $input.first().json.trace_id || 'tr_' + Date.now();\nreturn [{ json: { tenant_id, platform, topic_hint, trace_id } }];"
+      },
+      "id": "a1000002-0002-4000-8000-000000000002",
+      "name": "Prepare Input",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [220, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\nconst d = items[0].json;\nconst context_brief = { relevant_signals: [], recommended_angle: 'Lead with speed and scale.', risks: [], opportunities: ['DevOps efficiency'], timestamp: new Date().toISOString() };\nreturn [{ json: { ...d, context_brief } }];"
+      },
+      "id": "a1000003-0003-4000-8000-000000000003",
+      "name": "CONTEXT_SCANNER",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [440, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\nconst d = items[0].json;\nconst content_brief = { headline: 'How we cut deployment time by 40%', key_message: 'Standardizing on one pipeline helps teams ship faster.', hook_type: 'question', hook_text: 'What if you could ship twice as fast without hiring?', cta: 'Try the free tier—no credit card required.', platform_notes: { max_length: 3000 }, timestamp: new Date().toISOString() };\nreturn [{ json: { ...d, content_brief } }];"
+      },
+      "id": "a1000004-0004-4000-8000-000000000004",
+      "name": "STRATEGIC_PLANNER",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [660, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\nconst d = items[0].json;\nconst b = d.content_brief || {};\nconst full_text = (b.hook_text || '') + '\\n\\nWe ran 2M builds last quarter. 40% of teams cut deployment time in the first month by standardizing on a single pipeline.\\n\\n' + (b.cta || '');\nconst draft = { full_text, hook: b.hook_text, body: 'We ran 2M builds last quarter. 40% of teams cut deployment time in the first month by standardizing on a single pipeline.', cta: b.cta, hashtags: ['#DevOps', '#CI/CD'] };\nreturn [{ json: { ...d, draft } }];"
+      },
+      "id": "a1000005-0005-4000-8000-000000000005",
+      "name": "TECHNICAL_STORYTELLER",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [880, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\nconst d = items[0].json;\nconst draft = d.draft || {};\nconst human_draft = { ...draft, full_text: draft.full_text.replace('We ran', \"We ran 2M builds last quarter. Here's what we learned: 40% of teams\"), concrete_detail_used: \"Added 'Here's what we learned'\" };\nreturn [{ json: { ...d, human_draft } }];"
+      },
+      "id": "a1000006-0006-4000-8000-000000000006",
+      "name": "HUMAN_EDGE",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1100, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\nconst d = items[0].json;\nconst draft = d.human_draft || d.draft || {};\nconst approved = true;\nconst score = 0.88;\nconst reasons = ['Voice aligned', 'No forbidden topics'];\nconst suggested_fixes = [];\nreturn [{ json: { ...d, identity_result: { approved, score, reasons, suggested_fixes }, approved_draft: draft } }];"
+      },
+      "id": "a1000007-0007-4000-8000-000000000007",
+      "name": "IDENTITY_GUARDIAN",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1320, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" },
+          "conditions": [{ "id": "cond1", "leftValue": "={{ $json.identity_result.approved }}", "rightValue": true, "operator": { "type": "boolean", "operation": "equals" } }],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "a1000008-0008-4000-8000-000000000008",
+      "name": "Identity Approved?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1540, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\nconst d = items[0].json;\nconst draft = d.approved_draft || d.human_draft || {};\nconst approved = true;\nconst claims_checked = ['40% of teams', '2M builds'];\nconst issues = [];\nconst suggested_fixes = [];\nreturn [{ json: { ...d, cto_result: { approved, claims_checked, issues, suggested_fixes } } }];"
+      },
+      "id": "a1000009-0009-4000-8000-000000000009",
+      "name": "SKEPTICAL_CTO",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1760, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" },
+          "conditions": [{ "id": "cond1", "leftValue": "={{ $json.cto_result.approved }}", "rightValue": true, "operator": { "type": "boolean", "operation": "equals" } }],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "a1000010-0010-4000-8000-000000000010",
+      "name": "CTO Approved?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1980, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.nanobanana.com/v1/generate",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"prompt\": \"Professional B2B image. Clean, minimal. No text in image. Style: modern SaaS. Pipeline dashboard on a laptop screen.\",\n  \"aspect_ratio\": \"1.91:1\"\n}",
+        "options": {}
+      },
+      "id": "a1000011-0011-4000-8000-000000000011",
+      "name": "VISUAL_GENERATOR (NanoBanana API)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2200, 200],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\nconst d = items[0].json;\nconst platform = d.platform || 'linkedin';\nconst visual = { prompt: 'Professional B2B image. Clean, minimal. No text in image. Style: modern SaaS.', aspect_ratio: platform === 'twitter' ? '16:9' : platform === 'whatsapp' ? '1:1' : '1.91:1', alt_text: 'Laptop showing a CI/CD pipeline dashboard.' };\nreturn [{ json: { ...d, visual } }];"
+      },
+      "id": "a1000012-0012-4000-8000-000000000012",
+      "name": "Visual Brief Fallback",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2200, 400]
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\nconst d = items[0].json;\nconst logEntry = { trace_id: d.trace_id, tenant_id: d.tenant_id, platform: d.platform, node: 'Logging', timestamp: new Date().toISOString(), event: 'handoff' };\nreturn [{ json: { ...d, logEntry } }];"
+      },
+      "id": "a1000014-0014-4000-8000-000000000014",
+      "name": "Logging",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2640, 300]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            { "id": "a1", "name": "trace_id", "value": "={{ $json.trace_id }}", "type": "string" },
+            { "id": "a2", "name": "platform", "value": "={{ $json.platform }}", "type": "string" },
+            { "id": "a3", "name": "content", "value": "={{ $json.approved_draft || $json.human_draft || {} }}", "type": "object" },
+            { "id": "a4", "name": "visual", "value": "={{ $json.visual || {} }}", "type": "object" },
+            { "id": "a5", "name": "context_brief", "value": "={{ $json.context_brief || {} }}", "type": "object" },
+            { "id": "a6", "name": "content_brief", "value": "={{ $json.content_brief || {} }}", "type": "object" },
+            { "id": "a7", "name": "gatekeeper_results", "value": "={{ { identity_guardian: $json.identity_result || {}, skeptical_cto: $json.cto_result || {} } }}", "type": "object" },
+            { "id": "a8", "name": "timestamp", "value": "={{ new Date().toISOString() }}", "type": "string" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "a1000015-0015-4000-8000-000000000015",
+      "name": "Final Output JSON",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [2860, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\nconst d = items[0].json;\nconst content_brief = d.content_brief || {};\nconst suggested_fixes = d.identity_result?.suggested_fixes || [];\nconst draft = { full_text: (content_brief.hook_text || '') + '\\n\\nRevised body.\\n\\n' + (content_brief.cta || ''), hook: content_brief.hook_text, body: 'Revised body per Identity Guardian.', cta: content_brief.cta };\nreturn [{ json: { ...d, draft, human_draft: draft } }];"
+      },
+      "id": "a1000016-0016-4000-8000-000000000016",
+      "name": "Revision (Identity)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1540, 500]
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\nconst d = items[0].json;\nconst content_brief = d.content_brief || {};\nconst suggested_fixes = d.cto_result?.suggested_fixes || [];\nconst draft = { full_text: (content_brief.hook_text || '') + '\\n\\nRevised body (CTO).\\n\\n' + (content_brief.cta || ''), hook: content_brief.hook_text, body: 'Revised body per Skeptical CTO.', cta: content_brief.cta };\nreturn [{ json: { ...d, draft, human_draft: draft } }];"
+      },
+      "id": "a1000017-0017-4000-8000-000000000017",
+      "name": "Revision (CTO)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1980, 500]
+    }
+  ],
+  "connections": {
+    "Manual Trigger": {
+      "main": [[{ "node": "Prepare Input", "type": "main", "index": 0 }]]
+    },
+    "Prepare Input": {
+      "main": [[{ "node": "CONTEXT_SCANNER", "type": "main", "index": 0 }]]
+    },
+    "CONTEXT_SCANNER": {
+      "main": [[{ "node": "STRATEGIC_PLANNER", "type": "main", "index": 0 }]]
+    },
+    "STRATEGIC_PLANNER": {
+      "main": [[{ "node": "TECHNICAL_STORYTELLER", "type": "main", "index": 0 }]]
+    },
+    "TECHNICAL_STORYTELLER": {
+      "main": [[{ "node": "HUMAN_EDGE", "type": "main", "index": 0 }]]
+    },
+    "HUMAN_EDGE": {
+      "main": [[{ "node": "IDENTITY_GUARDIAN", "type": "main", "index": 0 }]]
+    },
+    "IDENTITY_GUARDIAN": {
+      "main": [[{ "node": "Identity Approved?", "type": "main", "index": 0 }]]
+    },
+    "Identity Approved?": {
+      "main": [
+        [{ "node": "SKEPTICAL_CTO", "type": "main", "index": 0 }],
+        [{ "node": "Revision (Identity)", "type": "main", "index": 0 }]
+      ]
+    },
+    "Revision (Identity)": {
+      "main": [[{ "node": "HUMAN_EDGE", "type": "main", "index": 0 }]]
+    },
+    "SKEPTICAL_CTO": {
+      "main": [[{ "node": "CTO Approved?", "type": "main", "index": 0 }]]
+    },
+    "CTO Approved?": {
+      "main": [
+        [{ "node": "Visual Brief Fallback", "type": "main", "index": 0 }],
+        [{ "node": "Revision (CTO)", "type": "main", "index": 0 }]
+      ]
+    },
+    "Revision (CTO)": {
+      "main": [[{ "node": "HUMAN_EDGE", "type": "main", "index": 0 }]]
+    },
+    "Visual Brief Fallback": {
+      "main": [[{ "node": "Logging", "type": "main", "index": 0 }]]
+    },
+    "Logging": {
+      "main": [[{ "node": "Final Output JSON", "type": "main", "index": 0 }]]
+    }
+  },
+  "active": false,
+  "settings": { "executionOrder": "v1" },
+  "staticData": null,
+  "meta": { "templateCredsSetupCompleted": false },
+  "pinData": {},
+  "versionId": "brand-os-v3-001",
+  "tags": []
+}

@@ -47,6 +47,16 @@ class SchemaEngine:
             await self.connect()
         return self._session_factory()
 
+    async def get_session(self) -> AsyncSession:
+        """
+        Public helper to obtain an AsyncSession.
+
+        Used by other components (e.g. projections) that share the same
+        PostgreSQL engine. Callers are responsible for transaction
+        boundaries (commit/rollback) when using the returned session.
+        """
+        return await self._get_session()
+
     async def upsert_node(
         self,
         tenant_id: str,

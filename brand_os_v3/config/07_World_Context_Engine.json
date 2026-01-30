@@ -1,0 +1,55 @@
+{
+  "$schema": "brand_os_v3_world_context",
+  "version": "3.0",
+  "name": "World Context Engine",
+  "description": "Signals, trends, and constraints from the outside world that shape what we say and when.",
+  "schema": {
+    "output_schema": {
+      "type": "object",
+      "required": ["relevant_signals", "recommended_angle", "risks", "opportunities", "timestamp"],
+      "properties": {
+        "relevant_signals": { "type": "array", "items": { "type": "object" } },
+        "recommended_angle": { "type": "string" },
+        "risks": { "type": "array", "items": { "type": "string" } },
+        "opportunities": { "type": "array", "items": { "type": "string" } },
+        "timestamp": { "type": "string", "format": "date-time" }
+      }
+    }
+  },
+  "sources": {
+    "industry_news": { "weight": 0.2, "refresh_hours": 24 },
+    "competitor_activity": { "weight": 0.15, "refresh_hours": 12 },
+    "audience_sentiment": { "weight": 0.25, "refresh_hours": 6 },
+    "calendar_events": { "weight": 0.2, "refresh_hours": 1 },
+    "product_releases": { "weight": 0.2, "refresh_hours": 24 }
+  },
+  "signals": {
+    "trending_topics": [],
+    "rising_keywords": [],
+    "declining_keywords": [],
+    "event_blackout_dates": [],
+    "sensitive_periods": []
+  },
+  "rules": {
+    "avoid_topic_if_trending_negative": true,
+    "align_with_calendar_when_possible": true,
+    "max_competitor_mention_frequency": "never",
+    "world_context_must_inform_angle": true
+  },
+  "thresholds": {
+    "relevance_score_min": 0.5,
+    "timeliness_score_min": 0.4,
+    "risk_score_max": 0.7
+  },
+  "output_schema": {
+    "relevant_signals": "array",
+    "recommended_angle": "string",
+    "risks": "array",
+    "opportunities": "array",
+    "timestamp": "string"
+  },
+  "examples": {
+    "relevant_signal": { "source": "industry_news", "summary": "DevOps adoption up 30% YoY", "relevance_score": 0.8, "timeliness_score": 0.9 },
+    "recommended_angle": "Lead with speed and scale; support with one concrete number."
+  }
+}

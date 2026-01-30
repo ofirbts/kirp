@@ -122,7 +122,7 @@ async def process_event(payload: dict[str, Any], retry_count: int = 0) -> bool:
             trace_id=data.get("trace_id"),
         )
 
-        # Run pipeline
+        # Run pipeline (preserve event id from Kafka payload)
         pipe = EventPipeline(store, rag, schema, gov, af)
         await pipe.run(
             tenant_id=ev.tenant_id,
@@ -132,6 +132,7 @@ async def process_event(payload: dict[str, Any], retry_count: int = 0) -> bool:
             content=ev.content,
             metadata=ev.metadata,
             sensitivity=ev.sensitivity,
+            event_id=ev.id,
         )
 
         # Mark as processed

@@ -56,10 +56,33 @@ class MetricsCollector:
         self._gauges[k].labels(**(labels or {})).set(value)
 
     def observe(self, name: str, value: float, labels: dict[str, str] | None = None) -> None:
-        """Observe histogram (e.g. latency)."""
+        """Observe histogram (e.g. latency). With no labels use .observe() directly."""
         if not PROMETHEUS_AVAILABLE:
             return
         k = self._key(name)
         if k not in self._histograms:
-            self._histograms[k] = Histogram(k, name, list(labels.keys()) if labels else [])
-        self._histograms[k].labels(**(labels or {})).observe(value)
+            label_list = list(labels.keys()) if labels else []
+            self._histograms[k] = Histogram(k, name, label_list)
+        h = self._histograms[k]
+        if labels:
+            h.labels(**labels).observe(value)
+        else:
+            h.observe(value)
+
+
+def normalize_path_for_metrics(path: str) -> str:
+    """
+    Reduce path cardinality for metrics: replace UUIDs and numeric IDs with _id_.
+    """
+    import re
+    segments = path.strip("/").split("/")
+    out = []
+    uuid_re = re.compile(
+        r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+    )
+    for seg in segments:
+        if uuid_re.match(seg) or (seg.isdigit() and len(seg) <= 20):
+            out.append("_id_")
+        else:
+            out.append(seg)
+    return "/" + "/".join(out) if out else "/"

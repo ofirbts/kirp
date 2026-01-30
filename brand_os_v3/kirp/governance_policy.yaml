@@ -1,0 +1,108 @@
+# Brand OS v3 — KIRP Governance Policy
+# Full OPA policy bundle structure for KIRP ingestion
+# Valid YAML, self-contained, with examples
+
+metadata:
+  name: brand_os_v3_governance
+  version: "3.0"
+  description: "Governance policy for Brand OS v3 agents and content"
+  engine: opa
+
+version: "3.0"
+
+rules:
+  identity_constraints:
+    description: "Enforce Master Identity Core boundaries before publish"
+    enabled: true
+    checks:
+      - id: no_forbidden_claims
+        type: string_match
+        config:
+          forbidden_claims:
+            - "best in the world"
+            - "number one"
+            - "everyone uses"
+            - "guaranteed results"
+        action: reject
+      - id: topics_we_own
+        type: topic_allowlist
+        config:
+          allowlist: ["CI/CD", "pipeline automation", "developer experience", "governance", "deployment"]
+        action: warn_if_empty
+      - id: topics_we_avoid
+        type: topic_denylist
+        config:
+          denylist: ["politics", "competitor bashing", "unverifiable claims", "sensationalism"]
+        action: reject
+    example:
+      input: { content: "We are the best in the world for DevOps." }
+      result: rejected
+      reason: "no_forbidden_claims"
+
+  agent_constraints:
+    description: "Per-agent governance tags and allowed actions"
+    enabled: true
+    agents:
+      CONTEXT_SCANNER:
+        allowed_actions: [read_signals, output_brief]
+        tenant_required: true
+      STRATEGIC_PLANNER:
+        allowed_actions: [read_context, read_identity, output_brief]
+        tenant_required: true
+      TECHNICAL_STORYTELLER:
+        allowed_actions: [read_brief, read_voice, output_draft]
+        tenant_required: true
+      HUMAN_EDGE:
+        allowed_actions: [read_draft, output_draft]
+        tenant_required: true
+      IDENTITY_GUARDIAN:
+        allowed_actions: [read_draft, read_identity, read_voice, approve, reject_with_fixes]
+        tenant_required: true
+        gatekeeper: true
+      SKEPTICAL_CTO:
+        allowed_actions: [read_draft, read_identity, approve, reject_with_fixes]
+        tenant_required: true
+        gatekeeper: true
+      VISUAL_GENERATOR:
+        allowed_actions: [read_draft, read_visual_identity, output_visual_brief]
+        tenant_required: true
+      GROWTH_ANALYST:
+        allowed_actions: [read_workflow_output, write_memory, output_summary]
+        tenant_required: true
+    example:
+      agent: IDENTITY_GUARDIAN
+      action: reject_with_fixes
+      payload: { approved: false, suggested_fixes: ["Replace 'best' with 'one of the fastest'"] }
+
+  audit_fields:
+    description: "Fields to capture for every Brand OS event in KIRP audit"
+    required:
+      - trace_id
+      - tenant_id
+      - platform
+      - agent_id
+      - timestamp
+      - action
+    optional:
+      - score
+      - approved
+      - revision_round
+
+examples:
+  allow:
+    trace_id: tr_a1b2c3d4
+    tenant_id: acme
+    platform: linkedin
+    agent_id: IDENTITY_GUARDIAN
+    action: approve
+    score: 0.88
+    timestamp: "2025-01-30T12:00:04.000Z"
+  reject:
+    trace_id: tr_a1b2c3d4
+    tenant_id: acme
+    platform: linkedin
+    agent_id: SKEPTICAL_CTO
+    action: reject
+    issues: ["Claim 'best' unverifiable"]
+    suggested_fixes: ["Change 'best' to 'one of the fastest'"]
+    timestamp: "2025-01-30T12:00:05.000Z"

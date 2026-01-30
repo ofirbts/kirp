@@ -1,0 +1,310 @@
+{
+  "product": "KIRP Enterprise Intelligence OS",
+  "inspiration": "Dark-mode dashboard tools (e.g., view-page-source.com aesthetic)",
+  "principles": {
+    "theme": "dark",
+    "tone": "enterprise, clean, modern, data-dense",
+    "spacing": "comfortable",
+    "corners": "8-12px",
+    "shadows": "subtle",
+    "icons": "simple line icons or emojis",
+    "animations": "soft fade/scale",
+    "responsive": "desktop-first, mobile collapses"
+  },
+  "typography": {
+    "headings": "Inter or Plus Jakarta Sans",
+    "body": "Inter 14-16px",
+    "code": "JetBrains Mono",
+    "lineHeight": 1.6
+  },
+  "colors": {
+    "dark": {
+      "background": "#0f0f23",
+      "surface": "#1a1b2e",
+      "textPrimary": "#f1f5f9",
+      "textSecondary": "#94a3b8",
+      "accent": "#06b6d4",
+      "success": "#10b981",
+      "warning": "#f59e0b",
+      "error": "#ef4444",
+      "border": "#334155"
+    },
+    "light": {
+      "background": "#f8fafc",
+      "surface": "#ffffff",
+      "textPrimary": "#0f0f23",
+      "textSecondary": "#64748b",
+      "accent": "#0ea5e9",
+      "success": "#059669",
+      "warning": "#d97706",
+      "error": "#dc2626",
+      "border": "#e2e8f0"
+    }
+  },
+  "layout": {
+    "header": {
+      "left": ["logo"],
+      "center": ["globalSearch"],
+      "right": ["tenantSwitcher", "spaceSwitcher", "themeToggle", "userMenu"]
+    },
+    "sidebar": {
+      "sections": [
+        "Dashboard",
+        "Agents",
+        "Events",
+        "Governance",
+        "Audit",
+        "Observability",
+        "Tenants",
+        "Settings"
+      ],
+      "footer": ["environmentBadge", "scopeIndicator"]
+    },
+    "content": {
+      "hero": "title + subtitle + search bar",
+      "sections": [
+        "statsGrid",
+        "chartsPanel",
+        "recentActivity",
+        "insightsPanel",
+        "tables"
+      ]
+    }
+  },
+  "components": {
+    "cards": {
+      "style": "rounded-lg shadow-md",
+      "header": "icon + title + badges",
+      "body": "chart/table/text"
+    },
+    "tables": {
+      "features": [
+        "sortable",
+        "zebraRows",
+        "expandableRows",
+        "filters",
+        "pagination"
+      ]
+    },
+    "badges": ["status", "tenant", "space", "governance"],
+    "buttons": {
+      "primary": "accent background, white text",
+      "secondary": "outline, accent text",
+      "danger": "red background",
+      "ghost": "transparent hover"
+    },
+    "modals": "centered or right-drawer",
+    "charts": "Recharts (line, bar, radial)",
+    "codeBlocks": "syntax highlighting, copy button"
+  },
+  "multiTenantUX": {
+    "switchers": ["tenantSwitcher", "spaceSwitcher"],
+    "breadcrumbs": "Tenants > {tenant} > Spaces > {space}",
+    "boundaryIndicators": "scope pill in header + footer",
+    "rbacFeedback": "permission toasts/modals"
+  },
+  "pages": {
+    "dashboard": ["hero", "statsGrid", "chartsPanel", "recentActivity"],
+    "agents": ["list", "inspectorDrawer", "metricsChart"],
+    "events": ["timeline", "filters", "jsonViewer"],
+    "governance": ["policies", "approvals", "auditTrail"],
+    "observability": ["metricsCharts", "logsViewer"],
+    "tenants": ["tenantList", "spacesList", "rbacMatrix"]
+  }
+}
+
+
+
+
+KIRP Enterprise UI/UX Design Specification
+Inspired by: view-page-source.com (dark-mode dashboard tool)
+Product Context: Intelligence OS for enterprises – multi-tenant dashboards for events, agents, RAG search, governance, automation (n8n/Celery), observability, tenants/users. Dense operational data, audit trails, charts/tables. Target: Technical admins, operators, decision-makers.
+
+1. Overall Vibe & Style
+Theme: Dark-mode by default (professional, reduces eye strain for long sessions). Optional light-mode toggle.
+
+Tone: Enterprise-grade tool – precise, trustworthy, dense info without clutter. Modern SaaS (Tailwind/Next.js aesthetic).
+
+Key Principles:
+
+Ample spacing, rounded corners (8-12px), subtle shadows.
+
+Icons: Simple line icons or emojis (🔍 for search, ⚙️ for settings, 📊 for metrics).
+
+Animations: Subtle (fade-in, scale on hover, loading spinners).
+
+Responsive: Desktop-first (multi-panel), mobile stacks vertically.
+
+2. Typography
+Headings: Sans-serif modern (Inter, Plus Jakarta Sans) – bold for hierarchy.
+
+H1: 48-56px, split lines with accent word (e.g., "KIRP" gradient).
+
+H2: 32px, section headers.
+
+H3: 24px, cards/tables.
+
+Body: 14-16px, high readability.
+
+Code/Monospace: JetBrains Mono for event IDs, JSON, logs (syntax highlighting: Prism.js style).
+
+Line Height: 1.5-1.7 everywhere.
+
+3. Color Palette
+Category	Dark Mode	Light Mode	Usage
+Background	#0f0f23 (dark navy)	#f8fafc	Main/app shell
+Surface/Cards	#1a1b2e	#ffffff	Sections, modals
+Text Primary	#f1f5f9	#0f0f23	Headings/body
+Text Secondary	#94a3b8	#64748b	Labels, subtitles
+Accent Primary	#06b6d4 (cyan/teal)	#0ea5e9	CTAs, links, highlights
+Success	#10b981	#059669	Approvals, healthy metrics
+Warning	#f59e0b	#d97706	Pending, risks
+Error	#ef4444	#dc2626	Failures, alerts
+Border	#334155	#e2e8f0	Dividers, inputs
+Gradients: Cyan-to-blue for hero accents (e.g., background: linear-gradient(135deg, #06b6d4, #0ea5e9)).
+
+4. Core Layout Structure
+Fixed top nav + sidebar (collapsible on mobile) + main content with multi-panel grids.
+
+text
+[Header: Logo | Nav: Agents/Events/Governance/Tenants | Tenant Switcher | Theme Toggle | User Menu]
+
+[Sidebar (20% width): Quick nav, Recent events, Metrics overview]
+
+[Main Content (80%)]
+├── Hero/Search Bar (Events/RAG query input)
+├── Dashboard Grid (Cards: Live Events, Agent Runs, Governance Decisions)
+├── Collapsible Sections (e.g., "Smart Analysis": SEO→Events, Agents→Pipelines)
+├── Features Grid (8-12 cards)
+├── Data Tables (Events log, Audit trail)
+└── Footer (Links, Version)
+Key Pages & Views
+Dashboard Home: Hero input for event query/RAG search + stats cards (events/hour, agent runs, uptime).
+
+Agents: List/table + inspector drawer (prompts, runs, traces).
+
+Events: Timeline/table with filters (tenant/space), syntax-highlighted payloads.
+
+Governance: Approval flows, policy simulator, audit logs (collapsible accordions).
+
+Tenants/Users: Admin tables, RBAC matrix, demo data toggle.
+
+Observability: Metrics charts (Prometheus-style), logs viewer.
+
+5. UI Components & Patterns
+Cards: Rounded (12px), subtle shadow, hover lift. Header (icon + title + badges) + body (table/list/chart).
+
+Tables: Zebra-striped rows, sortable headers, row selection, expandable rows (for event details).
+
+Badges/Pills: Status (e.g., "Active", "Pending Approval") – colored backgrounds, rounded.
+
+Inputs/Forms:
+
+Search bar: Prefix icon (🔍), autocomplete, debounce.
+
+Multi-select: Tenant/space filters, tags.
+
+Checkboxes: Custom styled (no native look).
+
+Buttons:
+
+Type	Style	Example
+Primary	Filled accent bg, white text, icon-right	"Run Agent", "Approve"
+Secondary	Outline border, accent text	"Edit", "Cancel"
+Danger	Red fill	"Reject", "Delete"
+Ghost	Transparent, hover bg	Sidebar nav
+Modals/Drawers: Overlay from right (inspector), backdrop blur.
+
+Charts: Radial speedometers (page load→pipeline latency), line charts (events over time), use Recharts.
+
+Code Blocks: Editor-like (red/yellow/green dots, filename, copy/download buttons).
+
+Accordions: Chevron toggle, header badges (e.g., "12 issues").
+
+6. Multi-Tenant UX Flows
+Tenant Switcher: Dropdown in header – shows current tenant/space, quick-switch.
+
+Scoped Breadcrumbs: "Tenants > Acme Corp > Spaces > Operations > Events".
+
+Isolation Indicators: Subtle banner "Viewing: Acme Corp / Ops Space".
+
+RBAC Feedback: Permission errors as toasts/modals with "Request Access" CTA.
+
+7. Responsiveness & Accessibility
+Breakpoints: Desktop (>1024px): Multi-column; Tablet (768px): 1-2 col; Mobile: Stacked, hamburger menu.
+
+Accessibility: ARIA labels, keyboard nav, high contrast, screen-reader friendly tables.
+
+Performance: Lazy-load sections, virtualized tables (for 10k+ events), skeleton loaders.
+
+8. Example Hero Section Mockup
+text
+[Badge: "Enterprise Intelligence OS – Multi-tenant, Auditable"]
+
+KIRP
+<span class="gradient-text">Enterprise</span>
+Intelligence
+
+[Input: 🔍 Search events / Run RAG query... | Primary Btn: Analyze →]
+
+Stats: 10k+ Events Ingested | 50+ Agent Runs | 100% Governed
+This spec captures 80% of the reference site's polish while adapting to KIRP's enterprise needs (e.g., more tables/charts, tenant scoping). Designer: Build Figma prototypes for Dashboard Home + Events page first. Reference: view-page-source.com (dark mode).
+
+This is ready-to-send, self-contained, and positions you as organized. If you share Figma links or more details (e.g., specific pages priority), I can refine it further.
+
+- Global “Command Palette” (Ctrl+K):
+  - Quick jump between tenants/spaces/pages.
+  - Run common actions (run agent, trigger workflow, search events).
+  - Uses the same dark theme, with subtle blur and spotlight effect.
+
+"tokens": {
+  "radius": {
+    "sm": "6px",
+    "md": "10px",
+    "lg": "14px"
+  },
+  "spacing": {
+    "xs": "4px",
+    "sm": "8px",
+    "md": "16px",
+    "lg": "24px",
+    "xl": "32px"
+  },
+  "shadow": {
+    "sm": "0 1px 2px rgba(0,0,0,0.15)",
+    "md": "0 4px 12px rgba(0,0,0,0.2)",
+    "lg": "0 8px 24px rgba(0,0,0,0.25)"
+  }
+}
+
+"interactions": {
+  "hover": {
+    "card": "background: rgba(255,255,255,0.03)",
+    "buttonPrimary": "brightness(1.1)",
+    "tableRow": "background: rgba(255,255,255,0.05)"
+  },
+  "active": {
+    "buttonPrimary": "scale(0.97)"
+  },
+  "focus": {
+    "outline": "2px solid #06b6d4"
+  }
+}
+"emptyStates": {
+  "agents": "No agents yet — create your first automation.",
+  "events": "No events in this space — try switching tenants or running an agent.",
+  "governance": "No decisions yet — policies will appear here.",
+  "audit": "Audit log is empty — actions will be tracked here."
+}
+"loading": {
+  "skeletons": {
+    "card": "animated gradient block",
+    "tableRow": "gray bars",
+    "chart": "pulsing circle/lines"
+  }
+}
+"errors": {
+  "network": "Connection lost — retrying...",
+  "permissions": "You don’t have access to this resource.",
+  "emptyResults": "No results found — try adjusting filters."
+}

@@ -233,7 +233,7 @@ async def insights(tenant_id: str, user_id: str) -> list[dict[str, Any]]:
 
 
 # Include routers
-from src.api import governance, observability, whatsapp_os, brand, auth
+from src.api import governance, observability, whatsapp_os, brand, auth, events, agents, realtime_ws
 
 app.include_router(governance.router)
 app.include_router(observability.router)
@@ -241,6 +241,9 @@ app.include_router(whatsapp_os.router)
 app.include_router(brand.router)
 app.include_router(command.router)
 app.include_router(auth.router)
+app.include_router(events.router)
+app.include_router(agents.router)
+app.include_router(realtime_ws.router)
 
 
 if __name__ == "__main__":

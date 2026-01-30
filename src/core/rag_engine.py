@@ -80,6 +80,8 @@ class RAGEngine:
         self._embedder: Any = None
         self._bm25_index: dict[str, Any] = {}  # tenant_id -> BM25 index
         self._text_cache: dict[str, list[dict[str, Any]]] = {}  # tenant_id -> [documents]
+        from src.observability.metrics import MetricsCollector
+        self._metrics = MetricsCollector("kirp_rag")
 
     async def connect(self) -> None:
         """Initialize Qdrant client and embedder."""
@@ -99,9 +101,17 @@ class RAGEngine:
                 logger.info("RAGEngine created Qdrant collection: %s", self._collection)
 
             if self._embedding_provider == "openai":
-                from langchain_openai import OpenAIEmbeddings
                 import os
-                self._embedder = OpenAIEmbeddings(model=self._embedding_model)
+                try:
+                    from langchain_openai import OpenAIEmbeddings
+                    if os.environ.get("OPENAI_API_KEY"):
+                        self._embedder = OpenAIEmbeddings(model=self._embedding_model)
+                    else:
+                        self._embedder = None
+                        logger.warning("OPENAI_API_KEY not set; embeddings disabled")
+                except Exception as e:
+                    self._embedder = None
+                    logger.warning("OpenAI embedder init failed (%s); embeddings disabled", e)
             else:
                 # Fallback: use a stub; plug in Ollama/local later
                 self._embedder = None
@@ -121,9 +131,13 @@ class RAGEngine:
                     "Cannot generate embeddings without a valid embedder."
                 )
         try:
+            from datetime import datetime, timezone
+            start = datetime.now(timezone.utc)
             emb = await self._embedder.aembed_query(text)
             if not emb or len(emb) == 0:
                 raise ValueError("Embedding generation returned empty result")
+            latency = (datetime.now(timezone.utc) - start).total_seconds()
+            self._metrics.observe("embedding_latency_seconds", latency, labels={})
             return emb
         except Exception as e:
             logger.error("Embedding generation failed: %s", e)
@@ -539,8 +553,28 @@ Return JSON:
             raise ValueError("tenant_id is required for search (multi-tenant isolation)")
         
         use_multihop = use_multihop if use_multihop is not None else self._enable_multihop
-        
+        mode = "multihop" if use_multihop else "single"
+
+        self._metrics.inc(
+            "queries_total",
+            labels={"tenant_id": tenant_id, "space_id": space_id or "none", "mode": mode},
+        )
+
         if use_multihop:
-            return await self._multi_hop_retrieval(query, tenant_id, space_id, user_id, limit)
+            resp = await self._multi_hop_retrieval(query, tenant_id, space_id, user_id, limit)
         else:
-            return await self._single_hop_search(query, tenant_id, space_id, user_id, limit, since, source)
+            resp = await self._single_hop_search(query, tenant_id, space_id, user_id, limit, since, source)
+
+        results_count = len(resp.results)
+        self._metrics.observe(
+            "results_per_query",
+            float(results_count),
+            labels={"tenant_id": tenant_id, "space_id": space_id or "none", "mode": mode},
+        )
+        self._metrics.observe(
+            "avg_confidence",
+            float(resp.confidence),
+            labels={"tenant_id": tenant_id, "space_id": space_id or "none", "mode": mode},
+        )
+
+        return resp

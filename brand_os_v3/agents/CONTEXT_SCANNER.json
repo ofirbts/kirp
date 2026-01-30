@@ -1,0 +1,55 @@
+{
+  "id": "CONTEXT_SCANNER",
+  "layer": "world_context",
+  "role": "Scan the external world for signals, trends, and constraints that should shape what we say and when we say it.",
+  "responsibilities": [
+    "Ingest and normalize signals from industry news, competitor activity, audience sentiment, calendar, and product releases.",
+    "Compute relevance, timeliness, and risk scores for each signal.",
+    "Output a short list of relevant signals with recommended angle and risks/opportunities."
+  ],
+  "input_schema": {
+    "type": "object",
+    "required": ["tenant_id", "platform", "topic_hint"],
+    "properties": {
+      "tenant_id": { "type": "string" },
+      "platform": { "type": "string", "enum": ["linkedin", "twitter", "whatsapp"] },
+      "topic_hint": { "type": "string" },
+      "date_range_days": { "type": "integer", "default": 7 },
+      "max_signals": { "type": "integer", "default": 5 }
+    }
+  },
+  "output_schema": {
+    "type": "object",
+    "required": ["relevant_signals", "recommended_angle", "risks", "opportunities", "timestamp"],
+    "properties": {
+      "relevant_signals": { "type": "array", "items": { "type": "object" } },
+      "recommended_angle": { "type": "string" },
+      "risks": { "type": "array", "items": { "type": "string" } },
+      "opportunities": { "type": "array", "items": { "type": "string" } },
+      "timestamp": { "type": "string", "format": "date-time" }
+    }
+  },
+  "prompt_template": "You are the World Context Scanner for Brand OS v3. Your job is to analyze the external environment and produce a concise context brief.\n\nInput:\n- Platform: {{platform}}\n- Topic hint: {{topic_hint}}\n- Date range: {{date_range_days}} days\n\nUsing only the signals and data provided in the context (industry_news, competitor_activity, audience_sentiment, calendar_events, product_releases), output a JSON object with:\n1. relevant_signals: array of up to {{max_signals}} signals, each with { source, summary, relevance_score, timeliness_score }.\n2. recommended_angle: one sentence describing the recommended narrative angle for the post.\n3. risks: array of strings (what to avoid or be careful about).\n4. opportunities: array of strings (what to lean into).\n5. timestamp: current ISO timestamp.\n\nDo not invent data. If no signals are available, set relevant_signals to [] and recommended_angle to a safe default based on topic_hint.",
+  "failure_modes": [
+    "No signals available: return empty relevant_signals and a generic recommended_angle.",
+    "Timeout or missing data source: return partial output with risks including 'partial_context'.",
+    "Conflicting signals: prioritize by relevance_score and list conflict in risks."
+  ],
+  "gatekeeper_logic": null,
+  "example_input": {
+    "tenant_id": "acme",
+    "platform": "linkedin",
+    "topic_hint": "CI/CD pipeline efficiency",
+    "date_range_days": 7,
+    "max_signals": 5
+  },
+  "example_output": {
+    "relevant_signals": [
+      { "source": "industry_news", "summary": "DevOps adoption up 30% YoY", "relevance_score": 0.8, "timeliness_score": 0.9 }
+    ],
+    "recommended_angle": "Lead with speed and scale; support with one concrete number.",
+    "risks": [],
+    "opportunities": ["DevOps efficiency", "pipeline automation"],
+    "timestamp": "2025-01-30T12:00:00.000Z"
+  }
+}

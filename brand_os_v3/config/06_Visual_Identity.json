@@ -1,0 +1,53 @@
+{
+  "$schema": "brand_os_v3_visual",
+  "version": "3.0",
+  "name": "Visual Identity",
+  "description": "Guidelines for imagery, layout, and visual consistency.",
+  "schema": {
+    "output_schema": {
+      "type": "object",
+      "required": ["prompt", "aspect_ratio", "platform", "alt_text"],
+      "properties": {
+        "prompt": { "type": "string" },
+        "aspect_ratio": { "type": "string" },
+        "platform": { "type": "string", "enum": ["linkedin", "twitter", "whatsapp"] },
+        "alt_text": { "type": "string" }
+      }
+    }
+  },
+  "brand": {
+    "primary_colors": ["#1a1a2e", "#16213e", "#0f3460"],
+    "accent_colors": ["#e94560"],
+    "font_families": ["Inter", "system-ui", "sans-serif"],
+    "logo_usage": "do not alter aspect ratio; minimum clear space 16px"
+  },
+  "imagery": {
+    "style": "clean, minimal, product-and-people",
+    "avoid": ["stock clichés", "overly staged", "generic office"],
+    "prefer": ["real screenshots", "diagrams", "simple illustrations"],
+    "aspect_ratios_by_platform": {
+      "linkedin": "1.91:1",
+      "twitter": "16:9",
+      "whatsapp": "1:1"
+    }
+  },
+  "generation_prompts": {
+    "default_prefix": "Professional B2B image. Clean, minimal. No text in image. Style: modern SaaS.",
+    "topic_modifiers": {},
+    "max_prompt_length": 500
+  },
+  "rules": {
+    "no_text_overlay_unless_branded": true,
+    "watermark": "none",
+    "accessibility_alt_required": true
+  },
+  "thresholds": {
+    "max_prompt_chars": 500
+  },
+  "output_schema": {
+    "prompt": "string",
+    "aspect_ratio": "string",
+    "platform": "string",
+    "alt_text": "string"
+  }
+}

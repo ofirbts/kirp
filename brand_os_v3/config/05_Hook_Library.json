@@ -1,0 +1,63 @@
+{
+  "$schema": "brand_os_v3_hooks",
+  "version": "3.0",
+  "name": "Hook Library",
+  "description": "Opening lines and patterns that grab attention while staying on-brand.",
+  "schema": {
+    "categories": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "description": { "type": "string" },
+          "examples": { "type": "array", "items": { "type": "string" } },
+          "tone_fit": { "type": "array", "items": { "type": "string", "enum": ["professional", "conversational"] } }
+        }
+      }
+    },
+    "hook_type_enum": { "type": "string", "enum": ["question", "statistic", "story", "contrarian", "direct_value"] }
+  },
+  "categories": {
+    "question": {
+      "description": "Open with a question the audience cares about.",
+      "examples": ["What if you could ship twice as fast without hiring?", "Why do most DevOps initiatives stall after year one?"],
+      "tone_fit": ["professional", "conversational"]
+    },
+    "statistic": {
+      "description": "Lead with a surprising or credible number.",
+      "examples": ["40% of our users cut deployment time in the first month.", "We ran 2M builds last quarter. Here's what we learned."],
+      "tone_fit": ["professional"]
+    },
+    "story": {
+      "description": "Start with a short, relatable scenario.",
+      "examples": ["Last Tuesday a customer asked us for a feature we'd never built. By Friday it was live."],
+      "tone_fit": ["conversational", "professional"]
+    },
+    "contrarian": {
+      "description": "Challenge a common belief (with evidence).",
+      "examples": ["Most people think you need a big team to move fast. We don't."],
+      "tone_fit": ["professional"]
+    },
+    "direct_value": {
+      "description": "State the benefit in the first line.",
+      "examples": ["You can now run our pipeline from the CLI in under 60 seconds."],
+      "tone_fit": ["professional", "conversational"]
+    }
+  },
+  "rules": {
+    "hook_must_match_platform": true,
+    "hook_must_match_identity": true,
+    "max_hook_length_linkedin": 150,
+    "max_hook_length_twitter": 80,
+    "max_hook_length_whatsapp": 100
+  },
+  "thresholds": {
+    "max_hook_chars_linkedin": 150,
+    "max_hook_chars_twitter": 80,
+    "max_hook_chars_whatsapp": 100
+  },
+  "selection": {
+    "strategy": "category_first_then_variant",
+    "avoid_recent_hooks_window_days": 7
+  }
+}

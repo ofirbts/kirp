@@ -1,0 +1,54 @@
+{
+  "id": "STRATEGIC_PLANNER",
+  "layer": "cognitive",
+  "role": "Turn world context and brand identity into a clear content strategy: one key message, hook type, and structure.",
+  "responsibilities": [
+    "Consume CONTEXT_SCANNER output and Master Identity Core.",
+    "Select hook type from Hook Library (question, statistic, story, contrarian, direct_value).",
+    "Produce a content brief: headline, key message, hook, CTA, and platform-specific notes."
+  ],
+  "input_schema": {
+    "type": "object",
+    "required": ["context_brief", "platform", "identity_core"],
+    "properties": {
+      "context_brief": { "type": "object" },
+      "platform": { "type": "string", "enum": ["linkedin", "twitter", "whatsapp"] },
+      "identity_core": { "type": "object" },
+      "hook_preference": { "type": "string", "enum": ["question", "statistic", "story", "contrarian", "direct_value"], "default": null }
+    }
+  },
+  "output_schema": {
+    "type": "object",
+    "required": ["headline", "key_message", "hook_type", "hook_text", "cta", "platform_notes", "timestamp"],
+    "properties": {
+      "headline": { "type": "string" },
+      "key_message": { "type": "string" },
+      "hook_type": { "type": "string" },
+      "hook_text": { "type": "string" },
+      "cta": { "type": "string" },
+      "platform_notes": { "type": "object" },
+      "timestamp": { "type": "string", "format": "date-time" }
+    }
+  },
+  "prompt_template": "You are the Strategic Planner for Brand OS v3. You turn world context and brand identity into a content brief.\n\nInput:\n- Context brief (from Context Scanner): {{context_brief}}\n- Platform: {{platform}}\n- Identity Core (voice, boundaries, examples): {{identity_core}}\n- Hook preference (optional): {{hook_preference}}\n\nOutput a JSON object with:\n1. headline: one line, benefit-led, matching identity boundaries.\n2. key_message: 1–2 sentences that the post must convey.\n3. hook_type: one of question, statistic, story, contrarian, direct_value.\n4. hook_text: the actual opening line (within platform length limits from Hook Library).\n5. cta: clear call-to-action matching identity examples.\n6. platform_notes: object with tone_modifier, max_length, and any platform-specific constraints.\n7. timestamp: current ISO timestamp.\n\nRespect identity boundaries: topics_we_own, topics_we_avoid, forbidden_claims, and voice do/dont.",
+  "failure_modes": [
+    "Context brief empty: use topic_hint or identity_core only; set platform_notes.assumption to 'no_context'.",
+    "Hook type unavailable for platform: fall back to direct_value or question.",
+    "Identity conflict: prioritize identity_core boundaries over context opportunity."
+  ],
+  "gatekeeper_logic": null,
+  "example_input": {
+    "context_brief": { "recommended_angle": "Lead with speed and scale.", "risks": [], "opportunities": ["DevOps efficiency"] },
+    "platform": "linkedin",
+    "identity_core": { "voice": { "do": ["Use short sentences."], "dont": ["No superlatives without proof."] }, "boundaries": { "topics_we_own": ["CI/CD"] } }
+  },
+  "example_output": {
+    "headline": "How we cut deployment time by 40% without adding headcount",
+    "key_message": "Standardizing on one pipeline helps teams ship faster.",
+    "hook_type": "question",
+    "hook_text": "What if you could ship twice as fast without hiring?",
+    "cta": "Try the free tier—no credit card required.",
+    "platform_notes": { "tone_modifier": "slightly_more_formal", "max_length": 3000 },
+    "timestamp": "2025-01-30T12:00:01.000Z"
+  }
+}
