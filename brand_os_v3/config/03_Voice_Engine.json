@@ -1,71 +1,96 @@
 {
-  "$schema": "brand_os_v3_voice",
-  "version": "3.0",
-  "name": "Voice Engine",
-  "description": "Tone, style, and linguistic rules that keep all content on-brand.",
-  "schema": {
-    "tone_axes": {
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "id": "https://brand-os.example/schemas/03_Voice_Engine",
+  "title": "Voice Engine",
+  "description": "Linguistic and stylistic rules for brand voice across channels",
+  "version": "3.0.0",
+  "type": "object",
+  "required": ["voice_id", "sentence_rules", "vocabulary", "platform_adaptations"],
+  "properties": {
+    "voice_id": {
+      "type": "string",
+      "description": "Unique identifier linking to Master Identity Core"
+    },
+    "sentence_rules": {
       "type": "object",
       "properties": {
-        "formal_casual": { "type": "number", "minimum": 0, "maximum": 1 },
-        "serious_playful": { "type": "number", "minimum": 0, "maximum": 1 },
-        "reserved_enthusiastic": { "type": "number", "minimum": 0, "maximum": 1 },
-        "submissive_dominant": { "type": "number", "minimum": 0, "maximum": 1 },
-        "literal_metaphorical": { "type": "number", "minimum": 0, "maximum": 1 }
+        "max_sentence_length": { "type": "integer", "minimum": 5, "maximum": 200, "default": 25 },
+        "prefer_active_voice": { "type": "boolean", "default": true },
+        "max_syllables_per_word_avg": { "type": "number", "minimum": 1, "maximum": 5, "default": 2.2 },
+        "avoid_sentence_starters": { "type": "array", "items": { "type": "string" } },
+        "preferred_openers": { "type": "array", "items": { "type": "string" } }
       }
     },
-    "style_rules": {
+    "vocabulary": {
       "type": "object",
       "properties": {
-        "prefer_active_voice": { "type": "boolean" },
-        "max_sentence_length": { "type": "integer" },
-        "preferred_first_person": { "type": "string", "enum": ["we", "I", "you"] },
-        "contraction_usage": { "type": "string", "enum": ["none", "moderate", "full"] },
-        "hedging_allowed": { "type": "boolean" },
-        "hedging_max_per_post": { "type": "integer" }
+        "preferred_terms": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["term", "context"],
+            "properties": {
+              "term": { "type": "string" },
+              "context": { "type": "string" },
+              "replace_instead_of": { "type": "string" }
+            }
+          }
+        },
+        "banned_terms": { "type": "array", "items": { "type": "string" } },
+        "banned_phrases": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "platform_adaptations": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "max_chars": { "type": "integer" },
+          "hashtag_style": { "type": "string", "enum": ["none", "minimal", "end", "inline"] },
+          "emoji_policy": { "type": "string", "enum": ["none", "sparse", "moderate", "allowed"] },
+          "cta_required": { "type": "boolean" }
+        }
       }
     }
   },
-  "tone_axes": {
-    "formal_casual": 0.4,
-    "serious_playful": 0.25,
-    "reserved_enthusiastic": 0.5,
-    "submissive_dominant": 0.6,
-    "literal_metaphorical": 0.35
-  },
-  "style_rules": {
-    "prefer_active_voice": true,
-    "max_sentence_length": 25,
-    "preferred_first_person": "we",
-    "contraction_usage": "moderate",
-    "punctuation_intensity": "standard",
-    "hedging_allowed": false,
-    "hedging_max_per_post": 0
-  },
-  "vocabulary": {
-    "tier_one": ["ship", "pipeline", "deploy", "build", "team", "automation"],
-    "tier_two": ["orchestration", "governance", "artifact", "workflow"],
-    "banned": ["best-in-class", "game-changing", "revolutionary", "disrupt", "synergy"],
-    "replacements": {
-      "utilize": "use",
-      "leverage": "use",
-      "facilitate": "enable"
-    }
-  },
+  "rules": [
+    "Output MUST respect sentence_rules for readability",
+    "Vocabulary preferred_terms SHOULD be used where context matches",
+    "Banned terms and phrases MUST never appear",
+    "Platform_adaptations override defaults when platform is specified"
+  ],
   "thresholds": {
-    "readability_target_flesch": 55,
-    "readability_min": 45,
-    "readability_max": 70,
-    "sentiment_neutrality_min": 0.3,
-    "brand_voice_score_min": 0.75
+    "readability_target_grade_level_max": 10,
+    "passive_voice_ratio_max": 0.2,
+    "banned_term_occurrence": 0
   },
-  "platform_modifiers": {
-    "linkedin": { "formal_casual_offset": 0.1, "max_hashtags": 5 },
-    "twitter": { "formal_casual_offset": -0.1, "max_hashtags": 3 },
-    "whatsapp": { "formal_casual_offset": -0.2, "max_hashtags": 0 }
+  "enums": {
+    "hashtag_style": ["none", "minimal", "end", "inline"],
+    "emoji_policy": ["none", "sparse", "moderate", "allowed"]
   },
   "examples": {
-    "high_voice_score": "We shipped the feature on Tuesday. Early users are already reporting fewer support tickets.",
-    "low_voice_score": "It is possible that one might consider that our solution could potentially be beneficial in certain scenarios."
+    "default_voice": {
+      "voice_id": "techflow-v1",
+      "sentence_rules": {
+        "max_sentence_length": 22,
+        "prefer_active_voice": true,
+        "max_syllables_per_word_avg": 2.0,
+        "avoid_sentence_starters": ["Actually", "Basically", "So"],
+        "preferred_openers": ["We", "Our", "Here's", "Try"]
+      },
+      "vocabulary": {
+        "preferred_terms": [
+          { "term": "release", "context": "product", "replace_instead_of": "launch" },
+          { "term": "team", "context": "general", "replace_instead_of": "folks" }
+        ],
+        "banned_terms": ["synergy", "leverage", "disrupt", "game-changer"],
+        "banned_phrases": ["at the end of the day", "move the needle", "low-hanging fruit"]
+      },
+      "platform_adaptations": {
+        "linkedin": { "max_chars": 3000, "hashtag_style": "end", "emoji_policy": "sparse", "cta_required": true },
+        "twitter": { "max_chars": 280, "hashtag_style": "minimal", "emoji_policy": "moderate", "cta_required": false },
+        "whatsapp": { "max_chars": 1000, "hashtag_style": "none", "emoji_policy": "allowed", "cta_required": false }
+      }
+    }
   }
 }

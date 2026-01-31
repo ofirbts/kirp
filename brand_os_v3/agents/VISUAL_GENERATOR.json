@@ -1,50 +1,83 @@
 {
   "id": "VISUAL_GENERATOR",
-  "layer": "distribution",
-  "role": "Generate the visual brief (image prompt + aspect ratio + alt text) from the approved copy and Visual Identity.",
+  "name": "Visual Generator",
+  "version": "3.0.0",
+  "role": "Produce or select visual assets (image prompts, specs) for the approved content using Visual Identity and platform rules.",
   "responsibilities": [
-    "Consume approved draft and Visual Identity config.",
-    "Produce an image generation prompt that matches brand (clean, minimal, no text unless branded).",
-    "Output aspect ratio and alt text per platform."
+    "Consume approved draft and Visual Identity config",
+    "Produce visual_spec: image_prompt, aspect_ratio, format, alt_text",
+    "Do not call external image APIs; output specs for downstream use"
   ],
   "input_schema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
     "type": "object",
-    "required": ["approved_draft", "platform", "visual_identity"],
+    "required": ["trace_id", "tenant_id", "platform", "polished_draft"],
     "properties": {
-      "approved_draft": { "type": "object" },
+      "trace_id": { "type": "string" },
+      "tenant_id": { "type": "string" },
       "platform": { "type": "string", "enum": ["linkedin", "twitter", "whatsapp"] },
-      "visual_identity": { "type": "object" },
-      "topic_hint": { "type": "string", "default": null }
+      "polished_draft": {
+        "type": "object",
+        "properties": {
+          "headline": { "type": "string" },
+          "body": { "type": "string" }
+        }
+      },
+      "visual_identity": {
+        "type": "object",
+        "properties": {
+          "colors": { "type": "object" },
+          "typography": { "type": "object" },
+          "imagery_rules": { "type": "object" },
+          "output_specs": { "type": "object" }
+        }
+      }
     }
   },
   "output_schema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
     "type": "object",
-    "required": ["prompt", "aspect_ratio", "platform", "alt_text", "timestamp"],
+    "required": ["trace_id", "visual_spec"],
     "properties": {
-      "prompt": { "type": "string" },
-      "aspect_ratio": { "type": "string" },
-      "platform": { "type": "string" },
-      "alt_text": { "type": "string" },
-      "timestamp": { "type": "string", "format": "date-time" }
+      "trace_id": { "type": "string" },
+      "visual_spec": {
+        "type": "object",
+        "required": ["image_prompt", "aspect_ratio", "format", "alt_text"],
+        "properties": {
+          "image_prompt": { "type": "string" },
+          "aspect_ratio": { "type": "string" },
+          "format": { "type": "string", "enum": ["png", "jpg", "webp", "svg"] },
+          "alt_text": { "type": "string" }
+        }
+      }
     }
   },
-  "prompt_template": "You are the Visual Generator for Brand OS v3. You create the image brief from approved copy and Visual Identity.\n\nInput:\n- Approved draft (full_text, headline): {{approved_draft}}\n- Platform: {{platform}}\n- Visual Identity (brand, imagery, generation_prompts, rules): {{visual_identity}}\n- Topic hint (optional): {{topic_hint}}\n\nOutput a JSON object with:\n1. prompt: image generation prompt (max 500 chars). Use default_prefix from generation_prompts. No text in image unless branded. Style: clean, minimal, modern SaaS. Reflect post topic without literally illustrating the headline.\n2. aspect_ratio: from visual_identity.imagery.aspect_ratios_by_platform for this platform.\n3. platform: same as input.\n4. alt_text: accessibility description (required by rules).\n5. timestamp: current ISO timestamp.\n\nRules: No text overlay unless branded. Watermark none. Alt text required.",
+  "prompt_template": "You are the Visual Generator for Brand OS. Your job is to produce a visual spec (prompt, aspect ratio, format, alt text) for the approved content. Do not call any image API; only output the spec.\n\nInput:\n- trace_id: {{trace_id}}\n- tenant_id: {{tenant_id}}\n- platform: {{platform}}\n- polished_draft: {{polished_draft}}\n- visual_identity: {{visual_identity}}\n\nRules:\n1. Derive image_prompt from the headline and body: describe the scene/style that would fit the brand (use visual_identity colors, imagery_rules.style, avoid/prefer).\n2. Pick aspect_ratio from visual_identity.imagery_rules.aspect_ratios or platform default (LinkedIn 1.91:1, Twitter 16:9 or 1:1, WhatsApp 1:1).\n3. Pick format from visual_identity.output_specs.formats (e.g. png or webp).\n4. Write concise alt_text for accessibility.\n\nOutput MUST be valid JSON:\n{\n  \"trace_id\": \"string\",\n  \"visual_spec\": {\n    \"image_prompt\": \"string\",\n    \"aspect_ratio\": \"string\",\n    \"format\": \"string\",\n    \"alt_text\": \"string\"\n  }\n}\n\nReturn only the JSON object, no markdown or extra text.",
   "failure_modes": [
-    "Visual Identity missing aspect_ratio for platform: use 1.91:1 as default.",
-    "Topic too abstract: generate a generic professional image prompt.",
-    "Prompt too long: truncate to 500 chars at word boundary."
+    "Missing visual_identity: use generic minimal style, aspect_ratio 1.91:1, format png.",
+    "Invalid JSON: retry once; on second failure return minimal visual_spec with image_prompt and alt_text only."
   ],
-  "gatekeeper_logic": null,
   "example_input": {
-    "approved_draft": { "full_text": "What if you could ship twice as fast without hiring?\n\nWe ran 2M builds last quarter...", "headline": "How we cut deployment time by 40% without adding headcount" },
+    "trace_id": "trace-001",
+    "tenant_id": "tenant-1",
     "platform": "linkedin",
-    "visual_identity": { "imagery": { "aspect_ratios_by_platform": { "linkedin": "1.91:1" } }, "generation_prompts": { "default_prefix": "Professional B2B image. Clean, minimal. No text in image. Style: modern SaaS." } }
+    "polished_draft": {
+      "headline": "Auth as one line of config",
+      "body": "We just shipped an API change that turns auth from a bottleneck into one line of config."
+    },
+    "visual_identity": {
+      "imagery_rules": { "style": "minimal", "aspect_ratios": ["1:1", "1.91:1"] },
+      "output_specs": { "formats": ["png", "webp"] }
+    }
   },
   "example_output": {
-    "prompt": "Professional B2B image. Clean, minimal. No text in image. Style: modern SaaS. Pipeline dashboard on a laptop screen.",
-    "aspect_ratio": "1.91:1",
-    "platform": "linkedin",
-    "alt_text": "Laptop showing a CI/CD pipeline dashboard with build status and deployment metrics.",
-    "timestamp": "2025-01-30T12:00:06.000Z"
-  }
+    "trace_id": "trace-001",
+    "visual_spec": {
+      "image_prompt": "Minimal diagram: one line of code next to a lock icon, clean background, brand colors #0A2540 and #00D4AA, no people, flat design",
+      "aspect_ratio": "1.91:1",
+      "format": "png",
+      "alt_text": "Diagram showing auth as one line of config with lock icon."
+    }
+  },
+  "gatekeeper_logic": null
 }

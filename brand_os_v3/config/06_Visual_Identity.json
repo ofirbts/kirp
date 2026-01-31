@@ -1,53 +1,95 @@
 {
-  "$schema": "brand_os_v3_visual",
-  "version": "3.0",
-  "name": "Visual Identity",
-  "description": "Guidelines for imagery, layout, and visual consistency.",
-  "schema": {
-    "output_schema": {
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "id": "https://brand-os.example/schemas/06_Visual_Identity",
+  "title": "Visual Identity",
+  "description": "Brand visual guidelines for generated assets: colors, typography, imagery",
+  "version": "3.0.0",
+  "type": "object",
+  "required": ["brand_name", "colors", "typography", "imagery_rules", "output_specs"],
+  "properties": {
+    "brand_name": { "type": "string" },
+    "colors": {
       "type": "object",
-      "required": ["prompt", "aspect_ratio", "platform", "alt_text"],
+      "required": ["primary", "secondary", "neutral", "accent"],
       "properties": {
-        "prompt": { "type": "string" },
-        "aspect_ratio": { "type": "string" },
-        "platform": { "type": "string", "enum": ["linkedin", "twitter", "whatsapp"] },
-        "alt_text": { "type": "string" }
+        "primary": { "type": "array", "items": { "type": "string" }, "minItems": 1 },
+        "secondary": { "type": "array", "items": { "type": "string" } },
+        "neutral": { "type": "array", "items": { "type": "string" } },
+        "accent": { "type": "array", "items": { "type": "string" } },
+        "hex_only": { "type": "boolean", "default": true }
+      }
+    },
+    "typography": {
+      "type": "object",
+      "properties": {
+        "primary_font": { "type": "string" },
+        "secondary_font": { "type": "string" },
+        "heading_weights": { "type": "array", "items": { "type": "integer" } },
+        "body_size_range": { "type": "array", "items": { "type": "integer" }, "minItems": 2, "maxItems": 2 }
+      }
+    },
+    "imagery_rules": {
+      "type": "object",
+      "properties": {
+        "style": { "type": "string", "enum": ["minimal", "illustrated", "photo", "mixed", "abstract"] },
+        "avoid": { "type": "array", "items": { "type": "string" } },
+        "prefer": { "type": "array", "items": { "type": "string" } },
+        "aspect_ratios": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "output_specs": {
+      "type": "object",
+      "properties": {
+        "formats": { "type": "array", "items": { "type": "string", "enum": ["png", "jpg", "webp", "svg"] } },
+        "max_width_px": { "type": "integer" },
+        "max_height_px": { "type": "integer" },
+        "dpi": { "type": "integer" }
       }
     }
   },
-  "brand": {
-    "primary_colors": ["#1a1a2e", "#16213e", "#0f3460"],
-    "accent_colors": ["#e94560"],
-    "font_families": ["Inter", "system-ui", "sans-serif"],
-    "logo_usage": "do not alter aspect ratio; minimum clear space 16px"
-  },
-  "imagery": {
-    "style": "clean, minimal, product-and-people",
-    "avoid": ["stock clichés", "overly staged", "generic office"],
-    "prefer": ["real screenshots", "diagrams", "simple illustrations"],
-    "aspect_ratios_by_platform": {
-      "linkedin": "1.91:1",
-      "twitter": "16:9",
-      "whatsapp": "1:1"
-    }
-  },
-  "generation_prompts": {
-    "default_prefix": "Professional B2B image. Clean, minimal. No text in image. Style: modern SaaS.",
-    "topic_modifiers": {},
-    "max_prompt_length": 500
-  },
-  "rules": {
-    "no_text_overlay_unless_branded": true,
-    "watermark": "none",
-    "accessibility_alt_required": true
-  },
+  "rules": [
+    "Generated visuals MUST use only colors from colors (primary, secondary, neutral, accent)",
+    "Typography MUST use primary_font for headings and secondary_font for body when specified",
+    "Imagery MUST follow imagery_rules (style, avoid, prefer); aspect_ratios MUST be respected per platform",
+    "Output MUST conform to output_specs (formats, dimensions, dpi)"
+  ],
   "thresholds": {
-    "max_prompt_chars": 500
+    "color_deviation_max": 0,
+    "max_colors_per_asset": 5,
+    "min_contrast_ratio": 4.5
   },
-  "output_schema": {
-    "prompt": "string",
-    "aspect_ratio": "string",
-    "platform": "string",
-    "alt_text": "string"
+  "enums": {
+    "imagery_style": ["minimal", "illustrated", "photo", "mixed", "abstract"],
+    "formats": ["png", "jpg", "webp", "svg"]
+  },
+  "examples": {
+    "identity": {
+      "brand_name": "TechFlow",
+      "colors": {
+        "primary": ["#0A2540"],
+        "secondary": ["#00D4AA"],
+        "neutral": ["#F7F9FC", "#E6EAEF", "#425466"],
+        "accent": ["#FF6B35"],
+        "hex_only": true
+      },
+      "typography": {
+        "primary_font": "Inter",
+        "secondary_font": "Inter",
+        "heading_weights": [600, 700],
+        "body_size_range": [14, 18]
+      },
+      "imagery_rules": {
+        "style": "minimal",
+        "avoid": ["stock photos of handshakes", "generic office"],
+        "prefer": ["diagrams", "code snippets", "simple icons"],
+        "aspect_ratios": ["1:1", "1.91:1", "4:5"]
+      },
+      "output_specs": {
+        "formats": ["png", "webp"],
+        "max_width_px": 1200,
+        "max_height_px": 630,
+        "dpi": 72
+      }
+    }
   }
 }

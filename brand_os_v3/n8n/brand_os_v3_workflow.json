@@ -119,7 +119,7 @@
         "options": {}
       },
       "id": "a1000011-0011-4000-8000-000000000011",
-      "name": "VISUAL_GENERATOR (NanoBanana API)",
+      "name": "VISUAL_GENERATOR",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [2200, 200],
@@ -127,13 +127,13 @@
     },
     {
       "parameters": {
-        "jsCode": "const items = $input.all();\nconst d = items[0].json;\nconst platform = d.platform || 'linkedin';\nconst visual = { prompt: 'Professional B2B image. Clean, minimal. No text in image. Style: modern SaaS.', aspect_ratio: platform === 'twitter' ? '16:9' : platform === 'whatsapp' ? '1:1' : '1.91:1', alt_text: 'Laptop showing a CI/CD pipeline dashboard.' };\nreturn [{ json: { ...d, visual } }];"
+        "jsCode": "const items = $input.all();\nconst fromInput = items[0].json;\nconst workflow = fromInput.trace_id ? fromInput : ($('SKEPTICAL_CTO').first().json || fromInput);\nconst platform = workflow.platform || 'linkedin';\nconst visual_spec = fromInput.image_url || fromInput.url ? { image_prompt: fromInput.prompt || 'Professional B2B image.', aspect_ratio: fromInput.aspect_ratio || '1.91:1', format: 'png', alt_text: fromInput.alt_text || 'Generated image.' } : { image_prompt: 'Professional B2B image. Clean, minimal. No text in image. Style: modern SaaS.', aspect_ratio: platform === 'twitter' ? '16:9' : platform === 'whatsapp' ? '1:1' : '1.91:1', format: 'png', alt_text: 'Laptop showing a CI/CD pipeline dashboard.' };\nreturn [{ json: { ...workflow, visual_spec } }];"
       },
       "id": "a1000012-0012-4000-8000-000000000012",
       "name": "Visual Brief Fallback",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [2200, 400]
+      "position": [2420, 200]
     },
     {
       "parameters": {
@@ -224,12 +224,15 @@
     },
     "CTO Approved?": {
       "main": [
-        [{ "node": "Visual Brief Fallback", "type": "main", "index": 0 }],
+        [{ "node": "VISUAL_GENERATOR", "type": "main", "index": 0 }],
         [{ "node": "Revision (CTO)", "type": "main", "index": 0 }]
       ]
     },
     "Revision (CTO)": {
       "main": [[{ "node": "HUMAN_EDGE", "type": "main", "index": 0 }]]
+    },
+    "VISUAL_GENERATOR": {
+      "main": [[{ "node": "Visual Brief Fallback", "type": "main", "index": 0 }]]
     },
     "Visual Brief Fallback": {
       "main": [[{ "node": "Logging", "type": "main", "index": 0 }]]
@@ -244,5 +247,5 @@
   "meta": { "templateCredsSetupCompleted": false },
   "pinData": {},
   "versionId": "brand-os-v3-001",
-  "tags": []
+  "tags": [{ "name": "brand-os-v3" }]
 }

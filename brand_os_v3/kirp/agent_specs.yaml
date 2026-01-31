@@ -1,245 +1,136 @@
 # Brand OS v3 — KIRP Agent Specs
-# YAML definitions for all Brand OS agents with governance tags
-# Valid YAML, fully generated, self-contained
+# YAML definitions for all Brand OS agents: name, version, role, input/output schema refs, governance tags
 
-version: "3.0"
-name: brand_os_v3_agent_specs
+metadata:
+  name: brand_os_v3_agent_specs
+  description: Agent definitions for Brand OS v3 aligned to KIRP
+  version: "3.0.0"
+
+version: "3.0.0"
 
 agents:
-  CONTEXT_SCANNER:
-    name: CONTEXT_SCANNER
-    version: "3.0"
-    role: "Scan the external world for signals, trends, and constraints."
-    layer: world_context
-    input_schema:
-      type: object
-      required: [tenant_id, platform, topic_hint]
-      properties:
-        tenant_id: { type: string }
-        platform: { type: string, enum: [linkedin, twitter, whatsapp] }
-        topic_hint: { type: string }
-        date_range_days: { type: integer, default: 7 }
-        max_signals: { type: integer, default: 5 }
-    output_schema:
-      type: object
-      required: [relevant_signals, recommended_angle, risks, opportunities, timestamp]
-      properties:
-        relevant_signals: { type: array }
-        recommended_angle: { type: string }
-        risks: { type: array, items: { type: string } }
-        opportunities: { type: array, items: { type: string } }
-        timestamp: { type: string, format: date-time }
+  - id: CONTEXT_SCANNER
+    name: Context Scanner
+    version: "3.0.0"
+    role: Scan and synthesize world context (signals, trends, memory) for the rest of the pipeline.
+    phase: context
+    input_schema_ref: brand_os_v3/agents/CONTEXT_SCANNER.json#input_schema
+    output_schema_ref: brand_os_v3/agents/CONTEXT_SCANNER.json#output_schema
     governance_tags:
-      - read_only_external
-      - tenant_required
-      - no_publish
+      - context
+      - non_gatekeeper
+    kirp_event_on_complete: brand_os_v3.context_scanner.completed
 
-  STRATEGIC_PLANNER:
-    name: STRATEGIC_PLANNER
-    version: "3.0"
-    role: "Turn world context and brand identity into a content strategy brief."
-    layer: cognitive
-    input_schema:
-      type: object
-      required: [context_brief, platform, identity_core]
-      properties:
-        context_brief: { type: object }
-        platform: { type: string, enum: [linkedin, twitter, whatsapp] }
-        identity_core: { type: object }
-        hook_preference: { type: string, nullable: true }
-    output_schema:
-      type: object
-      required: [headline, key_message, hook_type, hook_text, cta, platform_notes, timestamp]
-      properties:
-        headline: { type: string }
-        key_message: { type: string }
-        hook_type: { type: string }
-        hook_text: { type: string }
-        cta: { type: string }
-        platform_notes: { type: object }
-        timestamp: { type: string, format: date-time }
+  - id: STRATEGIC_PLANNER
+    name: Strategic Planner
+    version: "3.0.0"
+    role: Turn world context into a strategy brief (angle, key points, hook, CTA).
+    phase: strategy
+    input_schema_ref: brand_os_v3/agents/STRATEGIC_PLANNER.json#input_schema
+    output_schema_ref: brand_os_v3/agents/STRATEGIC_PLANNER.json#output_schema
     governance_tags:
-      - read_context_and_identity
-      - tenant_required
-      - no_publish
+      - strategy
+      - non_gatekeeper
+    kirp_event_on_complete: brand_os_v3.strategic_planner.completed
 
-  TECHNICAL_STORYTELLER:
-    name: TECHNICAL_STORYTELLER
-    version: "3.0"
-    role: "Draft the full post from the strategic brief in brand voice."
-    layer: content
-    input_schema:
-      type: object
-      required: [content_brief, platform, voice_engine]
-      properties:
-        content_brief: { type: object }
-        platform: { type: string, enum: [linkedin, twitter, whatsapp] }
-        voice_engine: { type: object }
-        max_length: { type: integer }
-        include_hashtags: { type: boolean, default: true }
-        suggested_fixes: { type: array, items: { type: string } }
-    output_schema:
-      type: object
-      required: [body, hook, cta, hashtags, full_text, word_count, timestamp]
-      properties:
-        body: { type: string }
-        hook: { type: string }
-        cta: { type: string }
-        hashtags: { type: array, items: { type: string } }
-        full_text: { type: string }
-        word_count: { type: integer }
-        timestamp: { type: string, format: date-time }
+  - id: TECHNICAL_STORYTELLER
+    name: Technical Storyteller
+    version: "3.0.0"
+    role: Draft the first version of the content (headline, body, hook, CTA).
+    phase: creation
+    input_schema_ref: brand_os_v3/agents/TECHNICAL_STORYTELLER.json#input_schema
+    output_schema_ref: brand_os_v3/agents/TECHNICAL_STORYTELLER.json#output_schema
     governance_tags:
-      - content_author
-      - tenant_required
-      - gatekeeper_downstream
+      - creation
+      - non_gatekeeper
+    kirp_event_on_complete: brand_os_v3.technical_storyteller.completed
 
-  HUMAN_EDGE:
-    name: HUMAN_EDGE
-    version: "3.0"
-    role: "Add the human edge: one concrete detail and warmth."
-    layer: content
-    input_schema:
-      type: object
-      required: [draft, platform, identity_core]
-      properties:
-        draft: { type: object }
-        platform: { type: string, enum: [linkedin, twitter, whatsapp] }
-        identity_core: { type: object }
-        concrete_detail_hint: { type: string, nullable: true }
-    output_schema:
-      type: object
-      required: [body, hook, cta, hashtags, full_text, concrete_detail_used, human_edge_notes, timestamp]
-      properties:
-        body: { type: string }
-        hook: { type: string }
-        cta: { type: string }
-        hashtags: { type: array }
-        full_text: { type: string }
-        concrete_detail_used: { type: string }
-        human_edge_notes: { type: string }
-        timestamp: { type: string, format: date-time }
+  - id: HUMAN_EDGE
+    name: Human Edge
+    version: "3.0.0"
+    role: Add human polish (clarity, warmth, platform-native feel) without changing the message.
+    phase: creation
+    input_schema_ref: brand_os_v3/agents/HUMAN_EDGE.json#input_schema
+    output_schema_ref: brand_os_v3/agents/HUMAN_EDGE.json#output_schema
     governance_tags:
-      - content_author
-      - tenant_required
-      - gatekeeper_downstream
+      - creation
+      - non_gatekeeper
+      - revision_target
+    kirp_event_on_complete: brand_os_v3.human_edge.completed
 
-  IDENTITY_GUARDIAN:
-    name: IDENTITY_GUARDIAN
-    version: "3.0"
-    role: "Gatekeeper: ensure draft is on-brand; approve or reject with fixes."
-    layer: gatekeeper
-    input_schema:
-      type: object
-      required: [draft, identity_core, voice_engine]
-      properties:
-        draft: { type: object }
-        identity_core: { type: object }
-        voice_engine: { type: object }
-        threshold: { type: number, default: 0.75 }
-    output_schema:
-      type: object
-      required: [approved, score, reasons, suggested_fixes, timestamp]
-      properties:
-        approved: { type: boolean }
-        score: { type: number }
-        reasons: { type: array, items: { type: string } }
-        suggested_fixes: { type: array, items: { type: string } }
-        timestamp: { type: string, format: date-time }
+  - id: IDENTITY_GUARDIAN
+    name: Identity Guardian
+    version: "3.0.0"
+    role: Gatekeeper — verify draft aligns with Master Identity; reject with revision_notes if not.
+    phase: quality
+    input_schema_ref: brand_os_v3/agents/IDENTITY_GUARDIAN.json#input_schema
+    output_schema_ref: brand_os_v3/agents/IDENTITY_GUARDIAN.json#output_schema
     governance_tags:
       - gatekeeper
-      - tenant_required
-      - audit_required
+      - identity
+    kirp_event_on_complete: brand_os_v3.identity_guardian.completed
+    kirp_event_on_reject: brand_os_v3.identity.rejected
 
-  SKEPTICAL_CTO:
-    name: SKEPTICAL_CTO
-    version: "3.0"
-    role: "Gatekeeper: ensure claims are defensible; approve or reject with fixes."
-    layer: gatekeeper
-    input_schema:
-      type: object
-      required: [draft, identity_core]
-      properties:
-        draft: { type: object }
-        identity_core: { type: object }
-        threshold: { type: number, default: 1.0 }
-    output_schema:
-      type: object
-      required: [approved, claims_checked, issues, suggested_fixes, timestamp]
-      properties:
-        approved: { type: boolean }
-        claims_checked: { type: array, items: { type: string } }
-        issues: { type: array, items: { type: string } }
-        suggested_fixes: { type: array, items: { type: string } }
-        timestamp: { type: string, format: date-time }
+  - id: SKEPTICAL_CTO
+    name: Skeptical CTO
+    version: "3.0.0"
+    role: Gatekeeper — verify draft is technically accurate and not overclaimed; reject with revision_notes if not.
+    phase: quality
+    input_schema_ref: brand_os_v3/agents/SKEPTICAL_CTO.json#input_schema
+    output_schema_ref: brand_os_v3/agents/SKEPTICAL_CTO.json#output_schema
     governance_tags:
       - gatekeeper
-      - tenant_required
-      - audit_required
+      - technical
+    kirp_event_on_complete: brand_os_v3.skeptical_cto.completed
+    kirp_event_on_reject: brand_os_v3.cto.rejected
 
-  VISUAL_GENERATOR:
-    name: VISUAL_GENERATOR
-    version: "3.0"
-    role: "Generate visual brief (image prompt, aspect ratio, alt text) from approved copy."
-    layer: distribution
-    input_schema:
-      type: object
-      required: [approved_draft, platform, visual_identity]
-      properties:
-        approved_draft: { type: object }
-        platform: { type: string, enum: [linkedin, twitter, whatsapp] }
-        visual_identity: { type: object }
-        topic_hint: { type: string, nullable: true }
-    output_schema:
-      type: object
-      required: [prompt, aspect_ratio, platform, alt_text, timestamp]
-      properties:
-        prompt: { type: string }
-        aspect_ratio: { type: string }
-        platform: { type: string }
-        alt_text: { type: string }
-        timestamp: { type: string, format: date-time }
+  - id: VISUAL_GENERATOR
+    name: Visual Generator
+    version: "3.0.0"
+    role: Produce visual spec (image_prompt, aspect_ratio, format, alt_text) for approved content.
+    phase: distribution
+    input_schema_ref: brand_os_v3/agents/VISUAL_GENERATOR.json#input_schema
+    output_schema_ref: brand_os_v3/agents/VISUAL_GENERATOR.json#output_schema
     governance_tags:
       - distribution
-      - tenant_required
-      - no_claim_verification
+      - non_gatekeeper
+    kirp_event_on_complete: brand_os_v3.visual_generator.completed
 
-  GROWTH_ANALYST:
-    name: GROWTH_ANALYST
-    version: "3.0"
-    role: "Log workflow output and optional performance; output summary and recommendations."
-    layer: memory
-    input_schema:
-      type: object
-      required: [workflow_output, trace_id]
-      properties:
-        workflow_output: { type: object }
-        trace_id: { type: string }
-        performance_data:
-          type: object
-          properties:
-            impressions: { type: number }
-            engagement_rate: { type: number }
-            clicks: { type: number }
-            shares: { type: number }
-    output_schema:
-      type: object
-      required: [logged, composite_score, summary, recommendations, timestamp]
-      properties:
-        logged: { type: boolean }
-        composite_score: { type: number, nullable: true }
-        summary: { type: string }
-        recommendations: { type: array, items: { type: string } }
-        timestamp: { type: string, format: date-time }
+  - id: GROWTH_ANALYST
+    name: Growth Analyst
+    version: "3.0.0"
+    role: Suggest optimizations (timing, hook, CTA, next topics) for future runs; advisory only.
+    phase: distribution
+    input_schema_ref: brand_os_v3/agents/GROWTH_ANALYST.json#input_schema
+    output_schema_ref: brand_os_v3/agents/GROWTH_ANALYST.json#output_schema
     governance_tags:
-      - memory_write
-      - tenant_required
-      - audit_required
+      - distribution
+      - advisory
+    kirp_event_on_complete: brand_os_v3.growth_analyst.completed
+
+audit_fields:
+  - agent_id
+  - trace_id
+  - tenant_id
+  - phase
+  - completed_at
+  - approved_or_rejected
+  - revision_notes_if_any
 
 examples:
-  CONTEXT_SCANNER:
-    input: { tenant_id: acme, platform: linkedin, topic_hint: "CI/CD pipeline efficiency" }
-    output: { relevant_signals: [], recommended_angle: "Lead with speed and scale.", risks: [], opportunities: ["DevOps efficiency"], timestamp: "2025-01-30T12:00:00.000Z" }
-  IDENTITY_GUARDIAN:
-    input: { draft: { full_text: "What if you could ship twice as fast..." }, identity_core: {}, voice_engine: {}, threshold: 0.75 }
-    output: { approved: true, score: 0.88, reasons: ["Voice aligned"], suggested_fixes: [], timestamp: "2025-01-30T12:00:04.000Z" }
+  context_scanner_output:
+    trace_id: trace-001
+    world_context: "API and auth are in focus; a new release is simplifying developer experience."
+    trends: ["API-first auth", "DevEx"]
+    signals_used: ["sig-1"]
+    memory_summary: "No recent content."
+  identity_guardian_approved:
+    approved: true
+    identity_alignment: 0.92
+    tone_deviation: 0.08
+    revision_notes: ""
+  identity_guardian_rejected:
+    approved: false
+    identity_alignment: 0.72
+    tone_deviation: 0.35
+    revision_notes: "Remove hype word 'revolutionary'. Align closing with value Integrity."

@@ -1,56 +1,88 @@
 {
   "id": "GROWTH_ANALYST",
-  "layer": "memory",
-  "role": "Log the run and (when performance data exists) update Content Memory with outcomes for future improvement.",
+  "name": "Growth Analyst",
+  "version": "3.0.0",
+  "role": "Consume final output and optional performance data; suggest optimizations (timing, hook, CTA) for future runs. Non-blocking.",
   "responsibilities": [
-    "Record the full workflow output (platform, content, visual, trace_id, timestamp).",
-    "When performance data is available: compute composite_score and store in Content Memory.",
-    "Output a short summary and any recommendations for next time."
+    "Consume final content and optional performance metrics",
+    "Produce recommendations: suggested_timing, hook_rotation, cta_rotation, next_topic_hints",
+    "Output is advisory only; does not block the pipeline"
   ],
   "input_schema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
     "type": "object",
-    "required": ["workflow_output", "trace_id"],
+    "required": ["trace_id", "tenant_id", "platform", "final_content"],
     "properties": {
-      "workflow_output": { "type": "object" },
       "trace_id": { "type": "string" },
-      "performance_data": {
+      "tenant_id": { "type": "string" },
+      "platform": { "type": "string" },
+      "final_content": {
         "type": "object",
         "properties": {
-          "impressions": { "type": "number" },
-          "engagement_rate": { "type": "number" },
-          "clicks": { "type": "number" },
-          "shares": { "type": "number" }
+          "headline": { "type": "string" },
+          "body": { "type": "string" },
+          "hook_used": { "type": "string" },
+          "cta_used": { "type": "string" }
+        }
+      },
+      "performance_history": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "content_id": { "type": "string" },
+            "platform": { "type": "string" },
+            "impressions": { "type": "integer" },
+            "engagement_rate": { "type": "number" },
+            "hook_id": { "type": "string" },
+            "cta_id": { "type": "string" }
+          }
         }
       }
     }
   },
   "output_schema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
     "type": "object",
-    "required": ["logged", "composite_score", "summary", "recommendations", "timestamp"],
+    "required": ["trace_id", "recommendations"],
     "properties": {
-      "logged": { "type": "boolean" },
-      "composite_score": { "type": "number", "nullable": true },
-      "summary": { "type": "string" },
-      "recommendations": { "type": "array", "items": { "type": "string" } },
-      "timestamp": { "type": "string", "format": "date-time" }
+      "trace_id": { "type": "string" },
+      "recommendations": {
+        "type": "object",
+        "properties": {
+          "suggested_timing": { "type": "string" },
+          "hook_rotation": { "type": "array", "items": { "type": "string" } },
+          "cta_rotation": { "type": "array", "items": { "type": "string" } },
+          "next_topic_hints": { "type": "array", "items": { "type": "string" } }
+        }
+      }
     }
   },
-  "prompt_template": "You are the Growth Analyst for Brand OS v3. You log the workflow output and optionally compute performance.\n\nInput:\n- Workflow output (platform, content, visual, all agent outputs): {{workflow_output}}\n- Trace ID: {{trace_id}}\n- Performance data (optional): {{performance_data}}\n\nOutput a JSON object with:\n1. logged: true (assume write to Content Memory succeeded).\n2. composite_score: if performance_data provided, compute a 0–1 score (e.g. weighted average of engagement_rate, clicks, shares normalized). Else null.\n3. summary: 1–2 sentences describing what was produced and (if any) how it performed.\n4. recommendations: array of strings (e.g. 'Use statistic hook next time for this topic', 'Shorten CTA for twitter').\n5. timestamp: current ISO timestamp.\n\nUse Content Memory Log rules: min_engagement_to_remember, composite_score_good/poor. Recommendations should inform future CONTEXT_SCANNER and STRATEGIC_PLANNER runs.",
+  "prompt_template": "You are the Growth Analyst for Brand OS. Your job is to suggest optimizations for future content based on what was just produced and optional performance history. Your output is advisory only.\n\nInput:\n- trace_id: {{trace_id}}\n- tenant_id: {{tenant_id}}\n- platform: {{platform}}\n- final_content: {{final_content}}\n- performance_history: {{performance_history}}\n\nRules:\n1. If performance_history is provided, note which hooks/CTAs performed better and suggest hook_rotation and cta_rotation (IDs or themes).\n2. Suggest suggested_timing (e.g. \"Tuesday 9am local\" or \"weekday morning\") if you have signal; otherwise leave empty or generic.\n3. Suggest 2–4 next_topic_hints that fit the brand and recent context.\n4. Keep recommendations short and actionable.\n\nOutput MUST be valid JSON:\n{\n  \"trace_id\": \"string\",\n  \"recommendations\": {\n    \"suggested_timing\": \"string\",\n    \"hook_rotation\": [\"string\"],\n    \"cta_rotation\": [\"string\"],\n    \"next_topic_hints\": [\"string\"]\n  }\n}\n\nReturn only the JSON object, no markdown or extra text.",
   "failure_modes": [
-    "Performance data missing: set composite_score to null, summary to content-only description.",
-    "Write failure: set logged to false, include reason in summary.",
-    "Invalid performance_data: set composite_score to null, note in recommendations."
+    "No performance_history: return generic recommendations (e.g. \"Try A/B hook rotation\"; next_topic_hints from final_content theme).",
+    "Invalid JSON: retry once; on second failure return recommendations with empty arrays and suggested_timing empty."
   ],
-  "gatekeeper_logic": null,
   "example_input": {
-    "workflow_output": { "platform": "linkedin", "content": { "full_text": "What if you could ship twice as fast..." }, "visual": { "prompt": "Professional B2B image...", "alt_text": "Laptop showing pipeline dashboard." } },
-    "trace_id": "tr_a1b2c3d4"
+    "trace_id": "trace-001",
+    "tenant_id": "tenant-1",
+    "platform": "linkedin",
+    "final_content": {
+      "headline": "Auth as one line of config",
+      "body": "What if you could ship every release without last-minute fires?\n\nWe just shipped an API change...",
+      "hook_used": "What if you could ship every release without last-minute fires?",
+      "cta_used": "Try it free →"
+    },
+    "performance_history": []
   },
   "example_output": {
-    "logged": true,
-    "composite_score": null,
-    "summary": "LinkedIn post produced; identity and CTO gates passed. No performance data yet.",
-    "recommendations": ["Consider statistic hook for next DevOps post."],
-    "timestamp": "2025-01-30T12:00:07.000Z"
-  }
+    "trace_id": "trace-001",
+    "recommendations": {
+      "suggested_timing": "Tuesday or Wednesday 9am local",
+      "hook_rotation": ["h1", "h2"],
+      "cta_rotation": ["c1", "c2"],
+      "next_topic_hints": ["DevEx metrics", "Security vs speed", "Docs and sandbox usage"]
+    }
+  },
+  "gatekeeper_logic": null
 }

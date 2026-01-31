@@ -1,72 +1,106 @@
 {
-  "$schema": "brand_os_v3_distribution",
-  "version": "3.0",
-  "name": "Platform Distribution Map",
-  "description": "Per-platform rules, limits, and variants for publishing.",
-  "schema": {
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "id": "https://brand-os.example/schemas/08_Platform_Distribution_Map",
+  "title": "Platform Distribution Map",
+  "description": "Platform-specific rules, limits, and variants for content distribution",
+  "version": "3.0.0",
+  "type": "object",
+  "required": ["platforms", "variant_schema", "routing_rules"],
+  "properties": {
     "platforms": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "name", "enabled", "limits", "content_rules"],
+        "properties": {
+          "id": { "type": "string" },
+          "name": { "type": "string" },
+          "enabled": { "type": "boolean" },
+          "limits": {
+            "type": "object",
+            "properties": {
+              "max_chars": { "type": "integer" },
+              "max_hashtags": { "type": "integer" },
+              "max_links": { "type": "integer" },
+              "max_images": { "type": "integer" }
+            }
+          },
+          "content_rules": {
+            "type": "object",
+            "properties": {
+              "first_line_hook": { "type": "boolean" },
+              "cta_placement": { "type": "string", "enum": ["start", "middle", "end", "none"] },
+              "hashtag_placement": { "type": "string", "enum": ["inline", "end", "none"] }
+            }
+          }
+        }
+      }
+    },
+    "variant_schema": {
       "type": "object",
-      "additionalProperties": {
+      "properties": {
+        "base_content_field": { "type": "string", "default": "body" },
+        "variant_fields": { "type": "array", "items": { "type": "string" } },
+        "required_adaptations": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "routing_rules": {
+      "type": "array",
+      "items": {
         "type": "object",
         "properties": {
-          "enabled": { "type": "boolean" },
-          "max_length": { "type": "integer" },
-          "min_length": { "type": "integer" },
-          "format": { "type": "string", "enum": ["text_with_hashtags", "concise_with_hashtags", "conversational"] }
+          "condition": { "type": "string" },
+          "platforms": { "type": "array", "items": { "type": "string" } },
+          "priority": { "type": "integer" }
         }
       }
     }
   },
-  "platforms": {
-    "linkedin": {
-      "enabled": true,
-      "max_length": 3000,
-      "min_length": 50,
-      "format": "text_with_hashtags",
-      "hashtag_rules": { "max": 5, "placement": "end", "required": false },
-      "image_rules": { "supported": true, "aspect_ratio": "1.91:1", "max_size_mb": 5 },
-      "best_posting_times": ["08:00", "12:00", "17:00"],
-      "tone_modifier": "slightly_more_formal",
-      "cta_style": "professional"
-    },
-    "twitter": {
-      "enabled": true,
-      "max_length": 280,
-      "min_length": 10,
-      "format": "concise_with_hashtags",
-      "hashtag_rules": { "max": 3, "placement": "end", "required": false },
-      "image_rules": { "supported": true, "aspect_ratio": "16:9", "max_size_mb": 5 },
-      "best_posting_times": ["09:00", "14:00", "19:00"],
-      "tone_modifier": "punchy",
-      "cta_style": "direct"
-    },
-    "whatsapp": {
-      "enabled": true,
-      "max_length": 1000,
-      "min_length": 20,
-      "format": "conversational",
-      "hashtag_rules": { "max": 0, "placement": "none", "required": false },
-      "image_rules": { "supported": true, "aspect_ratio": "1:1", "max_size_mb": 16 },
-      "best_posting_times": ["10:00", "18:00"],
-      "tone_modifier": "warm_and_short",
-      "cta_style": "soft"
-    }
-  },
-  "rules": {
-    "derive_from_master": true,
-    "master_platform": "linkedin",
-    "length_ratio": { "twitter": 0.1, "whatsapp": 0.4 }
-  },
+  "rules": [
+    "Output per platform MUST respect limits (max_chars, max_hashtags, etc.)",
+    "Content_rules MUST be applied when generating platform variants",
+    "Only platforms with enabled: true MAY receive distribution"
+  ],
   "thresholds": {
-    "min_content_length": 10,
-    "max_hashtags_linkedin": 5,
-    "max_hashtags_twitter": 3
+    "max_platforms_per_run": 10,
+    "variant_deviation_max_chars": 0.1,
+    "required_adaptations_compliance": 1.0
   },
-  "output_schema": {
-    "platform": "string",
-    "content": "string",
-    "hashtags": "array",
-    "image_prompt": "string",
-    "scheduled_slot": "string"
+  "enums": {
+    "cta_placement": ["start", "middle", "end", "none"],
+    "hashtag_placement": ["inline", "end", "none"]
+  },
+  "examples": {
+    "platforms": [
+      {
+        "id": "linkedin",
+        "name": "LinkedIn",
+        "enabled": true,
+        "limits": { "max_chars": 3000, "max_hashtags": 5, "max_links": 1, "max_images": 1 },
+        "content_rules": { "first_line_hook": true, "cta_placement": "end", "hashtag_placement": "end" }
+      },
+      {
+        "id": "twitter",
+        "name": "Twitter / X",
+        "enabled": true,
+        "limits": { "max_chars": 280, "max_hashtags": 3, "max_links": 1, "max_images": 4 },
+        "content_rules": { "first_line_hook": true, "cta_placement": "end", "hashtag_placement": "end" }
+      },
+      {
+        "id": "whatsapp",
+        "name": "WhatsApp",
+        "enabled": true,
+        "limits": { "max_chars": 1000, "max_hashtags": 0, "max_links": 1, "max_images": 1 },
+        "content_rules": { "first_line_hook": false, "cta_placement": "end", "hashtag_placement": "none" }
+      }
+    ],
+    "variant_schema": {
+      "base_content_field": "body",
+      "variant_fields": ["linkedin_body", "twitter_body", "whatsapp_body"],
+      "required_adaptations": ["length", "tone", "cta"]
+    },
+    "routing_rules": [
+      { "condition": "platform in request", "platforms": ["linkedin", "twitter", "whatsapp"], "priority": 1 }
+    ]
   }
 }

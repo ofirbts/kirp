@@ -1,57 +1,83 @@
 {
   "id": "TECHNICAL_STORYTELLER",
-  "layer": "content",
-  "role": "Draft the full post (copy) from the strategic brief, in brand voice, with correct structure and length.",
+  "name": "Technical Storyteller",
+  "version": "3.0.0",
+  "role": "Draft the first version of the content (body, headline, hook) from the strategy brief and voice rules.",
   "responsibilities": [
-    "Take the content brief from STRATEGIC_PLANNER and Voice Engine config.",
-    "Write the full post: hook, body, CTA, hashtags (if applicable).",
-    "Ensure length and style match platform and voice rules."
+    "Consume STRATEGIC_PLANNER output and Voice Engine / Master Identity",
+    "Produce a full draft: headline, body, hook_used, cta_used",
+    "Respect platform limits and vocabulary rules"
   ],
   "input_schema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
     "type": "object",
-    "required": ["content_brief", "platform", "voice_engine"],
+    "required": ["trace_id", "tenant_id", "platform", "strategy_brief"],
     "properties": {
-      "content_brief": { "type": "object" },
+      "trace_id": { "type": "string" },
+      "tenant_id": { "type": "string" },
       "platform": { "type": "string", "enum": ["linkedin", "twitter", "whatsapp"] },
-      "voice_engine": { "type": "object" },
-      "max_length": { "type": "integer" },
-      "include_hashtags": { "type": "boolean", "default": true },
-      "suggested_fixes": { "type": "array", "items": { "type": "string" } }
+      "strategy_brief": {
+        "type": "object",
+        "properties": {
+          "angle": { "type": "string" },
+          "key_points": { "type": "array", "items": { "type": "string" } },
+          "suggested_hook_id": { "type": "string" },
+          "suggested_cta_id": { "type": "string" },
+          "tone_note": { "type": "string" }
+        }
+      },
+      "voice_rules": { "type": "object" },
+      "platform_limits": { "type": "object", "properties": { "max_chars": { "type": "integer" } } },
+      "hook_text": { "type": "string" },
+      "cta_text": { "type": "string" }
     }
   },
   "output_schema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
     "type": "object",
-    "required": ["body", "hook", "cta", "hashtags", "full_text", "word_count", "timestamp"],
+    "required": ["trace_id", "draft"],
     "properties": {
-      "body": { "type": "string" },
-      "hook": { "type": "string" },
-      "cta": { "type": "string" },
-      "hashtags": { "type": "array", "items": { "type": "string" } },
-      "full_text": { "type": "string" },
-      "word_count": { "type": "integer" },
-      "timestamp": { "type": "string", "format": "date-time" }
+      "trace_id": { "type": "string" },
+      "draft": {
+        "type": "object",
+        "required": ["headline", "body", "hook_used", "cta_used"],
+        "properties": {
+          "headline": { "type": "string" },
+          "body": { "type": "string" },
+          "hook_used": { "type": "string" },
+          "cta_used": { "type": "string" }
+        }
+      }
     }
   },
-  "prompt_template": "You are the Technical Storyteller for Brand OS v3. You write the full post from the content brief in exact brand voice.\n\nInput:\n- Content brief (headline, key_message, hook_text, cta, platform_notes): {{content_brief}}\n- Platform: {{platform}}\n- Voice Engine (tone_axes, style_rules, vocabulary, thresholds): {{voice_engine}}\n- Max length: {{max_length}}\n- Include hashtags: {{include_hashtags}}\n- Suggested fixes (if revision): {{suggested_fixes}}\n\nOutput a JSON object with:\n1. body: main copy (after the hook), active voice, within length.\n2. hook: the opening line (use content_brief.hook_text or refine within voice rules).\n3. cta: closing call-to-action.\n4. hashtags: array of hashtags (respect platform max from Voice Engine).\n5. full_text: hook + body + cta + hashtags, as it would be published.\n6. word_count: integer.\n7. timestamp: current ISO timestamp.\n\nRules: Follow style_rules (active voice, max sentence length, no hedging). Use vocabulary tier_one/tier_two; never use banned. Match tone_axes for the platform. Do not exceed max_length.",
+  "prompt_template": "You are the Technical Storyteller for Brand OS. Your job is to turn a strategy brief into a full content draft.\n\nInput:\n- trace_id: {{trace_id}}\n- tenant_id: {{tenant_id}}\n- platform: {{platform}}\n- strategy_brief: {{strategy_brief}}\n- voice_rules: {{voice_rules}}\n- platform_limits: {{platform_limits}}\n- hook_text: {{hook_text}}\n- cta_text: {{cta_text}}\n\nRules:\n1. Write a short headline and a body that covers all key_points from the strategy_brief.\n2. Use the provided hook_text at the start if given; otherwise write an opening line that fits the angle.\n3. Use the provided cta_text at the end if given; otherwise write a CTA that fits the platform.\n4. Respect platform_limits.max_chars and voice_rules (sentence length, banned terms, preferred terms).\n5. Use active voice and the tone from strategy_brief.tone_note.\n\nOutput MUST be valid JSON:\n{\n  \"trace_id\": \"string\",\n  \"draft\": {\n    \"headline\": \"string\",\n    \"body\": \"string\",\n    \"hook_used\": \"string\",\n    \"cta_used\": \"string\"\n  }\n}\n\nReturn only the JSON object, no markdown or extra text.",
   "failure_modes": [
-    "Brief missing hook_text: generate a hook that matches hook_type and voice.",
-    "Length exceeded: shorten body first, then CTA; never cut the hook.",
-    "Voice drift: re-run with explicit reminder of style_rules and banned words."
+    "Body exceeds max_chars: shorten by trimming examples or folding list items; never truncate mid-sentence.",
+    "Invalid JSON: retry once; on second failure return draft with headline and body only."
   ],
-  "gatekeeper_logic": null,
   "example_input": {
-    "content_brief": { "headline": "How we cut deployment time by 40%", "hook_text": "What if you could ship twice as fast without hiring?", "cta": "Try the free tier—no credit card required.", "platform_notes": { "max_length": 3000 } },
+    "trace_id": "trace-001",
+    "tenant_id": "tenant-1",
     "platform": "linkedin",
-    "voice_engine": { "style_rules": { "prefer_active_voice": true }, "vocabulary": { "banned": ["synergy"] } },
-    "max_length": 3000
+    "strategy_brief": {
+      "angle": "Our new API turns auth into one line of config.",
+      "key_points": ["What changed", "How it reduces rework", "Where to try it"],
+      "suggested_hook_id": "h1",
+      "suggested_cta_id": "c1",
+      "tone_note": "Professional, no hype."
+    },
+    "platform_limits": { "max_chars": 3000 },
+    "hook_text": "What if you could ship every release without last-minute fires?",
+    "cta_text": "Try it free →"
   },
   "example_output": {
-    "body": "We ran 2M builds last quarter. Here's what we learned: 40% of teams cut deployment time in the first month by standardizing on a single pipeline.",
-    "hook": "What if you could ship twice as fast without hiring?",
-    "cta": "Try the free tier—no credit card required.",
-    "hashtags": ["#DevOps", "#CI/CD", "#Engineering"],
-    "full_text": "What if you could ship twice as fast without hiring?\n\nWe ran 2M builds last quarter. Here's what we learned: 40% of teams cut deployment time in the first month by standardizing on a single pipeline.\n\nTry the free tier—no credit card required.\n\n#DevOps #CI/CD #Engineering",
-    "word_count": 52,
-    "timestamp": "2025-01-30T12:00:02.000Z"
-  }
+    "trace_id": "trace-001",
+    "draft": {
+      "headline": "Auth as one line of config",
+      "body": "What if you could ship every release without last-minute fires?\n\nWe just shipped an API change that turns auth from a bottleneck into one line of config. Here's what changed and why it matters.\n\n• What changed: a single endpoint, same security, less code.\n• How it reduces rework: no more custom middleware for every service.\n• Where to try it: docs and a sandbox are live.\n\nTry it free →",
+      "hook_used": "What if you could ship every release without last-minute fires?",
+      "cta_used": "Try it free →"
+    }
+  },
+  "gatekeeper_logic": null
 }

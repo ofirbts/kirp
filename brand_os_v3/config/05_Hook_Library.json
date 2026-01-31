@@ -1,63 +1,86 @@
 {
-  "$schema": "brand_os_v3_hooks",
-  "version": "3.0",
-  "name": "Hook Library",
-  "description": "Opening lines and patterns that grab attention while staying on-brand.",
-  "schema": {
-    "categories": {
-      "type": "object",
-      "additionalProperties": {
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "id": "https://brand-os.example/schemas/05_Hook_Library",
+  "title": "Hook Library",
+  "description": "Reusable hooks, openers, and CTAs aligned to brand voice",
+  "version": "3.0.0",
+  "type": "object",
+  "required": ["hooks", "ctas", "openers", "rules"],
+  "properties": {
+    "hooks": {
+      "type": "array",
+      "items": {
         "type": "object",
+        "required": ["id", "text", "category", "platforms"],
         "properties": {
-          "description": { "type": "string" },
-          "examples": { "type": "array", "items": { "type": "string" } },
-          "tone_fit": { "type": "array", "items": { "type": "string", "enum": ["professional", "conversational"] } }
+          "id": { "type": "string" },
+          "text": { "type": "string" },
+          "category": { "type": "string", "enum": ["question", "statistic", "story", "contrarian", "how_to", "list"] },
+          "platforms": { "type": "array", "items": { "type": "string" } },
+          "usage_count": { "type": "integer", "minimum": 0 },
+          "max_uses_per_month": { "type": "integer", "minimum": 1 }
         }
       }
     },
-    "hook_type_enum": { "type": "string", "enum": ["question", "statistic", "story", "contrarian", "direct_value"] }
-  },
-  "categories": {
-    "question": {
-      "description": "Open with a question the audience cares about.",
-      "examples": ["What if you could ship twice as fast without hiring?", "Why do most DevOps initiatives stall after year one?"],
-      "tone_fit": ["professional", "conversational"]
+    "ctas": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "text", "type"],
+        "properties": {
+          "id": { "type": "string" },
+          "text": { "type": "string" },
+          "type": { "type": "string", "enum": ["link", "comment", "share", "dm", "none"] },
+          "platforms": { "type": "array", "items": { "type": "string" } }
+        }
+      }
     },
-    "statistic": {
-      "description": "Lead with a surprising or credible number.",
-      "examples": ["40% of our users cut deployment time in the first month.", "We ran 2M builds last quarter. Here's what we learned."],
-      "tone_fit": ["professional"]
+    "openers": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "text", "tone"],
+        "properties": {
+          "id": { "type": "string" },
+          "text": { "type": "string" },
+          "tone": { "type": "string" },
+          "platforms": { "type": "array", "items": { "type": "string" } }
+        }
+      }
     },
-    "story": {
-      "description": "Start with a short, relatable scenario.",
-      "examples": ["Last Tuesday a customer asked us for a feature we'd never built. By Friday it was live."],
-      "tone_fit": ["conversational", "professional"]
-    },
-    "contrarian": {
-      "description": "Challenge a common belief (with evidence).",
-      "examples": ["Most people think you need a big team to move fast. We don't."],
-      "tone_fit": ["professional"]
-    },
-    "direct_value": {
-      "description": "State the benefit in the first line.",
-      "examples": ["You can now run our pipeline from the CLI in under 60 seconds."],
-      "tone_fit": ["professional", "conversational"]
+    "rules": {
+      "type": "array",
+      "items": { "type": "string" }
     }
   },
-  "rules": {
-    "hook_must_match_platform": true,
-    "hook_must_match_identity": true,
-    "max_hook_length_linkedin": 150,
-    "max_hook_length_twitter": 80,
-    "max_hook_length_whatsapp": 100
-  },
+  "rules": [
+    "Hooks MUST be used within category and platform constraints",
+    "Usage_count MUST NOT exceed max_uses_per_month per hook",
+    "CTAs MUST match platform content_rules (e.g. cta_placement)",
+    "Openers SHOULD match current tone_profile"
+  ],
   "thresholds": {
-    "max_hook_chars_linkedin": 150,
-    "max_hook_chars_twitter": 80,
-    "max_hook_chars_whatsapp": 100
+    "max_hooks_per_piece": 1,
+    "max_ctas_per_piece": 1,
+    "opener_reuse_cooldown_days": 7
   },
-  "selection": {
-    "strategy": "category_first_then_variant",
-    "avoid_recent_hooks_window_days": 7
+  "enums": {
+    "hook_category": ["question", "statistic", "story", "contrarian", "how_to", "list"],
+    "cta_type": ["link", "comment", "share", "dm", "none"]
+  },
+  "examples": {
+    "hooks": [
+      { "id": "h1", "text": "What if you could ship every release without last-minute fires?", "category": "question", "platforms": ["linkedin", "twitter"], "usage_count": 2, "max_uses_per_month": 4 },
+      { "id": "h2", "text": "Most teams spend 40% of sprint time on rework. Here's how we cut that.", "category": "statistic", "platforms": ["linkedin"], "usage_count": 0, "max_uses_per_month": 2 }
+    ],
+    "ctas": [
+      { "id": "c1", "text": "Try it free →", "type": "link", "platforms": ["linkedin", "twitter"] },
+      { "id": "c2", "text": "What would you add? Drop a comment.", "type": "comment", "platforms": ["linkedin"] }
+    ],
+    "openers": [
+      { "id": "o1", "text": "We've been thinking about", "tone": "professional", "platforms": ["linkedin", "whatsapp"] },
+      { "id": "o2", "text": "Quick take:", "tone": "bold", "platforms": ["twitter"] }
+    ],
+    "rules": ["One hook per piece", "One CTA per piece", "Rotate openers to avoid repetition"]
   }
 }

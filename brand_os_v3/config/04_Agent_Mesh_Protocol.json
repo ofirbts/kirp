@@ -1,62 +1,89 @@
 {
-  "$schema": "brand_os_v3_agent_mesh",
-  "version": "3.0",
-  "name": "Agent Mesh Protocol",
-  "description": "How agents communicate, hand off, and resolve conflicts.",
-  "schema": {
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "id": "https://brand-os.example/schemas/04_Agent_Mesh_Protocol",
+  "title": "Agent Mesh Protocol",
+  "description": "Orchestration order, handoffs, and data contracts between agents",
+  "version": "3.0.0",
+  "type": "object",
+  "required": ["agents", "flow_order", "handoff_schema", "contracts"],
+  "properties": {
+    "agents": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "name", "phase", "inputs_from", "outputs_to"],
+        "properties": {
+          "id": { "type": "string" },
+          "name": { "type": "string" },
+          "phase": { "type": "string", "enum": ["context", "strategy", "creation", "quality", "distribution"] },
+          "inputs_from": { "type": "array", "items": { "type": "string" } },
+          "outputs_to": { "type": "array", "items": { "type": "string" } }
+        }
+      }
+    },
+    "flow_order": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Ordered list of agent IDs for execution"
+    },
     "handoff_schema": {
       "type": "object",
-      "required": ["from_agent", "to_agent", "payload_type", "payload", "trace_id", "timestamp"],
       "properties": {
-        "from_agent": { "type": "string" },
-        "to_agent": { "type": "string" },
-        "payload_type": { "type": "string" },
-        "payload": { "type": "object" },
-        "trace_id": { "type": "string" },
-        "timestamp": { "type": "string", "format": "date-time" }
+        "required_fields": { "type": "array", "items": { "type": "string" } },
+        "optional_fields": { "type": "array", "items": { "type": "string" } },
+        "immutable_after": { "type": "object", "additionalProperties": { "type": "string" } }
+      }
+    },
+    "contracts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["from_agent", "to_agent", "payload_schema_ref"],
+        "properties": {
+          "from_agent": { "type": "string" },
+          "to_agent": { "type": "string" },
+          "payload_schema_ref": { "type": "string" },
+          "obligations": { "type": "array", "items": { "type": "string" } }
+        }
       }
     }
   },
-  "agents": [
-    { "id": "CONTEXT_SCANNER", "layer": "world_context", "runs_first": true },
-    { "id": "STRATEGIC_PLANNER", "layer": "cognitive", "depends_on": ["CONTEXT_SCANNER"] },
-    { "id": "TECHNICAL_STORYTELLER", "layer": "content", "depends_on": ["STRATEGIC_PLANNER"] },
-    { "id": "HUMAN_EDGE", "layer": "content", "depends_on": ["TECHNICAL_STORYTELLER"] },
-    { "id": "IDENTITY_GUARDIAN", "layer": "gatekeeper", "depends_on": ["HUMAN_EDGE"] },
-    { "id": "SKEPTICAL_CTO", "layer": "gatekeeper", "depends_on": ["IDENTITY_GUARDIAN"] },
-    { "id": "VISUAL_GENERATOR", "layer": "distribution", "depends_on": ["SKEPTICAL_CTO"] },
-    { "id": "GROWTH_ANALYST", "layer": "memory", "depends_on": ["VISUAL_GENERATOR"] }
+  "rules": [
+    "Agents MUST execute in flow_order unless a gatekeeper rejects",
+    "Handoff payload MUST include all required_fields from handoff_schema",
+    "Fields listed in immutable_after MUST NOT be overwritten by later agents",
+    "Contracts define valid payload shape between agent pairs"
   ],
-  "handoff_schema": {
-    "from_agent": "string",
-    "to_agent": "string",
-    "payload_type": "string",
-    "payload": "object",
-    "trace_id": "string",
-    "timestamp": "string"
-  },
-  "rules": {
-    "strict_order": true,
-    "gatekeeper_override_on_reject": true,
-    "max_revision_rounds_per_gatekeeper": 2
-  },
-  "conflict_resolution": {
-    "strategy": "gatekeeper_override",
-    "order": ["IDENTITY_GUARDIAN", "SKEPTICAL_CTO"],
-    "on_reject": "return_to_previous_agent",
-    "max_revision_rounds": 2
-  },
-  "timeouts": {
-    "per_agent_seconds": 60,
-    "total_workflow_seconds": 300
-  },
   "thresholds": {
-    "identity_approval_min": 0.75,
-    "cto_issues_max": 0
+    "max_handoff_size_bytes": 524288,
+    "max_agents_per_run": 20,
+    "timeout_per_agent_seconds": 120
   },
-  "logging": {
-    "log_every_handoff": true,
-    "log_gatekeeper_decisions": true,
-    "log_failures": true
+  "enums": {
+    "phase": ["context", "strategy", "creation", "quality", "distribution"]
+  },
+  "examples": {
+    "mesh": {
+      "agents": [
+        { "id": "CONTEXT_SCANNER", "name": "Context Scanner", "phase": "context", "inputs_from": [], "outputs_to": ["STRATEGIC_PLANNER"] },
+        { "id": "STRATEGIC_PLANNER", "name": "Strategic Planner", "phase": "strategy", "inputs_from": ["CONTEXT_SCANNER"], "outputs_to": ["TECHNICAL_STORYTELLER"] },
+        { "id": "TECHNICAL_STORYTELLER", "name": "Technical Storyteller", "phase": "creation", "inputs_from": ["STRATEGIC_PLANNER"], "outputs_to": ["HUMAN_EDGE"] },
+        { "id": "HUMAN_EDGE", "name": "Human Edge", "phase": "creation", "inputs_from": ["TECHNICAL_STORYTELLER"], "outputs_to": ["IDENTITY_GUARDIAN"] },
+        { "id": "IDENTITY_GUARDIAN", "name": "Identity Guardian", "phase": "quality", "inputs_from": ["HUMAN_EDGE"], "outputs_to": ["SKEPTICAL_CTO", "HUMAN_EDGE"] },
+        { "id": "SKEPTICAL_CTO", "name": "Skeptical CTO", "phase": "quality", "inputs_from": ["IDENTITY_GUARDIAN"], "outputs_to": ["VISUAL_GENERATOR", "HUMAN_EDGE"] },
+        { "id": "VISUAL_GENERATOR", "name": "Visual Generator", "phase": "distribution", "inputs_from": ["SKEPTICAL_CTO"], "outputs_to": [] },
+        { "id": "GROWTH_ANALYST", "name": "Growth Analyst", "phase": "distribution", "inputs_from": [], "outputs_to": [] }
+      ],
+      "flow_order": ["CONTEXT_SCANNER", "STRATEGIC_PLANNER", "TECHNICAL_STORYTELLER", "HUMAN_EDGE", "IDENTITY_GUARDIAN", "SKEPTICAL_CTO", "VISUAL_GENERATOR", "GROWTH_ANALYST"],
+      "handoff_schema": {
+        "required_fields": ["trace_id", "tenant_id", "platform", "phase_output"],
+        "optional_fields": ["revision_notes", "scores", "metadata"],
+        "immutable_after": { "CONTEXT_SCANNER": "world_context", "STRATEGIC_PLANNER": "strategy_brief" }
+      },
+      "contracts": [
+        { "from_agent": "CONTEXT_SCANNER", "to_agent": "STRATEGIC_PLANNER", "payload_schema_ref": "context_scanner_output", "obligations": ["world_context", "trends", "signals"] },
+        { "from_agent": "STRATEGIC_PLANNER", "to_agent": "TECHNICAL_STORYTELLER", "payload_schema_ref": "strategy_planner_output", "obligations": ["angle", "key_points", "cta"] }
+      ]
+    }
   }
 }

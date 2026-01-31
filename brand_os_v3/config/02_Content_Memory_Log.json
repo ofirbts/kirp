@@ -1,55 +1,83 @@
 {
-  "$schema": "brand_os_v3_content_memory",
-  "version": "3.0",
-  "name": "Content Memory Log",
-  "description": "What we have already said and how it performed; prevents repetition and informs improvement.",
-  "schema": {
-    "performance_schema": {
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "id": "https://brand-os.example/schemas/02_Content_Memory_Log",
+  "title": "Content Memory Log",
+  "description": "Schema and policies for logging past content, performance, and avoidance of repetition",
+  "version": "3.0.0",
+  "type": "object",
+  "required": ["log_schema", "retention", "usage_rules", "dedup_rules"],
+  "properties": {
+    "log_schema": {
       "type": "object",
+      "required": ["content_id", "tenant_id", "platform", "body_hash", "published_at", "trace_id"],
       "properties": {
-        "impressions": { "type": "number" },
-        "engagement_rate": { "type": "number" },
-        "clicks": { "type": "number" },
-        "shares": { "type": "number" },
-        "composite_score": { "type": "number" }
+        "content_id": { "type": "string" },
+        "tenant_id": { "type": "string" },
+        "platform": { "type": "string" },
+        "body_hash": { "type": "string", "description": "Hash of normalized body for dedup" },
+        "published_at": { "type": "string", "format": "date-time" },
+        "trace_id": { "type": "string" },
+        "topic_hint": { "type": "string" },
+        "performance": {
+          "type": "object",
+          "properties": {
+            "impressions": { "type": "integer" },
+            "engagement_rate": { "type": "number" },
+            "clicks": { "type": "integer" }
+          }
+        }
       }
     },
-    "recommendation_enum": { "type": "string", "enum": ["proceed", "rephrase", "avoid"] }
+    "retention": {
+      "type": "object",
+      "properties": {
+        "retention_days": { "type": "integer", "minimum": 1, "maximum": 3650 },
+        "archive_after_days": { "type": "integer", "minimum": 0 },
+        "max_entries_per_tenant": { "type": "integer", "minimum": 100 }
+      }
+    },
+    "usage_rules": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "How memory is used in generation"
+    },
+    "dedup_rules": {
+      "type": "object",
+      "properties": {
+        "similarity_threshold": { "type": "number", "minimum": 0, "maximum": 1 },
+        "window_days": { "type": "integer", "minimum": 1 },
+        "block_if_above": { "type": "boolean", "default": true }
+      }
+    }
   },
-  "storage": {
-    "backend": "vector_and_metadata",
-    "metadata_fields": ["platform", "topic", "published_at", "performance_score", "trace_id"],
-    "retention_days": 365,
-    "dedup_window_days": 30
-  },
-  "performance_schema": {
-    "impressions": "number",
-    "engagement_rate": "number",
-    "clicks": "number",
-    "shares": "number",
-    "composite_score": "number"
-  },
-  "rules": {
-    "check_similarity_before_publish": true,
-    "similarity_threshold_max": 0.85,
-    "avoid_repeat_topic_within_days": 14,
-    "boost_angles_that_performed_well": true,
-    "flag_underperformers_for_review": true
-  },
+  "rules": [
+    "Every published content MUST be logged with log_schema",
+    "body_hash MUST be computed over normalized body (trim, lower, no extra spaces)",
+    "Before generation, memory SHOULD be queried for recent content; output MUST NOT exceed similarity_threshold within window_days",
+    "Retention policies MUST be enforced for storage"
+  ],
   "thresholds": {
-    "composite_score_good": 0.7,
-    "composite_score_poor": 0.3,
-    "min_engagement_to_remember": 0.1
+    "similarity_threshold": 0.82,
+    "window_days": 30,
+    "retention_days": 365
   },
-  "output_schema": {
-    "similar_past_content": "array",
-    "recommendation": "proceed|rephrase|avoid",
-    "suggested_angle_tweaks": "array",
-    "timestamp": "string"
-  },
+  "enums": {},
   "examples": {
-    "recommendation_proceed": "proceed",
-    "recommendation_rephrase": "rephrase",
-    "recommendation_avoid": "avoid"
+    "log_entry": {
+      "content_id": "cnt-abc123",
+      "tenant_id": "tenant-1",
+      "platform": "linkedin",
+      "body_hash": "sha256:abc123...",
+      "published_at": "2025-01-28T14:00:00Z",
+      "trace_id": "trace-xyz",
+      "topic_hint": "API release",
+      "performance": { "impressions": 1200, "engagement_rate": 0.04, "clicks": 48 }
+    },
+    "config": {
+      "log_schema": "as above",
+      "retention": { "retention_days": 365, "archive_after_days": 90, "max_entries_per_tenant": 5000 },
+      "usage_rules": ["Avoid repeating same angle within 14 days", "Prefer underused topics in strategy"],
+      "dedup_rules": { "similarity_threshold": 0.82, "window_days": 30, "block_if_above": true }
+    }
   }
 }

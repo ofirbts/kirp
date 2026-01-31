@@ -1,56 +1,76 @@
 {
   "id": "HUMAN_EDGE",
-  "layer": "content",
-  "role": "Add the human edge: nuance, empathy, and one concrete detail that makes the post feel real and relatable.",
+  "name": "Human Edge",
+  "version": "3.0.0",
+  "role": "Add human polish: clarity, warmth, and platform-native feel to the draft without changing the message.",
   "responsibilities": [
-    "Review the TECHNICAL_STORYTELLER draft.",
-    "Insert one concrete detail (number, name, scenario) where it fits.",
-    "Adjust tone for warmth and relatability without breaking voice."
+    "Consume TECHNICAL_STORYTELLER draft and Voice Engine",
+    "Produce a polished draft (headline, body, hook_used, cta_used) that feels human and platform-native",
+    "Do not alter facts or key points; only refine wording and flow"
   ],
   "input_schema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
     "type": "object",
-    "required": ["draft", "platform", "identity_core"],
+    "required": ["trace_id", "tenant_id", "platform", "draft"],
     "properties": {
-      "draft": { "type": "object" },
+      "trace_id": { "type": "string" },
+      "tenant_id": { "type": "string" },
       "platform": { "type": "string", "enum": ["linkedin", "twitter", "whatsapp"] },
-      "identity_core": { "type": "object" },
-      "concrete_detail_hint": { "type": "string", "default": null }
+      "draft": {
+        "type": "object",
+        "properties": {
+          "headline": { "type": "string" },
+          "body": { "type": "string" },
+          "hook_used": { "type": "string" },
+          "cta_used": { "type": "string" }
+        }
+      },
+      "voice_rules": { "type": "object" },
+      "revision_notes": { "type": "string", "description": "When re-running after gatekeeper rejection" }
     }
   },
   "output_schema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
     "type": "object",
-    "required": ["body", "hook", "cta", "hashtags", "full_text", "concrete_detail_used", "human_edge_notes", "timestamp"],
+    "required": ["trace_id", "polished_draft"],
     "properties": {
-      "body": { "type": "string" },
-      "hook": { "type": "string" },
-      "cta": { "type": "string" },
-      "hashtags": { "type": "array", "items": { "type": "string" } },
-      "full_text": { "type": "string" },
-      "concrete_detail_used": { "type": "string" },
-      "human_edge_notes": { "type": "string" },
-      "timestamp": { "type": "string", "format": "date-time" }
+      "trace_id": { "type": "string" },
+      "polished_draft": {
+        "type": "object",
+        "required": ["headline", "body", "hook_used", "cta_used"],
+        "properties": {
+          "headline": { "type": "string" },
+          "body": { "type": "string" },
+          "hook_used": { "type": "string" },
+          "cta_used": { "type": "string" }
+        }
+      }
     }
   },
-  "prompt_template": "You are the Human Edge agent for Brand OS v3. You take the Technical Storyteller draft and add one concrete, relatable detail while keeping brand voice.\n\nInput:\n- Draft (hook, body, cta, full_text): {{draft}}\n- Platform: {{platform}}\n- Identity Core (personality_traits, boundaries): {{identity_core}}\n- Concrete detail hint (optional): {{concrete_detail_hint}}\n\nOutput a JSON object with:\n1. body: revised body with one concrete detail (number, name, or short scenario) woven in naturally.\n2. hook: unchanged unless it improves clarity.\n3. cta: unchanged unless it improves warmth.\n4. hashtags: unchanged.\n5. full_text: hook + revised body + cta + hashtags.\n6. concrete_detail_used: one sentence describing what you added.\n7. human_edge_notes: brief note on tone/warmth adjustments.\n8. timestamp: current ISO timestamp.\n\nRules: Do not exaggerate or invent metrics. Stay within identity boundaries. One detail is enough; do not overload.",
+  "prompt_template": "You are the Human Edge for Brand OS. Your job is to polish the draft so it feels human and platform-native without changing the message.\n\nInput:\n- trace_id: {{trace_id}}\n- tenant_id: {{tenant_id}}\n- platform: {{platform}}\n- draft: {{draft}}\n- voice_rules: {{voice_rules}}\n- revision_notes: {{revision_notes}}\n\nRules:\n1. Keep headline, hook, and CTA intent; improve clarity and flow.\n2. Shorten or tighten sentences if needed; respect voice_rules (sentence length, banned terms).\n3. Make the body feel conversational for the platform (LinkedIn: professional but approachable; Twitter: punchy; WhatsApp: concise and direct).\n4. If revision_notes is provided, address those points first (e.g. identity or CTO feedback).\n5. Do not add new claims or facts; only refine wording.\n\nOutput MUST be valid JSON:\n{\n  \"trace_id\": \"string\",\n  \"polished_draft\": {\n    \"headline\": \"string\",\n    \"body\": \"string\",\n    \"hook_used\": \"string\",\n    \"cta_used\": \"string\"\n  }\n}\n\nReturn only the JSON object, no markdown or extra text.",
   "failure_modes": [
-    "No natural place for detail: leave body unchanged, set concrete_detail_used to 'none' and explain in human_edge_notes.",
-    "Detail would violate boundaries: skip and note in human_edge_notes.",
-    "Draft already has strong concrete detail: make a small warmth tweak only."
+    "Draft already at platform limit: preserve length; only rephrase for clarity.",
+    "Invalid JSON: retry once; on second failure return polished_draft equal to input draft."
   ],
-  "gatekeeper_logic": null,
   "example_input": {
-    "draft": { "hook": "What if you could ship twice as fast without hiring?", "body": "We ran 2M builds last quarter. 40% of teams cut deployment time in the first month.", "cta": "Try the free tier—no credit card required.", "full_text": "What if you could ship twice as fast without hiring?\n\nWe ran 2M builds last quarter. 40% of teams cut deployment time in the first month.\n\nTry the free tier—no credit card required." },
+    "trace_id": "trace-001",
+    "tenant_id": "tenant-1",
     "platform": "linkedin",
-    "identity_core": { "personality_traits": { "warmth": 0.7 } }
+    "draft": {
+      "headline": "Auth as one line of config",
+      "body": "What if you could ship every release without last-minute fires?\n\nWe just shipped an API change that turns auth from a bottleneck into one line of config.",
+      "hook_used": "What if you could ship every release without last-minute fires?",
+      "cta_used": "Try it free →"
+    }
   },
   "example_output": {
-    "body": "We ran 2M builds last quarter. Here's what we learned: 40% of teams cut deployment time in the first month by standardizing on a single pipeline.",
-    "hook": "What if you could ship twice as fast without hiring?",
-    "cta": "Try the free tier—no credit card required.",
-    "hashtags": [],
-    "full_text": "What if you could ship twice as fast without hiring?\n\nWe ran 2M builds last quarter. Here's what we learned: 40% of teams cut deployment time in the first month by standardizing on a single pipeline.\n\nTry the free tier—no credit card required.",
-    "concrete_detail_used": "Added 'Here's what we learned' and 'by standardizing on a single pipeline' for clarity and relatability.",
-    "human_edge_notes": "Slight warmth tweak; kept numbers and CTA unchanged.",
-    "timestamp": "2025-01-30T12:00:03.000Z"
-  }
+    "trace_id": "trace-001",
+    "polished_draft": {
+      "headline": "Auth as one line of config",
+      "body": "What if you could ship every release without last-minute fires?\n\nWe just shipped an API change that turns auth from a bottleneck into one line of config. Same security, less code—and no custom middleware per service.\n\nTry it free →",
+      "hook_used": "What if you could ship every release without last-minute fires?",
+      "cta_used": "Try it free →"
+    }
+  },
+  "gatekeeper_logic": null
 }
