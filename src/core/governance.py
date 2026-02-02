@@ -87,10 +87,13 @@ class GovernanceEngine:
                     "user_role": context.get("user_role", "member") if context else "member",
                     "space_owner_id": context.get("space_owner_id", user_id) if context else user_id,
                     "space_members": context.get("space_members", [user_id]) if context else [user_id],
+                    "roles": context.get("roles", []) if context else [],
+                    "resource_owner_id": context.get("resource_owner_id", user_id) if context else user_id,
                     "risk_score": risk_score,
                 }
             }
             async with httpx.AsyncClient() as client:
+                # Use /allow endpoint (returns bool); full /governance can 500 depending on policy load
                 r = await client.post(
                     f"{self._opa_url}/v1/data/kirp/governance/allow",
                     json=payload,
@@ -104,7 +107,17 @@ class GovernanceEngine:
                     risk_score=risk_score,
                 )
             data = r.json()
-            result = data.get("result", {})
+            result = data.get("result")
+            # OPA returns full document at kirp.governance; fallback if result is bool (single-rule query)
+            if isinstance(result, bool):
+                return GovernanceCheck(
+                    allowed=result,
+                    reason="allowed" if result else "denied_by_policy",
+                    requires_approval=risk_score >= 0.7,
+                    risk_score=risk_score,
+                )
+            if not isinstance(result, dict):
+                result = {}
             return GovernanceCheck(
                 allowed=result.get("allow", False),
                 reason=result.get("reason", "policy"),

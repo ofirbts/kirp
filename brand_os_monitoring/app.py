@@ -62,6 +62,18 @@ def metrics() -> dict:
 async def dashboard(request: Request):
     m = metrics()
     return templates.TemplateResponse(
+        request,
         "dashboard.html",
-        {"request": request, "metrics": m},
+        {"metrics": m},
+    )
+
+
+@app.get("/system-dashboard", response_class=HTMLResponse)
+async def system_dashboard(request: Request):
+    from brand_os_monitoring.system_dashboard import get_system_data
+    data = get_system_data()
+    return templates.TemplateResponse(
+        request,
+        "system_dashboard.html",
+        {"data": data},
     )

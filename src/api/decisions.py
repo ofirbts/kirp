@@ -1,5 +1,5 @@
 """
-Decisions API — minimal JSON endpoints for the frontend.
+Decisions API — JSON endpoints backed by domain store (Mongo).
 
 Backs:
 - GET /api/decisions
@@ -8,11 +8,14 @@ Backs:
 
 from __future__ import annotations
 
-from datetime import datetime, timezone, timedelta
+from datetime import datetime
 from typing import List
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Depends, Query
+from pydantic import BaseModel
 
+from src.auth.tenant_context import TenantContext, get_effective_tenant_context
+from src.core import domain_store
 from src.schemas.api_models import (
     Decision,
     DecisionsListResponse,
@@ -23,75 +26,88 @@ from src.schemas.api_models import (
 router = APIRouter(prefix="/api/decisions", tags=["Decisions"])
 
 
-def _now_iso() -> str:
-    return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
-
-
-def _demo_decision(
-    decision_id: str,
-    tenant_id: str,
-    space_id: str | None,
-    agent_id: str,
-) -> Decision:
-    created = datetime.now(timezone.utc) - timedelta(minutes=5)
+def _doc_to_decision(doc: dict) -> Decision:
     return Decision(
-        id=decision_id,
-        createdAt=created.isoformat().replace("+00:00", "Z"),
-        tenantId=tenant_id,
-        spaceId=space_id,
-        agentId=agent_id,
-        workflowId=None,
-        inputs=[],
-        trace=[],
-        output={"summary": "Placeholder decision output"},
-        confidence=0.9,
-        status="completed",
-        errorMessage=None,
+        id=doc["id"],
+        createdAt=doc["createdAt"],
+        tenantId=doc["tenantId"],
+        spaceId=doc.get("spaceId"),
+        agentId=doc["agentId"],
+        workflowId=doc.get("workflowId"),
+        inputs=doc.get("inputs", []),
+        trace=doc.get("trace", []),
+        output=doc.get("output", {}),
+        confidence=doc.get("confidence", 0),
+        status=doc.get("status", "completed"),
+        errorMessage=doc.get("errorMessage"),
     )
 
 
 @router.get("", response_model=DecisionsListResponse)
 async def list_decisions(
+    ctx: TenantContext = Depends(get_effective_tenant_context),
     agentId: str | None = Query(None),
-    tenantId: str | None = Query(None),
-    spaceId: str | None = Query(None),
     from_: str | None = Query(None, alias="from"),
     to: str | None = Query(None),
 ) -> DecisionsListResponse:
-    """
-    List decisions (placeholder implementation).
-    """
-    tenant = tenantId or "demo-tenant"
-    space = spaceId or "default-space"
-    agent = agentId or "demo-agent"
-    decisions: List[Decision] = [
-        _demo_decision("dec-1", tenant, space, agent),
-        _demo_decision("dec-2", tenant, space, agent),
-    ]
+    """List decisions for tenant/space from domain store."""
+    since = None
+    if from_:
+        try:
+            since = datetime.fromisoformat(from_.replace("Z", "+00:00"))
+        except Exception:
+            pass
+    docs = await domain_store.list_decisions(
+        tenant_id=ctx.tenant_id,
+        space_id=ctx.space_id or None,
+        agent_id=agentId,
+        limit=100,
+        since=since,
+    )
+    decisions: List[Decision] = [_doc_to_decision(d) for d in docs]
     return DecisionsListResponse(
         data=decisions,
-        meta={
-            "placeholder": True,
-            "tenantId": tenant,
-            "spaceId": space,
-            "agentId": agent,
-            "from": from_,
-            "to": to,
-        },
+        meta={"tenantId": ctx.tenant_id, "spaceId": ctx.space_id, "from": from_, "to": to},
     )
 
 
 @router.get("/{decision_id}", response_model=DecisionItemResponse)
 async def get_decision(
     decision_id: str,
-    tenantId: str | None = Query(None),
-    spaceId: str | None = Query(None),
+    ctx: TenantContext = Depends(get_effective_tenant_context),
 ) -> DecisionItemResponse:
-    """
-    Get a single decision (placeholder).
-    """
-    tenant = tenantId or "demo-tenant"
-    space = spaceId or "default-space"
-    decision = _demo_decision(decision_id, tenant, space, "demo-agent")
-    return DecisionItemResponse(data=decision, meta={"placeholder": True})
+    """Get a single decision by id."""
+    doc = await domain_store.get_decision(decision_id, ctx.tenant_id)
+    if not doc:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=404, detail="Decision not found")
+    return DecisionItemResponse(data=_doc_to_decision(doc), meta={})
+
+
+class CreateDecisionBody(BaseModel):
+    agent_id: str
+    output: dict
+    confidence: float = 0.9
+    status: str = "completed"
+    inputs: list | None = None
+    trace: list | None = None
+
+
+@router.post("", status_code=201)
+async def create_decision(
+    body: CreateDecisionBody,
+    ctx: TenantContext = Depends(get_effective_tenant_context),
+):
+    """Create a decision (for seeding)."""
+    did = await domain_store.create_decision(
+        tenant_id=ctx.tenant_id,
+        space_id=ctx.space_id or "all",
+        agent_id=body.agent_id,
+        output=body.output,
+        confidence=body.confidence,
+        status=body.status,
+        inputs=body.inputs,
+        trace=body.trace,
+    )
+    return {"ok": True, "id": did}
 

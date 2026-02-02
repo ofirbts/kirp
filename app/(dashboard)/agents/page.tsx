@@ -34,8 +34,8 @@ function AgentsContent() {
     setError(null);
     try {
       const res = await apiClient.listAgents({
-        tenantId: tenantId ?? undefined,
-        spaceId: spaceId ?? undefined,
+        tenantId: tenantId ?? "default",
+        spaceId: spaceId ?? "all",
         status: statusFilter || undefined,
         type: typeFilter || undefined,
       });
@@ -56,8 +56,8 @@ function AgentsContent() {
   }
 
   return (
-    <div className="space-y-6">
-      <div>
+    <div className="space-y-6" suppressHydrationWarning>
+      <div suppressHydrationWarning>
         <h1 className="text-2xl font-bold tracking-tight">Agents</h1>
         <p className="text-muted-foreground text-sm mt-1">
           Manage and inspect intelligence agents.

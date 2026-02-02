@@ -36,8 +36,8 @@ function EventsContent() {
     setError(null);
     try {
       const res = await apiClient.listEvents({
-        tenantId: tenantId ?? undefined,
-        spaceId: spaceId ?? undefined,
+        tenantId: tenantId ?? "default",
+        spaceId: spaceId ?? "all",
         topic: topic || undefined,
         severity: (severity as EventSeverity) || undefined,
         status: status || undefined,
@@ -61,15 +61,21 @@ function EventsContent() {
   }
 
   return (
-    <div className="space-y-6">
-      <div>
+    <div className="space-y-6" suppressHydrationWarning>
+      <div suppressHydrationWarning>
         <h1 className="text-2xl font-bold tracking-tight">Events</h1>
         <p className="text-muted-foreground text-sm mt-1">
           Event stream and filters.
         </p>
       </div>
 
-      <div className="flex flex-wrap items-center gap-3">
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          load();
+        }}
+        className="flex flex-wrap items-center gap-3"
+      >
         <Input
           placeholder="Topic"
           value={topic}
@@ -114,10 +120,10 @@ function EventsContent() {
           onChange={(e) => setTo(e.target.value)}
           className="h-8 w-44 border-neutral-700 bg-neutral-900 text-sm"
         />
-        <Button variant="outline" size="sm" onClick={load}>
-          Apply
+        <Button type="submit" variant="outline" size="sm" disabled={loading}>
+          {loading ? "Loading…" : "Apply"}
         </Button>
-      </div>
+      </form>
 
       {error && <ErrorState message={error} onRetry={load} />}
 

@@ -64,7 +64,7 @@ def _append_memory_log(entry: dict) -> None:
 
 @click.group()
 def brandos():
-    """Brand OS v3 CLI — run, daily, signals, agents."""
+    """Brand OS v3 CLI — run, daily, signals, agents, system."""
 
 
 @brandos.command("run")
@@ -166,6 +166,13 @@ def agents_cmd():
     agents_list = list_agents()
     for a in agents_list:
         click.echo(a)
+
+
+try:
+    from brand_os_cli.system import system as system_group
+    brandos.add_command(system_group, "system")
+except ImportError:
+    pass
 
 
 def main():

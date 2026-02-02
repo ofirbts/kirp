@@ -19,6 +19,19 @@ from src.models.schema import SchemaNode, SchemaEntity
 
 logger = logging.getLogger(__name__)
 
+_schema_engine: "SchemaEngine | None" = None
+
+
+async def get_schema_engine(postgres_uri: str | None = None) -> "SchemaEngine":
+    """Singleton SchemaEngine for use by services and main app."""
+    global _schema_engine
+    if _schema_engine is None:
+        import os
+        uri = postgres_uri or os.getenv("POSTGRES_URI", "postgresql+asyncpg://kirp_user:kirp_password@localhost:5432/kirp")
+        _schema_engine = SchemaEngine(uri)
+        await _schema_engine.connect()
+    return _schema_engine
+
 
 class SchemaEngine:
     """

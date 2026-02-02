@@ -92,8 +92,8 @@ function DashboardContent() {
       ];
 
   return (
-    <div className="space-y-6">
-      <div>
+    <div className="space-y-6" suppressHydrationWarning>
+      <div suppressHydrationWarning>
         <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
         <p className="text-muted-foreground text-sm mt-1">
           System health, KPIs, and overview.

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useCallback, Suspense } from "react";
+import React, { useState, useCallback, useEffect, Suspense } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,13 +9,46 @@ import { useTenantContextStore } from "@/lib/stores/tenantContextStore";
 import { PageSkeleton } from "@/components/dashboard/PageSkeleton";
 import { ErrorState } from "@/components/feedback/ErrorState";
 import { EmptyState } from "@/components/dashboard/EmptyState";
+import { DataTable } from "@/components/dashboard/DataTable";
+
+interface DecisionRow {
+  id: string;
+  createdAt: string;
+  tenantId: string;
+  spaceId?: string;
+  agentId: string;
+  status: string;
+  confidence: number;
+  output?: unknown;
+}
 
 function DecisionsContent() {
   const { tenantId, spaceId } = useTenantContextStore();
   const [query, setQuery] = useState("");
   const [result, setResult] = useState<Record<string, unknown> | null>(null);
+  const [decisions, setDecisions] = useState<DecisionRow[]>([]);
   const [loading, setLoading] = useState(false);
+  const [loadingList, setLoadingList] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  const loadDecisions = useCallback(async () => {
+    setLoadingList(true);
+    try {
+      const res = await apiClient.listDecisions({
+        tenantId: tenantId ?? "default",
+        spaceId: spaceId ?? "all",
+      });
+      setDecisions((res.data ?? []) as DecisionRow[]);
+    } catch {
+      setDecisions([]);
+    } finally {
+      setLoadingList(false);
+    }
+  }, [tenantId, spaceId]);
+
+  useEffect(() => {
+    loadDecisions();
+  }, [loadDecisions]);
 
   const search = useCallback(async () => {
     if (!query.trim()) return;
@@ -25,7 +58,7 @@ function DecisionsContent() {
     try {
       const res = await apiClient.queryV1({
         tenant_id: tenantId ?? "default",
-        space_id: spaceId ?? "default",
+        space_id: spaceId ?? "all",
         user_id: "dashboard",
         query: query.trim(),
         k: 6,
@@ -39,43 +72,52 @@ function DecisionsContent() {
   }, [query, tenantId, spaceId]);
 
   return (
-    <div className="space-y-6">
-      <div>
+    <div className="space-y-6" suppressHydrationWarning>
+      <div suppressHydrationWarning>
         <h1 className="text-2xl font-bold tracking-tight">Decisions</h1>
         <p className="text-muted-foreground text-sm mt-1">
-          Browse and explore decisions (queryV1 for exploration).
+          Browse decisions and explore via RAG query.
         </p>
       </div>
 
-      <Card className="border-neutral-800 bg-neutral-900/70">
-        <CardHeader>
-          <CardTitle className="text-base">Decision timeline</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-sm text-neutral-500">
-            Run a query below to explore decision-related context. Results are returned from the RAG/query pipeline.
-          </p>
-        </CardContent>
-      </Card>
+      <DataTable<DecisionRow>
+        title="Decision timeline"
+        data={decisions}
+        keyExtractor={(r) => r.id}
+        loading={loadingList}
+        columns={[
+          { key: "agentId", header: "Agent", render: (r) => r.agentId },
+          { key: "status", header: "Status", render: (r) => r.status },
+          { key: "confidence", header: "Confidence", render: (r) => (r.confidence * 100).toFixed(0) + "%" },
+          { key: "createdAt", header: "Time", render: (r) => r.createdAt?.slice(0, 19) ?? "—" },
+        ]}
+        emptyMessage="No decisions yet. Run agents or seed script to populate."
+        pageSize={10}
+      />
 
       <Card className="border-neutral-800 bg-neutral-900/70">
         <CardHeader>
-          <CardTitle className="text-base">Explore</CardTitle>
+          <CardTitle className="text-base">Explore (RAG)</CardTitle>
         </CardHeader>
-        <CardContent className="flex flex-wrap items-end gap-3">
-          <div className="flex-1 min-w-[200px]">
-            <label className="block text-xs font-medium text-neutral-500 mb-1">Query</label>
-            <Input
-              placeholder="e.g. recent decisions, agent outcomes…"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && search()}
-              className="border-neutral-700 bg-neutral-900"
-            />
+        <CardContent>
+          <p className="text-sm text-neutral-500 mb-3">
+            Run a query to explore decision-related context from the RAG pipeline.
+          </p>
+          <div className="flex flex-wrap items-end gap-3">
+            <div className="flex-1 min-w-[200px]">
+              <label className="block text-xs font-medium text-neutral-500 mb-1">Query</label>
+              <Input
+                placeholder="e.g. recent decisions, agent outcomes…"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && search()}
+                className="border-neutral-700 bg-neutral-900"
+              />
+            </div>
+            <Button onClick={search} disabled={loading || !query.trim()}>
+              {loading ? "Searching…" : "Search"}
+            </Button>
           </div>
-          <Button onClick={search} disabled={loading || !query.trim()}>
-            {loading ? "Searching…" : "Search"}
-          </Button>
         </CardContent>
       </Card>
 

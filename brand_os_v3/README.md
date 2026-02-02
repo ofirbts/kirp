@@ -1,81 +1,82 @@
-# Brand OS v3.0 — Full Documentation
+# Brand OS v3.0 — Complete System Documentation
 
-A complete, modular, multi-agent Brand Operating System: config, agents, workflow, execution template, Python SDK, FastAPI, KIRP integration, and n8n export.
+A production-ready, modular, multi-agent Brand Operating System with config, agents, workflow, execution template, Python SDK, FastAPI, CLI, scheduler, monitoring dashboard, Next.js UI, integrations (WhatsApp, LinkedIn), KIRP integration, n8n export, and E2E test suite.
 
 ---
 
 ## Full System Overview
 
-Brand OS v3 produces on-brand, platform-adapted content (headline, body, hook, CTA, visual spec) from tenant_id, platform, and topic_hint. It runs a pipeline of eight agents in order, with two gatekeepers (IDENTITY_GUARDIAN, SKEPTICAL_CTO) that can reject and trigger one revision loop each. Config lives under `brand_os_v3/config/`, agent definitions under `brand_os_v3/agents/`, orchestration under `brand_os_v3/workflow/` and `brand_os_v3/execution/`. KIRP governance and event mapping live under `brand_os_v3/kirp/`. The system can be run via the Python SDK (`brand_os_sdk`), the FastAPI app (`api/main.py`), or the n8n workflow (`brand_os_v3/n8n/brand_os_v3_workflow.json`).
+Brand OS v3 produces on-brand, platform-adapted content (headline, body, hook, CTA, visual spec) from tenant_id, platform, and topic_hint. The system runs a pipeline of eight agents in order, with two gatekeepers (IDENTITY_GUARDIAN, SKEPTICAL_CTO) that can reject and trigger one revision loop each.
+
+**Core components:**
+- **Config** (`brand_os_v3/config/`) — 8 JSON files: identity, voice, agent mesh, world context, platform distribution, memory, hooks, visual identity
+- **Agents** (`brand_os_v3/agents/`) — 8 agent JSON files with role, input/output schemas, prompt templates, examples, gatekeeper logic
+- **Workflow** (`brand_os_v3/workflow/`) — Orchestration flow with gatekeeper loops, platform variants, logging
+- **Execution** (`brand_os_v3/execution/`) — EXECUTION_TEMPLATE with system prompt, agent order, revision rules
+- **KIRP** (`brand_os_v3/kirp/`) — 3 YAML files: governance policy, agent specs, workflow mapping
+- **n8n** (`brand_os_v3/n8n/`) — Real n8n workflow export (executable without modification)
+
+**Modules:**
+- **SDK** (`brand_os_sdk/`) — Python SDK: load_identity, load_voice, list_agents, run_orchestrator, handle_kirp_event
+- **API** (`api/`) — FastAPI: POST /brand-os/run, GET /health
+- **CLI** (`brand_os_cli/`) — Click CLI: brandos run, brandos daily, brandos signals, brandos agents
+- **Scheduler** (`brand_os_scheduler/`) — APScheduler daily job at 08:00 (auto-run pipeline)
+- **Monitoring** (`brand_os_monitoring/`) — FastAPI + Jinja2: /metrics (JSON), /dashboard (HTML with Chart.js)
+- **UI** (`brand_os_ui/`) — Next.js 14 App Router: /dashboard, /run, /history, /agents, /visuals
+- **Integrations** (`brand_os_integrations/`) — Twilio WhatsApp, LinkedIn API v2
+- **E2E tests** (`tests_e2e/`) — 11 test groups: config, SDK, API, KIRP, CLI, scheduler, monitoring, integrations, n8n, UI, Docker
 
 ---
 
 ## Architecture Diagram (ASCII)
 
 ```
-                    ┌─────────────────────────────────────────────────────────────────┐
-                    │                        BRAND OS v3                               │
-                    └─────────────────────────────────────────────────────────────────┘
-                                                              │
-     ┌──────────────┐     ┌──────────────┐     ┌──────────────┐     ┌──────────────┐
-     │   Trigger    │     │   Config     │     │   Execution   │     │   Output     │
-     │ tenant_id    │────▶│ brand_os_v3/ │────▶│ EXECUTION_   │────▶│ final_output │
-     │ platform     │     │ config/      │     │ TEMPLATE     │     │ _format      │
-     │ topic_hint   │     │ agents/     │     │ workflow/    │     │ content      │
-     └──────────────┘     └──────────────┘     └──────────────┘     │ visual_spec  │
-              │                     │                    │           │ status       │
-              │                     │                    │           └──────────────┘
-              ▼                     ▼                    ▼
-     ┌─────────────────────────────────────────────────────────────────────────────┐
-     │                         AGENT PIPELINE (flow_order)                          │
-     │                                                                              │
-     │  Prepare Input ──▶ CONTEXT_SCANNER ──▶ STRATEGIC_PLANNER ──▶ TECHNICAL_      │
-     │                                                                 STORYTELLER  │
-     │         │                    │                    │                    │     │
-     │         ▼                    ▼                    ▼                    ▼     │
-     │  HUMAN_EDGE ◀──────── Revision (Identity) ◀── IDENTITY_GUARDIAN ──▶ IF?     │
-     │       │                    │                         │                  │     │
-     │       │                    │                         ▼                  │     │
-     │       │                    │              SKEPTICAL_CTO ◀─────────────────┘   │
-     │       │                    │                    │                            │
-     │       │                    └──────── Revision (CTO) ◀────────── IF?           │
-     │       │                              │                            │           │
-     │       ▼                              ▼                            ▼           │
-     │  VISUAL_GENERATOR ──▶ Logging ──▶ GROWTH_ANALYST ──▶ Final Output            │
-     │                                                                              │
-     └─────────────────────────────────────────────────────────────────────────────┘
-              │                     │                    │
-              ▼                     ▼                    ▼
-     ┌──────────────┐     ┌──────────────┐     ┌──────────────┐
-     │  Python SDK  │     │  FastAPI     │     │  n8n         │
-     │ brand_os_   │     │ api/main.py  │     │ brand_os_v3_ │
-     │ sdk         │     │ POST /brand- │     │ workflow     │
-     │ run_        │     │ os/run       │     │ .json        │
-     │ orchestrator│     │              │     │              │
-     └──────────────┘     └──────────────┘     └──────────────┘
-              │                     │                    │
-              └─────────────────────┴────────────────────┘
-                                    │
-                                    ▼
-                         ┌──────────────────────┐
-                         │  KIRP Integration    │
-                         │  kirp/*.yaml         │
-                         │  handle_kirp_event() │
-                         └──────────────────────┘
+┌───────────────────────────────────────────────────────────────────────────────┐
+│                        BRAND OS v3 COMPLETE ECOSYSTEM                          │
+└───────────────────────────────────────────────────────────────────────────────┘
+         │
+         ├─── Triggers: CLI (brandos), API (POST /brand-os/run), n8n, KIRP, Scheduler
+         │
+         ▼
+┌───────────────────────────────────────────────────────────────────────────────┐
+│  ORCHESTRATOR (brand_os_sdk.run_orchestrator)                                 │
+│  ┌─────────────────────────────────────────────────────────────────────────┐  │
+│  │ Prepare Input → CONTEXT_SCANNER → STRATEGIC_PLANNER →                  │  │
+│  │ TECHNICAL_STORYTELLER → HUMAN_EDGE → IDENTITY_GUARDIAN (gatekeeper) →  │  │
+│  │ IF approved → SKEPTICAL_CTO (gatekeeper) → IF approved →               │  │
+│  │ VISUAL_GENERATOR → Logging → GROWTH_ANALYST → Final Output             │  │
+│  │                                                                         │  │
+│  │ Revision loops:                                                         │  │
+│  │   IDENTITY_GUARDIAN reject → Revision → HUMAN_EDGE (max 1)             │  │
+│  │   SKEPTICAL_CTO reject → Revision → HUMAN_EDGE (max 1)                 │  │
+│  └─────────────────────────────────────────────────────────────────────────┘  │
+└───────────────────────────────────────────────────────────────────────────────┘
+         │
+         ▼
+┌───────────────────────────────────────────────────────────────────────────────┐
+│  OUTPUT (final_output_format)                                                 │
+│  trace_id, tenant_id, platform, topic_hint                                    │
+│  content: headline, body, hook_used, cta_used                                 │
+│  visual_spec: image_prompt, aspect_ratio, format, alt_text                    │
+│  recommendations: suggested_timing, hook_rotation, cta_rotation, topics       │
+│  status: approved | rejected_identity | rejected_cto                          │
+└───────────────────────────────────────────────────────────────────────────────┘
+         │
+         ├─── Publish: WhatsApp (Twilio), LinkedIn (API v2), log to memory
+         ├─── Monitor: brand_os_monitoring (/metrics, /dashboard)
+         └─── UI: brand_os_ui (Next.js 14: /dashboard, /run, /history, /agents, /visuals)
 ```
 
 ---
 
-## Config Layer
-
-Config files under `brand_os_v3/config/` define identity, voice, agent mesh, world context, platform distribution, content memory, hooks, and visual identity.
+## Config Layer (8 JSON files)
 
 | File | Description |
 |------|--------------|
-| 00_Master_Identity_Core.json | brand_name, mission, values, tone_profile, constraints, audience_archetypes; rules; thresholds (identity_alignment_min_score, tone_deviation_max); enums; examples |
+| 00_Master_Identity_Core.json | brand_name, mission, values, tone_profile, constraints, audience_archetypes; rules; thresholds; enums; examples |
 | 02_Content_Memory_Log.json | log_schema, retention, usage_rules, dedup_rules; rules; thresholds; examples |
 | 03_Voice_Engine.json | voice_id, sentence_rules, vocabulary, platform_adaptations; rules; thresholds; enums; examples |
-| 04_Agent_Mesh_Protocol.json | agents (id, name, phase, inputs_from, outputs_to), flow_order, handoff_schema, contracts; rules; thresholds; enums; examples |
+| 04_Agent_Mesh_Protocol.json | agents, flow_order, handoff_schema, contracts; rules; thresholds; enums; examples |
 | 05_Hook_Library.json | hooks, ctas, openers; rules; thresholds; enums; examples |
 | 06_Visual_Identity.json | colors, typography, imagery_rules, output_specs; rules; thresholds; enums; examples |
 | 07_World_Context_Engine.json | sources, refresh_policies, signal_schema, weighting; rules; thresholds; enums; examples |
@@ -83,9 +84,7 @@ Config files under `brand_os_v3/config/` define identity, voice, agent mesh, wor
 
 ---
 
-## Agent Descriptions
-
-Agents under `brand_os_v3/agents/` each have role, responsibilities, input_schema, output_schema, prompt_template, failure_modes, example_input, example_output, and gatekeeper_logic (for gatekeepers).
+## Agent Descriptions (8 agents)
 
 | Agent | Role | Phase | Inputs From | Outputs To |
 |-------|------|-------|-------------|------------|
@@ -102,73 +101,157 @@ Agents under `brand_os_v3/agents/` each have role, responsibilities, input_schem
 
 ## Workflow Explanation
 
-1. **Trigger** — Input: tenant_id, platform, topic_hint; optional trace_id, signals, memory_entries (extra_context).
+1. **Trigger** — Input: tenant_id, platform, topic_hint; optional trace_id, signals, memory_entries.
 2. **Prepare Input** — Generate trace_id if missing; attach config (identity, voice, hooks, platform, visual).
 3. **CONTEXT_SCANNER** — Output: world_context, trends, signals_used, memory_summary.
 4. **STRATEGIC_PLANNER** — Output: strategy_brief (angle, key_points, suggested_hook_id, suggested_cta_id, tone_note).
 5. **TECHNICAL_STORYTELLER** — Output: draft (headline, body, hook_used, cta_used).
 6. **HUMAN_EDGE** — Output: polished_draft.
 7. **IDENTITY_GUARDIAN** — Output: approved, identity_alignment, tone_deviation, revision_notes. If approved=false, pass revision_notes to HUMAN_EDGE and re-run HUMAN_EDGE → IDENTITY_GUARDIAN once (max one identity revision).
-8. **IF Identity Approved?** — Yes → SKEPTICAL_CTO; No (after revision) → set status=rejected_identity and stop, or retry once.
+8. **IF Identity Approved?** — Yes → SKEPTICAL_CTO; No (after revision) → set status=rejected_identity and stop.
 9. **SKEPTICAL_CTO** — Output: approved, technical_accuracy, overclaim_risk, revision_notes. If approved=false, pass revision_notes to HUMAN_EDGE and re-run HUMAN_EDGE → IDENTITY_GUARDIAN → SKEPTICAL_CTO once (max one CTO revision).
-10. **IF CTO Approved?** — Yes → VISUAL_GENERATOR; No (after revision) → set status=rejected_cto and stop, or retry once.
+10. **IF CTO Approved?** — Yes → VISUAL_GENERATOR; No (after revision) → set status=rejected_cto and stop.
 11. **VISUAL_GENERATOR** — Output: visual_spec (image_prompt, aspect_ratio, format, alt_text).
 12. **Logging** — Log trace_id, tenant_id, platform, approved/rejected.
 13. **GROWTH_ANALYST** — Output: recommendations.
-14. **Final Output** — Assemble: trace_id, tenant_id, platform, topic_hint, content, visual_spec, recommendations, status (approved | rejected_identity | rejected_cto).
+14. **Final Output** — Assemble: trace_id, tenant_id, platform, topic_hint, content, visual_spec, recommendations, status.
 
 Defined in: `workflow/master_orchestrator_workflow.json`, `execution/EXECUTION_TEMPLATE.json`.
 
 ---
 
-## API Usage
+## Modules
 
-The FastAPI app lives at `api/main.py` (repo root). Run from repo root:
+### Python SDK (`brand_os_sdk/`)
 
-```bash
-uvicorn api.main:app --reload
+**Exports:**
+- `load_identity()` — Load Master Identity Core from config/00_Master_Identity_Core.json
+- `load_voice()` — Load Voice Engine from config/03_Voice_Engine.json
+- `list_agents()` — List agent IDs from agents/*.json
+- `run_orchestrator(input_payload: dict) -> dict` — Run the pipeline; returns final_output_format
+- `handle_kirp_event(event: dict) -> Optional[dict]` — Route KIRP events; for brand_os_run_started runs orchestrator
+
+**Example:**
+```python
+from brand_os_sdk import run_orchestrator
+result = run_orchestrator({"tenant_id": "t1", "platform": "linkedin", "topic_hint": "API release"})
 ```
 
-- Base URL: `http://127.0.0.1:8000`
-- Docs: `http://127.0.0.1:8000/docs`
-- Health: `GET /health` → `{"status": "ok", "service": "brand-os-v3-api"}`
-- Run pipeline: `POST /brand-os/run`
+### FastAPI (`api/`)
 
-**POST /brand-os/run** — Body: tenant_id (required), platform (required), topic_hint (required), trace_id (optional), extra_context (optional). Response: final_output_format (trace_id, tenant_id, platform, topic_hint, content, visual_spec, recommendations, status). 503 if config not found; 400 on invalid input.
+**Endpoints:**
+- `GET /health` → `{"status": "ok", "service": "brand-os-v3-api"}`
+- `POST /brand-os/run` → final_output_format (trace_id, content, visual_spec, recommendations, status)
 
-See `README_API.md` (repo root) for full API and deployment details.
+**Run:** `uvicorn api.main:app --reload` → `http://127.0.0.1:8000`
+
+### CLI (`brand_os_cli/`)
+
+**Commands:**
+- `brandos run "<topic>"` — Calls API or SDK; prints content, visual spec, recommendations
+- `brandos daily` — Runs CONTEXT_SCANNER, picks best signal, runs orchestrator, optional WhatsApp, appends to memory log
+- `brandos signals` — Runs CONTEXT_SCANNER; prints world_context, trends
+- `brandos agents` — Prints list of agents
+
+**Install:** `pip install -e .` → `brandos` command available
+
+### Scheduler (`brand_os_scheduler/`)
+
+Daily job at 08:00: CONTEXT_SCANNER → pick best signal → run_orchestrator → optional WhatsApp → append to memory log.
+
+**Run:** `python run_scheduler.py` (blocks; runs daily at 08:00)
+
+**Env:** `BRAND_OS_TENANT_ID`, `BRAND_OS_PLATFORM`, `BRAND_OS_WHATSAPP_TO`
+
+### Monitoring (`brand_os_monitoring/`)
+
+**Endpoints:**
+- `GET /metrics` — JSON: total_runs, approved, rejected_identity, rejected_cto, avg_revisions, top_hooks, top_pillars
+- `GET /dashboard` — HTML with Chart.js (doughnut: status distribution; bar: top topics)
+
+**Run:** `uvicorn brand_os_monitoring.app:app --port 8001 --reload` → `http://127.0.0.1:8001`
+
+**Data source:** `brand_os_v3/storage/content_memory_log.jsonl`
+
+### UI (`brand_os_ui/`)
+
+Next.js 14 App Router with pages: /, /dashboard, /run, /history, /agents, /visuals.
+
+**Run:** `cd brand_os_ui && npm run dev` → `http://localhost:3001`
+
+**Components:** Layout, PostCard, VisualCard, AgentCard, RunForm
+
+**API client:** `lib/api.ts` — `runBrandOs()`, `healthCheck()`
+
+**Theme:** Primary #0A2540, secondary #00D4AA, accent #FF6B35 (from Visual Identity)
+
+### Integrations (`brand_os_integrations/`)
+
+**WhatsApp (Twilio):**
+```python
+from brand_os_integrations.whatsapp import send_whatsapp
+send_whatsapp("+1234567890", "Hello")
+```
+Env: `TWILIO_SID`, `TWILIO_TOKEN`, `TWILIO_WHATSAPP_FROM`
+
+**LinkedIn (API v2):**
+```python
+from brand_os_integrations.linkedin import post_text, post_image
+post_text("Hello from Brand OS!")
+```
+Env: `LINKEDIN_ACCESS_TOKEN`, `LINKEDIN_PERSON_URN`, `LINKEDIN_ASSET_URN` (for images)
+
+### E2E Tests (`tests_e2e/`)
+
+11 test groups: config validity, SDK, API, KIRP integration, CLI, scheduler, monitoring, integrations, n8n workflow, UI build, Docker.
+
+**Run:** `pytest -q tests_e2e/` → 38 passed, 3 skipped
 
 ---
 
-## SDK Usage
+## Quick Start
 
-The Python SDK lives under `brand_os_sdk/` (repo root). It reads config and agents from `brand_os_v3/config/` and `brand_os_v3/agents/` (path from `BRAND_OS_V3_PATH` or default repo sibling).
+### Local development
 
-**Exports:**
+```bash
+# 1. Install Python deps
+pip install -e .
 
-- `load_identity()` — Load Master Identity Core from `config/00_Master_Identity_Core.json`.
-- `load_voice()` — Load Voice Engine from `config/03_Voice_Engine.json`.
-- `list_agents()` — List agent IDs from `agents/*.json` (e.g. CONTEXT_SCANNER, STRATEGIC_PLANNER, …).
-- `run_orchestrator(input_payload: dict) -> dict` — Run the pipeline per EXECUTION_TEMPLATE and workflow; returns final_output_format. input_payload must include tenant_id, platform, topic_hint; optional trace_id, extra_context (signals, memory_entries).
+# 2. Run API
+uvicorn api.main:app --reload
+# API: http://127.0.0.1:8000
 
-**Example:**
+# 3. Run UI (separate terminal)
+cd brand_os_ui && npm install && npm run dev
+# UI: http://localhost:3001
 
-```python
-from brand_os_sdk import load_identity, load_voice, list_agents, run_orchestrator
+# 4. Run CLI
+brandos run "API release" --tenant tenant-1 --platform linkedin
 
-identity = load_identity()
-voice = load_voice()
-agents = list_agents()  # ['CONTEXT_SCANNER', 'GROWTH_ANALYST', ...]
+# 5. Run scheduler (separate terminal)
+python run_scheduler.py
 
-result = run_orchestrator({
-    "tenant_id": "tenant-1",
-    "platform": "linkedin",
-    "topic_hint": "API release",
-})
-# result: trace_id, tenant_id, platform, topic_hint, content, visual_spec, recommendations, status
+# 6. Run monitoring (separate terminal)
+uvicorn brand_os_monitoring.app:app --port 8001 --reload
+# Dashboard: http://127.0.0.1:8001/dashboard
+
+# 7. Run E2E tests
+pytest -q tests_e2e/
 ```
 
-**KIRP integration:** `brand_os_sdk.kirp_integration.handle_kirp_event(event)` routes KIRP events; for event_type `brand_os_run_started` or `brand_os_v3.workflow.started` it runs the orchestrator and returns the result. See `brand_os_v3/KIRP_INTEGRATION.md` and `README_API.md`.
+### Docker
+
+```bash
+# Build API
+docker build -f Dockerfile.brand_os_api -t brand-os-api .
+docker run -p 8000:8000 brand-os-api
+# API: http://localhost:8000
+
+# Build UI (create brand_os_ui/Dockerfile first; see OPERATIONS_MANUAL.md)
+cd brand_os_ui && docker build -t brand-os-ui .
+docker run -p 3001:3001 -e NEXT_PUBLIC_BRAND_OS_API_URL=http://host.docker.internal:8000 brand-os-ui
+# UI: http://localhost:3001
+```
 
 ---
 
@@ -184,80 +267,23 @@ Defined in `kirp/workflow_mapping.yaml` and `kirp/governance_policy.yaml`.
 | Identity rejected | brand_os_v3.identity.rejected | trace_id, identity_alignment, tone_deviation, revision_notes |
 | CTO rejected | brand_os_v3.cto.rejected | trace_id, technical_accuracy, overclaim_risk, revision_notes |
 
-Agent completion events: brand_os_v3.context_scanner.completed, brand_os_v3.strategic_planner.completed, … (one per agent). Gatekeeper reject events: brand_os_v3.identity.rejected, brand_os_v3.cto.rejected.
+Agent completion events: brand_os_v3.context_scanner.completed, brand_os_v3.strategic_planner.completed, … (one per agent).
 
-Governance rules (governance_policy.yaml): identity_must_align, no_forbidden_topics, no_forbidden_claims, technical_accuracy, agent_order, revision_loop_max. identity_constraints and agent_constraints define allowed inputs and required outputs per agent.
+Governance rules (governance_policy.yaml): identity_must_align, no_forbidden_topics, no_forbidden_claims, technical_accuracy, agent_order, revision_loop_max.
 
-Full mapping and alignment with `agents/*.json` is in `brand_os_v3/KIRP_INTEGRATION.md`.
-
----
-
-## n8n Workflow Explanation
-
-The file `n8n/brand_os_v3_workflow.json` is a real n8n workflow export. Import it into n8n to run the pipeline visually.
-
-**Nodes:**
-
-- **Manual Trigger** — Start with tenant_id, platform, topic_hint (and optionally trace_id, signals, memory_entries).
-- **Prepare Input** — Code node: normalizes input and sets trace_id.
-- **CONTEXT_SCANNER** — Code node: produces context_brief (stub).
-- **STRATEGIC_PLANNER** — Code node: produces content_brief (stub).
-- **TECHNICAL_STORYTELLER** — Code node: produces draft.
-- **HUMAN_EDGE** — Code node: produces human_draft.
-- **IDENTITY_GUARDIAN** — Code node: identity_result (approved, score, reasons, suggested_fixes).
-- **Identity Approved?** — IF node: true → SKEPTICAL_CTO; false → Revision (Identity).
-- **Revision (Identity)** — Code node: revises draft from identity_result.suggested_fixes; connects back to HUMAN_EDGE.
-- **SKEPTICAL_CTO** — Code node: cto_result (approved, claims_checked, issues, suggested_fixes).
-- **CTO Approved?** — IF node: true → VISUAL_GENERATOR; false → Revision (CTO).
-- **Revision (CTO)** — Code node: revises draft from cto_result; connects back to HUMAN_EDGE.
-- **VISUAL_GENERATOR** — HTTP Request node (placeholder URL); continueOnFail true.
-- **Visual Brief Fallback** — Code node: builds visual_spec from input or SKEPTICAL_CTO context when HTTP is not used or fails.
-- **Logging** — Code node: logs trace_id, tenant_id, platform, event.
-- **Final Output JSON** — Set node: assembles content, visual, context_brief, content_brief, gatekeeper_results, timestamp.
-
-**Connections:** Manual Trigger → Prepare Input → CONTEXT_SCANNER → … → HUMAN_EDGE → IDENTITY_GUARDIAN → Identity Approved? → (true) SKEPTICAL_CTO → CTO Approved? → (true) VISUAL_GENERATOR → Visual Brief Fallback → Logging → Final Output JSON. Rejection branches go to Revision (Identity) or Revision (CTO) then back to HUMAN_EDGE.
-
-Executable in n8n without modification. For production, replace Code-node stubs with HTTP calls to an LLM or the Brand OS API.
+Full KIRP integration: `brand_os_v3/KIRP_INTEGRATION.md`.
 
 ---
 
-## Deployment Instructions
+## n8n Workflow
 
-### Local (API)
+Import `n8n/brand_os_v3_workflow.json` into n8n. Run with Manual Trigger; supply tenant_id, platform, topic_hint.
 
-From repo root:
+**Nodes:** Manual Trigger, Prepare Input, CONTEXT_SCANNER, STRATEGIC_PLANNER, TECHNICAL_STORYTELLER, HUMAN_EDGE, IDENTITY_GUARDIAN, Identity Approved?, SKEPTICAL_CTO, CTO Approved?, Revision (Identity), Revision (CTO), VISUAL_GENERATOR (HTTP placeholder), Visual Brief Fallback, Logging, Final Output JSON.
 
-```bash
-pip install "fastapi>=0.109.0" "uvicorn[standard]>=0.27.0" "pydantic>=2.0.0"
-export BRAND_OS_V3_PATH=/path/to/brand_os_v3   # optional; default is repo sibling
-uvicorn api.main:app --reload
-```
+**Connections:** Trigger → Prepare → CONTEXT_SCANNER → … → HUMAN_EDGE → IDENTITY_GUARDIAN → IF → SKEPTICAL_CTO → IF → VISUAL_GENERATOR → Fallback → Logging → Final Output. Rejection branches loop back to HUMAN_EDGE.
 
-API: `http://127.0.0.1:8000`. POST /brand-os/run with tenant_id, platform, topic_hint.
-
-### Local (SDK only)
-
-From repo root, ensure `brand_os_v3/` is present (or set BRAND_OS_V3_PATH). Then:
-
-```python
-from brand_os_sdk import run_orchestrator
-result = run_orchestrator({"tenant_id": "t1", "platform": "linkedin", "topic_hint": "API"})
-```
-
-### Docker (API)
-
-From repo root:
-
-```bash
-docker build -f Dockerfile.brand_os_api -t brand-os-api .
-docker run -p 8000:8000 brand-os-api
-```
-
-Image copies brand_os_v3/, brand_os_sdk/, api/ and sets BRAND_OS_V3_PATH=/app/brand_os_v3. API: `http://localhost:8000`.
-
-### n8n
-
-Import `brand_os_v3/n8n/brand_os_v3_workflow.json` into n8n. Run with Manual Trigger; supply tenant_id, platform, topic_hint in the trigger payload.
+Executable in n8n without modification. For production: replace Code stubs with HTTP calls to Brand OS API or LLM.
 
 ---
 
@@ -265,28 +291,87 @@ Import `brand_os_v3/n8n/brand_os_v3_workflow.json` into n8n. Run with Manual Tri
 
 | Path | Description |
 |------|--------------|
-| config/00_Master_Identity_Core.json | Identity, mission, values, tone, constraints, audience |
-| config/02_Content_Memory_Log.json | Log schema, retention, usage_rules, dedup_rules |
-| config/03_Voice_Engine.json | Voice id, sentence_rules, vocabulary, platform_adaptations |
-| config/04_Agent_Mesh_Protocol.json | Agents, flow_order, handoff_schema, contracts |
-| config/05_Hook_Library.json | Hooks, ctas, openers |
-| config/06_Visual_Identity.json | Colors, typography, imagery_rules, output_specs |
-| config/07_World_Context_Engine.json | Sources, refresh_policies, signal_schema, weighting |
-| config/08_Platform_Distribution_Map.json | Platforms, variant_schema, routing_rules |
-| agents/*.json | Role, input/output schema, prompt_template, examples, gatekeeper_logic |
+| config/*.json | 8 config files (identity, voice, mesh, world, platform, memory, hook, visual) |
+| agents/*.json | 8 agent files (role, input/output schema, prompt, examples, gatekeeper logic) |
 | workflow/master_orchestrator_workflow.json | Trigger, nodes, connections, flow_order, gatekeeper_loops, final_output_schema |
 | execution/EXECUTION_TEMPLATE.json | orchestrator_system_prompt, user_prompt_template, agent/gatekeeper order, revision_loop rules, final_output_format |
-| kirp/governance_policy.yaml | Rules, identity_constraints, agent_constraints, event_triggers |
-| kirp/agent_specs.yaml | Agent definitions, input/output refs, governance tags, kirp_event_* |
-| kirp/workflow_mapping.yaml | event_triggers, routing_rules, agent_to_kirp_event |
+| kirp/*.yaml | 3 YAML files (governance_policy, agent_specs, workflow_mapping) |
 | n8n/brand_os_v3_workflow.json | n8n workflow export (Manual Trigger → … → Final Output) |
-| KIRP_INTEGRATION.md | KIRP events, governance, agent_specs alignment, SDK routes |
+| README.md | This file (system overview, architecture, modules, quick start, KIRP, n8n, file map, how to extend) |
+| KIRP_INTEGRATION.md | KIRP events, governance, agent_specs alignment, SDK handle_kirp_event |
+| OPERATIONS_MANUAL.md | Full operations guide (setup, usage, deployment, CI/CD, multi-tenant, auto-learning, analytics) |
+| FILE_MAP.md | Complete file list, purpose, interactions, module, dependency graph, learning guide |
+
+**SDK:** brand_os_sdk/ (config_loader, orchestrator, kirp_integration, __init__)
+
+**API:** api/ (main.py, __init__)
+
+**CLI:** brand_os_cli/ (main.py, __init__)
+
+**Scheduler:** brand_os_scheduler/ (scheduler.py, __init__); run_scheduler.py
+
+**Monitoring:** brand_os_monitoring/ (app.py, templates/dashboard.html, __init__)
+
+**UI:** brand_os_ui/ (app/, components/, lib/, package.json, next.config.js, tailwind.config.js, tsconfig.json, postcss.config.js, next-env.d.ts)
+
+**Integrations:** brand_os_integrations/ (whatsapp.py, linkedin.py, __init__)
+
+**E2E tests:** tests_e2e/ (11 test files: test_config_validity, test_sdk, test_api, test_kirp_integration, test_cli, test_scheduler, test_monitoring, test_integrations, test_n8n_workflow, test_ui_build, test_docker)
+
+**Root:** pyproject.toml, Dockerfile.brand_os_api, README_API.md
 
 ---
 
 ## How to Extend
 
-- **New agent:** Add `agents/<ID>.json`; add to config/04_Agent_Mesh_Protocol.json and execution/EXECUTION_TEMPLATE.json; add node and connections in workflow and n8n workflow; add entry in kirp/agent_specs.yaml and kirp/workflow_mapping.yaml.
-- **New platform:** Add platform in config/08_Platform_Distribution_Map.json and config/03_Voice_Engine.json platform_adaptations; extend platform enum in agent input_schemas and workflow.
-- **New gatekeeper:** Add agent JSON with gatekeeper_logic; insert in flow_order; add IF node and revision loop in workflow and n8n; add to gatekeeper_invocation_order and revision_loop_rules; update KIRP policy and mapping.
-- **New config file:** Add JSON under config/; reference from Agent Mesh Protocol or execution template; inject into agents as needed.
+### Add a new agent
+
+1. Add `agents/<ID>.json` with role, input_schema, output_schema, prompt_template, example_input, example_output.
+2. Add to `config/04_Agent_Mesh_Protocol.json` (agents array, flow_order).
+3. Add to `execution/EXECUTION_TEMPLATE.json` (agent_invocation_order).
+4. Add node and connections in `workflow/master_orchestrator_workflow.json` and `n8n/brand_os_v3_workflow.json`.
+5. Add entry in `kirp/agent_specs.yaml` and `kirp/workflow_mapping.yaml`.
+6. Update `brand_os_sdk/orchestrator.py` to invoke the new agent.
+
+### Add a new platform
+
+1. Add platform entry in `config/08_Platform_Distribution_Map.json` (id, name, enabled, limits, content_rules).
+2. Add platform_adaptations in `config/03_Voice_Engine.json`.
+3. Extend platform enum in agent input_schemas (CONTEXT_SCANNER, STRATEGIC_PLANNER, etc.).
+4. Update `workflow/master_orchestrator_workflow.json` platform_variants.
+5. Add platform variant logic in TECHNICAL_STORYTELLER or HUMAN_EDGE.
+
+### Add a new gatekeeper
+
+1. Add `agents/<ID>.json` with gatekeeper_logic (approve_condition, on_reject, on_approve).
+2. Insert in flow_order between HUMAN_EDGE and VISUAL_GENERATOR (or after SKEPTICAL_CTO).
+3. Add IF node and revision loop in workflow and n8n.
+4. Add to gatekeeper_invocation_order and revision_loop_rules in EXECUTION_TEMPLATE.json.
+5. Update KIRP governance_policy and workflow_mapping.
+
+### Add a new integration
+
+1. Create `brand_os_integrations/<platform>.py` with post function.
+2. Export from `brand_os_integrations/__init__.py`.
+3. Use in CLI or scheduler.
+
+### Add a new UI page
+
+1. Create `brand_os_ui/app/<page>/page.tsx`.
+2. Add link in `brand_os_ui/components/Layout.tsx`.
+
+### Add a new CLI command
+
+1. Edit `brand_os_cli/main.py`: add `@brandos.command("<name>")` function.
+2. Run: `brandos <name>`.
+
+---
+
+## Resources
+
+- **OPERATIONS_MANUAL.md** — Full operations guide (setup, usage, deployment, cloud, CI/CD, multi-tenant, auto-learning, analytics, troubleshooting)
+- **KIRP_INTEGRATION.md** — KIRP events, governance, agent_specs alignment, SDK handle_kirp_event
+- **README_API.md** (repo root) — API usage, SDK usage, KIRP integration, deployment
+- **FILE_MAP.md** — Complete file list, purpose, interactions, module, dependency graph, learning guide
+- **E2E tests** — `tests_e2e/` (11 test groups); run with `pytest -q tests_e2e/`
+- **Monitoring** — `http://127.0.0.1:8001/dashboard` (metrics and charts)

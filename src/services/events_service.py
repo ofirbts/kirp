@@ -51,6 +51,7 @@ async def list_events(
     status: Optional[str] = None,
     from_ts: Optional[str] = None,
     to_ts: Optional[str] = None,
+    limit: int = 100,  
 ) -> List[EventSchema]:
     """List events from EventStore. Tenant required for multi-tenant isolation."""
     if not tenant_id:

@@ -1,64 +1,72 @@
 "use client";
 
-import React, { useState, Suspense } from "react";
+import React, { useState, useEffect, useCallback, Suspense } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { DataTable } from "@/components/dashboard/DataTable";
 import { PageSkeleton } from "@/components/dashboard/PageSkeleton";
 import { useCan } from "@/lib/auth/permissions";
+import { apiClient } from "@/lib/apiClient";
 import type { User, Role } from "@/lib/types";
-
-const MOCK_USERS: User[] = [
-  {
-    id: "user-1",
-    email: "operator@kirp.local",
-    name: "Operator",
-    status: "active",
-    roles: ["role-1"],
-    tenants: ["tenant-1"],
-    spaces: ["space-1"],
-    createdAt: new Date().toISOString(),
-  },
-];
-
-const MOCK_ROLES: Role[] = [
-  {
-    id: "role-1",
-    name: "Operator",
-    description: "Read and execute",
-    permissions: [
-      { resource: "agents", action: "read", scope: "tenant" },
-      { resource: "events", action: "read", scope: "tenant" },
-    ],
-  },
-];
 
 function UsersRolesContent() {
   const { can } = useCan();
+  const [users, setUsers] = useState<User[]>([]);
+  const [roles, setRoles] = useState<Role[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [selectedRole, setSelectedRole] = useState<Role | null>(null);
   const [userDrawerOpen, setUserDrawerOpen] = useState(false);
   const [roleDrawerOpen, setRoleDrawerOpen] = useState(false);
 
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const [uRes, rRes] = await Promise.all([
+        apiClient.listUsers(),
+        apiClient.listRoles(),
+      ]);
+      setUsers((uRes.data ?? []) as User[]);
+      setRoles((rRes.data ?? []) as Role[]);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to load users/roles");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  if (loading && users.length === 0 && roles.length === 0) {
+    return <PageSkeleton title subtitle tableRows={8} />;
+  }
+
   return (
-    <div className="space-y-6">
-      <div>
+    <div className="space-y-6" suppressHydrationWarning>
+      <div suppressHydrationWarning>
         <h1 className="text-2xl font-bold tracking-tight">Users & Roles</h1>
         <p className="text-muted-foreground text-sm mt-1">
-          Directory and permissions (mock data; no backend API yet).
+          Directory and permissions. Data from /api/users and /api/roles.
         </p>
       </div>
 
       <DataTable<User>
         title="Users"
-        data={MOCK_USERS}
+        data={users}
         keyExtractor={(r) => r.id}
         columns={[
           { key: "name", header: "Name", render: (r) => r.name },
           { key: "email", header: "Email", render: (r) => r.email },
           { key: "status", header: "Status", render: (r) => r.status },
         ]}
-        emptyMessage="No users (mock list)."
+        loading={loading}
+        error={error}
+        onRetry={load}
+        emptyMessage="No users."
         pageSize={10}
         onRowClick={(row) => {
           setSelectedUser(row);
@@ -68,13 +76,16 @@ function UsersRolesContent() {
 
       <DataTable<Role>
         title="Roles"
-        data={MOCK_ROLES}
+        data={roles}
         keyExtractor={(r) => r.id}
         columns={[
           { key: "name", header: "Name", render: (r) => r.name },
           { key: "description", header: "Description", render: (r) => r.description ?? "—" },
         ]}
-        emptyMessage="No roles (mock list)."
+        loading={loading}
+        error={error}
+        onRetry={load}
+        emptyMessage="No roles."
         pageSize={10}
         onRowClick={(row) => {
           setSelectedRole(row);

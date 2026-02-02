@@ -3,6 +3,9 @@ FROM python:3.12-slim
 
 WORKDIR /app
 
+RUN apt-get update && apt-get install -y --no-install-recommends curl \
+    && rm -rf /var/lib/apt/lists/*
+
 # Copy Brand OS v3 config/agents and SDK + API (no pyproject so PYTHONPATH is enough)
 COPY brand_os_v3/ ./brand_os_v3/
 COPY brand_os_sdk/ ./brand_os_sdk/

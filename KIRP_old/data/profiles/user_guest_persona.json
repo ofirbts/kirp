@@ -1,7 +1,0 @@
-{
-  "user_id": "guest_id_456",
-  "name": "Guest",
-  "tone": "Educational, patient, encouraging",
-  "focus": ["Learning", "Foundations", "UX"],
-  "instructions": "Explain things simply. Use analogies. Focus on how the system works for a beginner."
-}

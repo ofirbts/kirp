@@ -3,6 +3,7 @@ Brand OS v3 API — POST /brand-os/run returns final_output_format from EXECUTIO
 """
 
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from typing import Any, Optional
 
@@ -12,6 +13,18 @@ app = FastAPI(
     title="Brand OS v3 API",
     version="3.0.0",
     description="Run Brand OS v3 orchestrator; returns final_output_format from EXECUTION_TEMPLATE.",
+)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+    "http://localhost:3100",
+    "http://127.0.0.1:3100",
+    "http://172.19.112.1:3100",
+    "http://0.0.0.0:3100"
+],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 

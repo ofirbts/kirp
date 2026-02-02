@@ -1,49 +1,47 @@
-# KIRP Enterprise
-.venv/
-venv/
-.env
-.DS_Store
-
 # Python
 __pycache__/
-*.pyc
-*.pyo
-*.pyd
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+ENV/
+.pytest_cache/
 *.egg-info/
-.eggs/
 dist/
 build/
-.pytest_cache/
-.coverage
-htmlcov/
-.mypy_cache/
-.ruff_cache/
+
+# Node
+node_modules/
+.next/
+.npm
+*.log
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Env files
+.env
+.env.local
 
 # Logs
 *.log
 
-# MongoDB
-mongo_data/
-mongodb/
-WiredTiger*
-*.wt
+# Database
+*.db
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
 
-# Redis
-redis_data/
+# n8n
+n8n_data/*.log
 
-# Postgres
-pg_data/
-postgres_data/
-
-# Qdrant
-qdrant_data/
-
-# Kafka / Zookeeper
-kafka_data/
-kafka-logs/
-zookeeper_data/
-zookeeper-logs/
-
-# Docker
-docker-compose.override.yml
-node_modules
+# Temporary
+*.tmp
+*.bak

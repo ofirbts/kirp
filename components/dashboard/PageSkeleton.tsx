@@ -20,8 +20,8 @@ export const PageSkeleton: React.FC<PageSkeletonProps> = ({
   className,
 }) => {
   return (
-    <div className={cn("space-y-6", className)}>
-      <div>
+    <div className={cn("space-y-6", className)} suppressHydrationWarning>
+      <div suppressHydrationWarning>
         {title && (
           <div className="mb-1 h-7 w-48 animate-pulse rounded bg-neutral-800" />
         )}
@@ -30,7 +30,7 @@ export const PageSkeleton: React.FC<PageSkeletonProps> = ({
         )}
       </div>
       {cards > 0 && (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4" suppressHydrationWarning>
           {Array.from({ length: cards }).map((_, i) => (
             <Card
               key={i}
@@ -46,16 +46,17 @@ export const PageSkeleton: React.FC<PageSkeletonProps> = ({
           ))}
         </div>
       )}
-      <Card className="border-neutral-800 bg-neutral-900/70">
-        <CardHeader>
-          <div className="h-5 w-32 animate-pulse rounded bg-neutral-700" />
+      <Card className="border-neutral-800 bg-neutral-900/70" suppressHydrationWarning>
+        <CardHeader suppressHydrationWarning>
+          <div className="h-5 w-32 animate-pulse rounded bg-neutral-700" suppressHydrationWarning />
         </CardHeader>
         <CardContent>
-          <div className="space-y-2">
+          <div className="space-y-2" suppressHydrationWarning>
             {Array.from({ length: tableRows }).map((_, i) => (
               <div
                 key={i}
                 className="h-10 w-full animate-pulse rounded bg-neutral-800"
+                suppressHydrationWarning
               />
             ))}
           </div>

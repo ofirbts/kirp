@@ -84,6 +84,16 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
         _manager.disconnect(websocket)
 
 
+@router.get("/ws/health")
+async def websocket_health() -> dict[str, Any]:
+    """Lightweight health probe for WebSocket layer."""
+    return {
+        "status": "ok",
+        "connectedClients": len(_manager._connections),
+        "channels": list({ch for subs in _manager._subscriptions.values() for ch in subs}),
+    }
+
+
 @router.get("/events/stream")
 async def sse_events_stream() -> Any:
     """SSE endpoint for live events (alternative to WebSocket)."""
