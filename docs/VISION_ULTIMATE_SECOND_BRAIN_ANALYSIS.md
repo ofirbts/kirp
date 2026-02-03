@@ -302,3 +302,65 @@ That is one coherent “meta-task” for 1–2 weeks; Phases 2–4 then build on
 | Notion deep | ingest_database, create_task | Scheduled pull; CommandExecutor; webhooks; conflict handling | P1 |
 
 **Recommended first move:** Implement Phase 1 (schema wiring, Notion pull + push, minimal Tasks UI) so that “Notion and KIRP talk to each other and I see tasks in one place.” Then add obligations and reminders (Phase 2), then shared context and richer UI (Phase 3–4).
+
+---
+
+## 6) Alignment with “Autonomous Agentic Second Brain” Master Instruction
+
+The separate **MASTER INSTRUCTION — Autonomous Agentic Second Brain (KIRP Intelligence OS)** document describes a phased execution model (Phase 0–6) with an invariant cognitive pipeline:
+
+> Event → Structured Life Objects → Time-aware Obligations → Decisions → Actions → Feedback → Learning
+
+This section aligns that phased plan with the analysis above.
+
+### 6.1 Phase mapping
+
+| Master Phase | Goal | Corresponding sections here |
+|--------------|------|-----------------------------|
+| **Phase 0 — Architectural alignment** | Understand vision, constraints, and end-to-end flow (e.g. “bring pitas to kindergarten next week”). | Whole doc, especially §1 (current state) and §2 (missing layers). |
+| **Phase 1 — Second brain foundation (structure + time)** | Events → Life Objects (Tasks/Commitments/Projects/Life Areas), due-date detection, future obligations, reminders, Notion in/out. | §2.2 Life objects, §2.3 Prediction agents (future obligations), §2.7 Notion bi-directional, §3.2 Life-objects model. |
+| **Phase 2 — Human feedback & meta-cognition** | User corrections (accept/edit/ignore/delete), Decision objects, confidence, feedback events, “Was I right?” loop. | §2.3/2.4 (agents + problem-solving) + §3.3/3.4 integration hooks; today mostly missing and called out as future “feedback loop” + audit. |
+| **Phase 3 — Context & shared intelligence** | Multi-user isolation, shared contexts (family/team), ownership vs awareness. | §2.5 Shared context model, §3.5 Shared context. |
+| **Phase 4 — Predictive & proactive intelligence** | Pattern detection, recurrent obligations, risk alerts, missed-task prediction. | §2.3 Prediction agents, §2.4 Problem-solving agents, §3.3 Prediction agents. |
+| **Phase 5 — Executive delegation (agents act)** | Policy-based autonomy, action approval thresholds, agent-to-agent coordination. | §2.4 Problem-solving (CommandExecutor + Governance), §3.4 Problem-solving agents. |
+| **Phase 6 — Product / research readiness** | Metrics on decision quality, cognitive load indicators, explainability. | §5 Brutally Honest Assessment + observability/governance sections; needs explicit metrics layer. |
+
+### 6.2 What this adds beyond the original vision
+
+The MASTER INSTRUCTION does not change the technical vision; it **tightens the operating model**:
+
+- **Phased execution only** — no “big bang” or mixing concerns; each layer is implemented, inspected, and adjusted before moving on.
+- **Hard STOP conditions** per phase — forces architecture + code review + human feedback before progressing.
+- **Human-in-the-loop as a rule** — even when agents act, there is an explicit notion of approval thresholds and governance, not blind autonomy.
+- **Cognitive pipeline as an invariant** — everything must be modeled as:  
+  Event → Life Object → Obligation → Decision → Action → Feedback → Learning.
+
+In practice this means:
+
+- The items in §2 (missing layers) become **concrete phase goals** instead of a flat backlog.
+- The staged roadmap in §4/§5 can be re-expressed as:
+  - **Phase 1** ≈ “wire schema + obligations + minimal Tasks UI + first Notion connector”
+  - **Phase 2** ≈ “add feedback/meta-cognition over decisions and actions”
+  - **Phase 3** ≈ “shared spaces and ownership semantics”
+  - **Phase 4** ≈ “predictive/anticipatory agents”
+  - **Phase 5** ≈ “delegation & autonomy under OPA”
+  - **Phase 6** ≈ “metrics, research hooks, explainability”
+
+### 6.3 Working principles going forward
+
+To stay consistent with both this analysis and the Master Instruction:
+
+- Treat **EventPipeline + SchemaEngine + Agents** as the core of the “Executive Function System”.  
+- For any new feature, ask:
+  1. Where does the **Event** enter?
+  2. What **Life Objects** does it create/update?
+  3. What **Obligations** emerge (time, ownership, shared vs private)?
+  4. Which **Decisions** and **Actions** are taken (and under what policies)?
+  5. How is **Feedback** captured?
+  6. How does the system **Learn** (tuning agents, thresholds, views)?
+- Implement changes **phase-by-phase**, and after each phase:
+  - Summarize architecture and code deltas.
+  - Show example flows (“bring pitas next week” style).
+  - Decide together whether to proceed, adjust, or roll back.
+
+This keeps KIRP/Brand OS on a single coherent trajectory toward the “Ultimate Second Brain” while avoiding big, unreviewable jumps.
