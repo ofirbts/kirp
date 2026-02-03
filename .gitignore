@@ -26,9 +26,25 @@ node_modules/
 *~
 .DS_Store
 
-# Env files
+# Env files (VERY IMPORTANT)
 .env
-.env.local
+.env.*
+*.env
+
+# Credentials & Secrets (CRITICAL)
+google_credentials.json
+*.json
+*.key
+*.pem
+*.p12
+*.pfx
+*.crt
+*.der
+*.csr
+
+# OAuth / API Keys
+client_secret*.json
+credentials.json
 
 # Logs
 *.log
@@ -45,3 +61,4 @@ n8n_data/*.log
 # Temporary
 *.tmp
 *.bak
+*.backup
