@@ -20,4 +20,4 @@ dependencies = [
 brandos = "brand_os_cli.main:main"
 
 [tool.setuptools]
-packages = ["app", "brand_os_sdk", "api", "brand_os_cli", "brand_os_scheduler", "brand_os_monitoring", "brand_os_integrations"]
+packages = ["src", "app", "brand_os_sdk", "api", "brand_os_cli", "brand_os_scheduler", "brand_os_monitoring", "brand_os_integrations"]
