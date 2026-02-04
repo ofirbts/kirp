@@ -8,8 +8,15 @@ from __future__ import annotations
 
 import logging
 import os
+import sys
+from pathlib import Path
 from contextlib import asynccontextmanager
 from typing import Any
+
+# Ensure project root is on sys.path when running as a script (e.g. Streamlit, `python src/main.py`)
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
 
 from fastapi import FastAPI, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
