@@ -195,6 +195,17 @@ async def health() -> dict[str, Any]:
         raise HTTPException(status_code=503, detail=str(e))
 
 
+@app.get("/healthz")
+async def healthz() -> dict[str, Any]:
+    """
+    Lightweight health check for platforms (e.g. Streamlit Cloud) that probe `/healthz`.
+
+    Does not hit external dependencies to avoid startup failures when optional
+    services (Mongo, Qdrant, etc.) are not available.
+    """
+    return {"status": "ok", "service": "kirp-enterprise-api"}
+
+
 @app.get("/api/v1/stats")
 async def stats() -> dict[str, Any]:
     """Dashboard stats from real data (event count, agents, etc.)."""
