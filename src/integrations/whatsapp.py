@@ -69,24 +69,26 @@ class WhatsAppIntegration:
             return {"ok": False, "error": str(e)}
 
     def parse_webhook_payload(self, body: dict[str, Any]) -> list[dict[str, Any]]:
-        """Parse Meta/Twilio webhook body into event payloads."""
+        """Parse Meta/Twilio webhook body into unified event payloads (tenant_id etc. set by caller)."""
         events: list[dict[str, Any]] = []
         # Meta format
         for entry in body.get("entry", []):
             for change in entry.get("changes", []):
                 val = change.get("value", {})
                 for msg in val.get("messages", []):
+                    msg_id = msg.get("id")
+                    text = (msg.get("text") or {}).get("body", "")
                     events.append({
                         "source": "whatsapp",
-                        "from": msg.get("from"),
-                        "text": (msg.get("text") or {}).get("body", ""),
-                        "msg_id": msg.get("id"),
+                        "content": text,
+                        "metadata": {"external_id": msg_id or "", "from": msg.get("from"), "msg_id": msg_id},
                     })
         # Simple format
         if not events and "from" in body and "text" in body:
+            ext_id = body.get("msg_id") or body.get("from", "") + "_" + str(body.get("timestamp", ""))
             events.append({
                 "source": "whatsapp",
-                "from": body["from"],
-                "text": body["text"],
+                "content": body["text"],
+                "metadata": {"external_id": ext_id, "from": body["from"]},
             })
         return events

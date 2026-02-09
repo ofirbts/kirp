@@ -2,6 +2,7 @@
 
 import React from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -10,11 +11,24 @@ import { useToastStore } from "@/lib/stores/toastStore";
 
 export default function Page() {
   const router = useRouter();
-  const { login, loggingIn } = useAuthStore();
+  const { login, loadUser, loggingIn, user, loaded } = useAuthStore();
   const { show } = useToastStore();
+  const skipAuth = process.env.NEXT_PUBLIC_SKIP_AUTH === "1";
 
   const [email, setEmail] = React.useState("");
   const [password, setPassword] = React.useState("");
+
+  // In SKIP_AUTH mode: load dev user on mount and redirect when ready
+  React.useEffect(() => {
+    if (!skipAuth) return;
+    loadUser();
+  }, [skipAuth, loadUser]);
+
+  React.useEffect(() => {
+    if (skipAuth && loaded && user) {
+      router.replace("/");
+    }
+  }, [skipAuth, loaded, user, router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -46,18 +60,17 @@ export default function Page() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-neutral-950 px-4">
-      <Card className="w-full max-w-sm border-neutral-800 bg-neutral-900/90 px-5 py-6 text-sm shadow-lg shadow-cyan-500/10">
-        <h1 className="text-base font-semibold text-neutral-100">
+    <div className="flex min-h-screen items-center justify-center bg-bg px-4">
+      <Card className="w-full max-w-sm border-[color:var(--color-border-subtle)] bg-surface1 px-5 py-6 text-sm shadow-soft">
+        <h1 className="text-base font-semibold text-textMain">
           Sign in to KIRP
         </h1>
-        <p className="mt-1 text-xs text-neutral-500">
-          This is an authentication scaffold. Once a real login API is wired,
-          credentials will be validated against the backend.
+        <p className="mt-1 text-xs text-textSoft">
+          Enter your credentials to access your KIRP workspace.
         </p>
         <form onSubmit={handleSubmit} className="mt-4 space-y-3">
           <div>
-            <label className="block text-xs font-medium text-neutral-300">
+            <label className="block text-xs font-medium text-textMain">
               Email
             </label>
             <Input
@@ -65,12 +78,12 @@ export default function Page() {
               autoComplete="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="mt-1 h-8 border-neutral-700 bg-neutral-900 text-xs text-neutral-100 placeholder:text-neutral-500"
+              className="mt-1 h-8 border-[color:var(--color-border-subtle)] bg-surface2 text-xs text-textMain placeholder:text-textSoft"
               placeholder="operator@kirp.local"
             />
           </div>
           <div>
-            <label className="block text-xs font-medium text-neutral-300">
+            <label className="block text-xs font-medium text-textMain">
               Password
             </label>
             <Input
@@ -78,18 +91,45 @@ export default function Page() {
               autoComplete="current-password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="mt-1 h-8 border-neutral-700 bg-neutral-900 text-xs text-neutral-100 placeholder:text-neutral-500"
+              className="mt-1 h-8 border-[color:var(--color-border-subtle)] bg-surface2 text-xs text-textMain placeholder:text-textSoft"
               placeholder="••••••••"
             />
           </div>
           <Button
             type="submit"
             disabled={loggingIn}
-            className="mt-2 h-8 w-full bg-cyan-600 text-xs font-medium text-neutral-50 hover:bg-cyan-500"
+            className="mt-2 h-8 w-full text-xs font-medium"
           >
             {loggingIn ? "Signing in…" : "Sign in"}
           </Button>
+          {skipAuth && (
+            <Button
+              type="button"
+              variant="outline"
+              disabled={loggingIn}
+              className="mt-2 h-8 w-full text-xs font-medium"
+              onClick={async () => {
+                try {
+                  await loadUser();
+                  show({ variant: "success", title: "Dev login", description: "Signed in as dev user." });
+                  router.replace("/");
+                } catch {
+                  show({ variant: "error", title: "Dev login failed", description: "Could not load dev user." });
+                }
+              }}
+            >
+              Dev login (SKIP_AUTH)
+            </Button>
+          )}
         </form>
+        <p className="mt-4 text-[11px] text-textSoft">
+          Don&apos;t have an account?{" "}
+          <Link href="/signup" className="text-primary hover:underline">
+            Create one
+          </Link>
+          {" · "}
+          First run? Demo: dev@localhost / dev
+        </p>
       </Card>
     </div>
   );

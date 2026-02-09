@@ -12,9 +12,7 @@ import type {
   ListPoliciesResponse,
   ListAuditResponse,
 } from "@/lib/types";
-
-const TENANT = "default";
-const SPACE = "all";
+import { DEFAULT_TENANT_ID, DEFAULT_USER_ID } from "@/lib/constants";
 
 /** Backend API base URL. Must be set for UI → API requests. */
 const BASE =
@@ -26,10 +24,17 @@ const DEV_TOKEN =
     ? process.env?.NEXT_PUBLIC_DEV_TOKEN ?? ""
     : "";
 
+function getRuntimeToken(): string | null {
+  if (typeof window === "undefined") return DEV_TOKEN || null;
+  const stored = window.localStorage.getItem("kirp_auth_token");
+  return stored || DEV_TOKEN || null;
+}
+
 function authHeaders(): Record<string, string> {
   const headers: Record<string, string> = {};
-  if (DEV_TOKEN) {
-    headers["Authorization"] = `Bearer ${DEV_TOKEN}`;
+  const token = getRuntimeToken();
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
   }
   return headers;
 }
@@ -123,6 +128,49 @@ export async function getStats(): Promise<Record<string, unknown>> {
   return get<Record<string, unknown>>("/api/v1/stats");
 }
 
+// ---------- Ask / Insights ----------
+
+export interface AskResponse {
+  answer: string;
+  sources: unknown[];
+  needs_external_info: boolean;
+}
+
+export async function askV1(body: {
+  tenant_id: string;
+  space_id: string;
+  query: string;
+}): Promise<AskResponse> {
+  return post<AskResponse>("/api/v1/ask", body);
+}
+
+export interface InsightV1 {
+  id: string;
+  type: string;
+  category: string;
+  title: string;
+  body: string;
+  data: Record<string, unknown>;
+  confidence: number;
+  source_entities: Array<{ entity: string; id: string; title?: string }>;
+  created_at: string;
+}
+
+export async function getInsightsV1(params?: {
+  tenant_id?: string;
+  space_id?: string;
+  user_id?: string;
+  limit?: number;
+}): Promise<InsightV1[]> {
+  const q: Record<string, string | number | undefined> = {};
+  if (params?.tenant_id) q.tenant_id = params.tenant_id;
+  if (params?.space_id) q.space_id = params.space_id;
+  if (params?.user_id) q.user_id = params.user_id;
+  if (params?.limit != null) q.limit = params.limit;
+  const json = await get<InsightV1[]>("/api/v1/insights", q);
+  return Array.isArray(json) ? json : [];
+}
+
 // ---------- Tenants ----------
 
 export async function listTenants(): Promise<ListTenantsResponse> {
@@ -151,6 +199,145 @@ export async function listAgents(params?: {
   if (params?.status) q.status = params.status;
   if (params?.type) q.type = params.type;
   return get<ListAgentsResponse>("/api/agents", q);
+}
+
+export interface AgentV1 {
+  id: string;
+  name: string;
+  type: string;
+  triggers: string[];
+  description: string;
+  last_run?: string | null;
+  next_run?: string | null;
+}
+
+export async function listAgentsV1(params?: { tenant_id?: string }): Promise<AgentV1[]> {
+  const q: Record<string, string> = {};
+  if (params?.tenant_id) q.tenant_id = params.tenant_id;
+  const json = await get<AgentV1[]>("/api/v1/agents", q);
+  return Array.isArray(json) ? json : [];
+}
+
+export async function runAgentV1(
+  agentId: string,
+  body?: { tenant_id?: string; space_id?: string; user_id?: string },
+): Promise<{ ok: boolean; agent_id: string; result?: Record<string, unknown> }> {
+  return post<{ ok: boolean; agent_id: string; result?: Record<string, unknown> }>(
+    `/api/v1/agents/${encodeURIComponent(agentId)}/run`,
+    body ?? {},
+  );
+}
+
+export interface AgentLogV1 {
+  agent_name: string;
+  run_at: string;
+  duration_ms: number;
+  result_count: number;
+  errors: string[];
+  tenant_id: string;
+  space_id: string;
+  trigger: string;
+}
+
+export async function getAgentLogsV1(params?: {
+  tenant_id?: string;
+  agent_name?: string;
+  limit?: number;
+}): Promise<AgentLogV1[]> {
+  const q: Record<string, string | number | undefined> = {};
+  if (params?.tenant_id) q.tenant_id = params.tenant_id;
+  if (params?.agent_name) q.agent_name = params.agent_name;
+  if (params?.limit != null) q.limit = params.limit;
+  const json = await get<AgentLogV1[]>("/api/v1/agents/logs", q);
+  return Array.isArray(json) ? json : [];
+}
+
+export interface AgentActionV1 {
+  id: string;
+  agent: string;
+  type: string;
+  payload: Record<string, unknown>;
+  status: string;
+  tenant_id: string;
+  space_id: string;
+  created_at: string;
+  executed_at?: string | null;
+  error?: string | null;
+}
+
+export async function getAgentActionsV1(params?: {
+  tenant_id?: string;
+  status?: string;
+  agent?: string;
+  limit?: number;
+}): Promise<AgentActionV1[]> {
+  const q: Record<string, string | number | undefined> = {};
+  if (params?.tenant_id) q.tenant_id = params.tenant_id;
+  if (params?.status) q.status = params.status;
+  if (params?.agent) q.agent = params.agent;
+  if (params?.limit != null) q.limit = params.limit;
+  const json = await get<AgentActionV1[]>("/api/v1/agents/actions", q);
+  return Array.isArray(json) ? json : [];
+}
+
+// ---------- Notifications (Activity Center) ----------
+
+export interface NotificationV1 {
+  id: string;
+  tenant_id: string;
+  space_id: string;
+  user_id: string;
+  type: string;
+  title: string;
+  body: string;
+  entity_id?: string | null;
+  created_at: string;
+  read: boolean;
+  meta?: Record<string, unknown>;
+}
+
+export async function listNotificationsV1(params?: {
+  tenant_id?: string;
+  user_id?: string;
+  limit?: number;
+  type?: string;
+}): Promise<NotificationV1[]> {
+  const q: Record<string, string | number | undefined> = {};
+  if (params?.tenant_id) q.tenant_id = params.tenant_id;
+  if (params?.user_id) q.user_id = params.user_id;
+  if (params?.limit != null) q.limit = params.limit;
+  if (params?.type) q.type = params.type;
+  const json = await get<NotificationV1[]>("/api/v1/notifications", q);
+  return Array.isArray(json) ? json : [];
+}
+
+export async function getUnreadCountV1(params?: { tenant_id?: string; user_id?: string }): Promise<number> {
+  const q: Record<string, string> = {};
+  if (params?.tenant_id) q.tenant_id = params.tenant_id;
+  if (params?.user_id) q.user_id = params.user_id;
+  const res = await get<{ unread_count: number }>("/api/v1/notifications/unread-count", q);
+  return typeof res.unread_count === "number" ? res.unread_count : 0;
+}
+
+export async function markNotificationReadV1(notificationId: string): Promise<{ ok: boolean }> {
+  return post<{ ok: boolean }>(`/api/v1/notifications/${encodeURIComponent(notificationId)}/read`, {});
+}
+
+export async function markAllNotificationsReadV1(params?: {
+  tenant_id?: string;
+  user_id?: string;
+}): Promise<{ ok: boolean; marked_count: number }> {
+  const q: Record<string, string | undefined> = {};
+  if (params?.tenant_id) q.tenant_id = params.tenant_id;
+  if (params?.user_id) q.user_id = params.user_id;
+  const url = buildUrl("/api/v1/notifications/read-all", q);
+  const res = await fetch(url, {
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+  });
+  if (!res.ok) throw new Error(`${res.status}: ${await res.text()}`);
+  return res.json() as Promise<{ ok: boolean; marked_count: number }>;
 }
 
 // ---------- Events ----------
@@ -212,18 +399,89 @@ export async function listDecisions(params?: {
   return { data, meta: (json as { meta?: Record<string, unknown> })?.meta ?? {} };
 }
 
-// ---------- V1 domain (history, signals, visuals, content) ----------
+// ---------- V1 domain (history 2.0, signals, visuals, content) ----------
 
+export type HistoryEntryV1 = {
+  id: string;
+  tenant_id: string;
+  space_id: string;
+  user_id: string;
+  type: string;
+  title: string;
+  body: string;
+  entity_id: string | null;
+  source: string;
+  created_at: string | null;
+  meta: Record<string, unknown>;
+};
+
+export async function listHistoryV1(params?: {
+  tenant_id?: string;
+  user_id?: string;
+  limit?: number;
+  type?: string;
+  from?: string;
+  to?: string;
+}): Promise<HistoryEntryV1[]> {
+  const q: Record<string, string | number | undefined> = {};
+  if (params?.tenant_id) q.tenant_id = params.tenant_id;
+  if (params?.user_id) q.user_id = params.user_id;
+  if (params?.limit != null) q.limit = params.limit;
+  if (params?.type) q.type = params.type;
+  if (params?.from) q.from = params.from;
+  if (params?.to) q.to = params.to;
+  const json = await getJson("/api/v1/history", q);
+  return Array.isArray(json) ? (json as HistoryEntryV1[]) : [];
+}
+
+/** @deprecated Use listHistoryV1 for History 2.0 timeline. */
 export async function listHistory(params?: {
   tenantId?: string;
   spaceId?: string;
-}): Promise<{ data: unknown[]; meta?: Record<string, unknown> }> {
-  const q: Record<string, string | undefined> = {};
-  if (params?.tenantId) q.tenantId = params.tenantId;
-  if (params?.spaceId) q.spaceId = params.spaceId;
-  const json = await getJson("/api/v1/history", q);
-  const data = Array.isArray((json as { data?: unknown[] })?.data) ? (json as { data: unknown[] }).data : [];
-  return { data, meta: (json as { meta?: Record<string, unknown> })?.meta ?? {} };
+  userId?: string;
+}): Promise<{ data: HistoryEntryV1[]; meta?: Record<string, unknown> }> {
+  const entries = await listHistoryV1({
+    tenant_id: params?.tenantId ?? DEFAULT_TENANT_ID,
+    user_id: params?.userId,
+    limit: 100,
+  });
+  return { data: entries, meta: {} };
+}
+
+// ---------- V1 auth ----------
+
+export type AuthUserV1 = {
+  id: string;
+  email: string;
+  name: string;
+  tenant_id: string;
+  roles: string[];
+};
+
+export type AuthResponseV1 = {
+  access_token: string;
+  user: AuthUserV1;
+};
+
+export async function signupV1(body: {
+  email: string;
+  password: string;
+  name: string;
+}): Promise<AuthResponseV1> {
+  const json = await post<AuthResponseV1>("/api/v1/auth/signup", body);
+  return json;
+}
+
+export async function loginV1(body: {
+  email: string;
+  password: string;
+}): Promise<AuthResponseV1> {
+  const json = await post<AuthResponseV1>("/api/v1/auth/login", body);
+  return json;
+}
+
+export async function meV1(): Promise<AuthUserV1> {
+  return get<AuthUserV1>("/api/v1/auth/me");
 }
 
 export async function listSignals(params?: {
@@ -262,6 +520,164 @@ export async function listContentIntelligence(params?: {
   return { data, meta: (json as { meta?: Record<string, unknown> })?.meta ?? {} };
 }
 
+// ---------- V1 Tasks (SchemaEngine life objects) ----------
+
+export interface TaskV1 {
+  id: string;
+  title: string;
+  due_date: string | null;
+  source: string | null;
+  source_event_id: string | null;
+  tenant_id: string;
+  space_id: string;
+  user_id: string | null;
+  status: string | null;
+}
+
+export async function listTasksV1(params?: {
+  tenant_id?: string;
+  space_id?: string;
+  status?: string;
+  limit?: number;
+}): Promise<{ data: TaskV1[]; meta?: Record<string, unknown> }> {
+  const q: Record<string, string | number | undefined> = {};
+  if (params?.tenant_id) q.tenant_id = params.tenant_id;
+  if (params?.space_id) q.space_id = params.space_id;
+  if (params?.status) q.status = params.status;
+  if (params?.limit) q.limit = params.limit;
+  const json = await getJson("/api/v1/tasks", q);
+  const data = Array.isArray((json as { data?: TaskV1[] })?.data) ? (json as { data: TaskV1[] }).data : [];
+  return { data, meta: (json as { meta?: Record<string, unknown> })?.meta ?? {} };
+}
+
+export async function updateNodeV1(
+  nodeId: string,
+  body: { title?: string; description?: string; status?: string; priority?: string; due_date?: string; parent_id?: string },
+  params?: { tenant_id?: string }
+): Promise<{ ok: boolean; node: SchemaNodeV1 }> {
+  const q: Record<string, string> = {};
+  if (params?.tenant_id) q.tenant_id = params.tenant_id;
+  const url = `/api/v1/nodes/${encodeURIComponent(nodeId)}?${new URLSearchParams(q).toString()}`;
+  return post(url, body);
+}
+
+export async function createTaskV1(
+  body: { title: string; due_date?: string; status?: string; priority?: string; description?: string },
+  params?: { tenant_id?: string; space_id?: string; user_id?: string }
+): Promise<{ ok: boolean; data: TaskV1 }> {
+  const q: Record<string, string> = {};
+  if (params?.tenant_id) q.tenant_id = params.tenant_id;
+  if (params?.space_id) q.space_id = params.space_id ?? "all";
+  if (params?.user_id) q.user_id = params.user_id ?? "system";
+  const url = `/api/v1/tasks?${new URLSearchParams(q).toString()}`;
+  return post(url, body);
+}
+
+export async function createNodeV1(
+  body: { entity: string; title: string; due_date?: string; status?: string; priority?: string; description?: string; parent_id?: string },
+  params?: { tenant_id?: string; space_id?: string; user_id?: string }
+): Promise<{ ok: boolean; node: SchemaNodeV1 }> {
+  const q: Record<string, string> = {};
+  if (params?.tenant_id) q.tenant_id = params.tenant_id;
+  if (params?.space_id) q.space_id = params.space_id ?? "all";
+  if (params?.user_id) q.user_id = params.user_id ?? "system";
+  const url = `/api/v1/nodes?${new URLSearchParams(q).toString()}`;
+  return post(url, body);
+}
+
+export async function getNodeV1(
+  nodeId: string,
+  params?: { tenant_id?: string }
+): Promise<{ ok: boolean; node: SchemaNodeV1 }> {
+  const q: Record<string, string> = {};
+  if (params?.tenant_id) q.tenant_id = params.tenant_id;
+  return get(`/api/v1/nodes/${encodeURIComponent(nodeId)}`, q);
+}
+
+// ---------- Reminders (upcoming obligations) ----------
+
+export interface ObligationV1 {
+  id: string;
+  title: string;
+  entity: string;
+  due_date: string | null;
+  status: string | null;
+  tenant_id: string;
+  space_id: string;
+  metadata?: Record<string, unknown>;
+}
+
+export async function getRemindersUpcoming(params?: {
+  tenant_id?: string;
+  space_id?: string;
+  horizon_days?: number;
+}): Promise<{ ok: boolean; obligations: ObligationV1[]; due_from?: string; due_to?: string }> {
+  const q: Record<string, string | number | undefined> = {};
+  if (params?.tenant_id) q.tenant_id = params.tenant_id;
+  if (params?.space_id) q.space_id = params.space_id;
+  if (params?.horizon_days != null) q.horizon_days = params.horizon_days;
+  return get<{ ok: boolean; obligations: ObligationV1[]; due_from?: string; due_to?: string }>(
+    "/api/v1/reminders/upcoming",
+    q,
+  );
+}
+
+// ---------- Context (accessible spaces for Second Brain) ----------
+
+export async function getContextAccessibleSpaces(
+  tenantId: string,
+  userId: string,
+): Promise<{ tenant_id: string; user_id: string; space_ids: string[] }> {
+  return get("/api/v1/context/accessible-spaces", { tenant_id: tenantId, user_id: userId });
+}
+
+export async function getContextSpaces(
+  tenantId: string,
+  userId: string,
+): Promise<{ tenant_id: string; user_id: string; spaces: { space_id: string; role: string | null }[] }> {
+  return get("/api/v1/context/spaces", { tenant_id: tenantId, user_id: userId });
+}
+
+// ---------- Schema nodes (life areas, commitments, tasks, projects) ----------
+
+export interface SchemaNodeV1 {
+  id: string;
+  tenant_id: string;
+  space_id: string;
+  entity: string;
+  title: string;
+  description?: string | null;
+  parent_id?: string | null;
+  status?: string | null;
+  priority?: string | null;
+  due_date?: string | null;
+  metadata?: Record<string, unknown>;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export async function listNodesV1(params?: {
+  tenant_id?: string;
+  space_id?: string;
+  entity?: string;
+  status?: string;
+  limit?: number;
+}): Promise<{ data: SchemaNodeV1[]; meta?: Record<string, unknown> }> {
+  const q: Record<string, string | number | undefined> = {};
+  if (params?.tenant_id) q.tenant_id = params.tenant_id;
+  if (params?.space_id) q.space_id = params.space_id;
+  if (params?.entity) q.entity = params.entity;
+  if (params?.status) q.status = params.status;
+  if (params?.limit) q.limit = params.limit;
+  const json = await getJson("/api/v1/nodes", q);
+  const data = Array.isArray((json as { data?: SchemaNodeV1[] })?.data)
+    ? (json as { data: SchemaNodeV1[] }).data
+    : [];
+  return { data, meta: (json as { meta?: Record<string, unknown> })?.meta ?? {} };
+}
+
+// ---------- Graph ----------
+
 export async function getGraph(params?: {
   tenantId?: string;
   spaceId?: string;
@@ -278,6 +694,58 @@ export async function getGraph(params?: {
   const json = await getJson("/api/graph", q);
   const data = (json as { data?: { nodes?: unknown[]; edges?: unknown[] } })?.data ?? { nodes: [], edges: [] };
   return { data: { nodes: data.nodes ?? [], edges: data.edges ?? [] }, meta: (json as { meta?: Record<string, unknown> })?.meta };
+}
+
+// ---------- V1 Graph (Life Graph: schema + events) ----------
+
+export interface GraphNodeV1 {
+  id: string;
+  type: string;
+  label: string;
+  meta?: Record<string, unknown>;
+}
+
+export interface GraphEdgeV1 {
+  source: string;
+  target: string;
+  type: string;
+  meta?: Record<string, unknown>;
+}
+
+export interface GraphV1Response {
+  nodes: GraphNodeV1[];
+  edges: GraphEdgeV1[];
+  stats?: { node_count: number; edge_count: number };
+}
+
+export async function getGraphV1(params?: {
+  tenant_id?: string;
+  space_id?: string;
+  life_area?: string;
+  project_id?: string;
+  date_from?: string;
+  date_to?: string;
+  entity_types?: string;
+  source?: string;
+  limit_nodes?: number;
+}): Promise<GraphV1Response> {
+  const q: Record<string, string | number | undefined> = {};
+  if (params?.tenant_id) q.tenant_id = params.tenant_id;
+  if (params?.space_id) q.space_id = params.space_id;
+  if (params?.life_area) q.life_area = params.life_area;
+  if (params?.project_id) q.project_id = params.project_id;
+  if (params?.date_from) q.date_from = params.date_from;
+  if (params?.date_to) q.date_to = params.date_to;
+  if (params?.entity_types) q.entity_types = params.entity_types;
+  if (params?.source) q.source = params.source;
+  if (params?.limit_nodes != null) q.limit_nodes = params.limit_nodes;
+  const json = await getJson("/api/v1/graph", q);
+  const j = json as GraphV1Response;
+  return {
+    nodes: Array.isArray(j.nodes) ? j.nodes : [],
+    edges: Array.isArray(j.edges) ? j.edges : [],
+    stats: j.stats,
+  };
 }
 
 // ---------- RAG pipeline ----------
@@ -302,12 +770,23 @@ export async function queryV1(body: {
   return post<Record<string, unknown>>("/api/v1/query", body);
 }
 
+// ---------- Agent run ----------
+
+export async function runAgent(
+  agentId: string,
+  body?: { tenant_id?: string; space_id?: string; user_id?: string;[key: string]: unknown },
+): Promise<Record<string, unknown>> {
+  return post<Record<string, unknown>>(`/api/agents/${encodeURIComponent(agentId)}/run`, body ?? {});
+}
+
 // ---------- Aggregated export ----------
 
 export const apiClient = {
   getObservabilityHealth,
   getMetricsSnapshot,
   getStats,
+  askV1,
+  getInsightsV1,
   listTenants,
   listSpacesForTenant,
   listAgents,
@@ -318,10 +797,138 @@ export const apiClient = {
   listAuditEntries,
   listDecisions,
   listHistory,
+  listHistoryV1,
   listSignals,
   listVisuals,
   listContentIntelligence,
   getGraph,
+  getGraphV1,
   ingestV1,
   queryV1,
+  runAgent,
+  listAgentsV1,
+  runAgentV1,
+  getAgentLogsV1,
+  getAgentActionsV1,
+  listNotificationsV1,
+  getUnreadCountV1,
+  markNotificationReadV1,
+  markAllNotificationsReadV1,
+  listTasksV1,
+  getRemindersUpcoming,
+  getContextAccessibleSpaces,
+  getContextSpaces,
+  listNodesV1,
+  updateNodeV1,
+  createTaskV1,
+  createNodeV1,
+  getNodeV1,
+  listConnections,
+  connectIntegration,
+  disconnectIntegration,
+  syncConnection,
+  validateConnection,
+  getConnectionErrors,
+  getConnectionsOAuthStartUrl,
+  signupV1,
+  loginV1,
+  meV1,
 };
+
+// ---------- Connections Hub ----------
+
+export interface ConnectorStatus {
+  integration: string;
+  label: string;
+  status: "connected" | "not_connected" | "error";
+  connected: boolean;
+  last_sync_at: string | null;
+  last_sync_status: string;
+  last_sync_result: Record<string, unknown>;
+  error_count: number;
+}
+
+export async function listConnections(params?: {
+  tenant_id?: string;
+  user_id?: string;
+}): Promise<{ ok: boolean; connectors: ConnectorStatus[] }> {
+  const q: Record<string, string> = {};
+  if (params?.tenant_id) q.tenant_id = params.tenant_id;
+  if (params?.user_id) q.user_id = params.user_id;
+  return get("/api/v1/connections", q);
+}
+
+export async function connectIntegration(
+  integration: string,
+  body: { access_token?: string; refresh_token?: string; extra?: Record<string, unknown> },
+  params?: { tenant_id?: string; user_id?: string }
+): Promise<{ ok: boolean }> {
+  const q: Record<string, string> = {};
+  if (params?.tenant_id) q.tenant_id = params.tenant_id;
+  if (params?.user_id) q.user_id = params.user_id;
+  const url = `/api/v1/connections/${encodeURIComponent(integration)}/connect?${new URLSearchParams(q).toString()}`;
+  return post(url, body);
+}
+
+export async function disconnectIntegration(
+  integration: string,
+  params?: { tenant_id?: string; user_id?: string }
+): Promise<{ ok: boolean; disconnected: boolean }> {
+  const q: Record<string, string> = {};
+  if (params?.tenant_id) q.tenant_id = params.tenant_id;
+  if (params?.user_id) q.user_id = params.user_id;
+  const url = `/api/v1/connections/${encodeURIComponent(integration)}/disconnect?${new URLSearchParams(q).toString()}`;
+  return post(url);
+}
+
+export async function syncConnection(
+  integration: string,
+  params?: { tenant_id?: string; space_id?: string; user_id?: string }
+): Promise<{ ok: boolean; result: Record<string, unknown> }> {
+  const q: Record<string, string> = {};
+  if (params?.tenant_id) q.tenant_id = params.tenant_id;
+  if (params?.space_id) q.space_id = params.space_id ?? "all";
+  if (params?.user_id) q.user_id = params.user_id ?? "system";
+  const url = `/api/v1/connections/${encodeURIComponent(integration)}/sync?${new URLSearchParams(q).toString()}`;
+  return post(url);
+}
+
+export async function validateConnection(
+  integration: string,
+  params?: { tenant_id?: string; user_id?: string }
+): Promise<{ ok: boolean; valid: boolean; reason?: string }> {
+  const q: Record<string, string> = {};
+  if (params?.tenant_id) q.tenant_id = params.tenant_id;
+  if (params?.user_id) q.user_id = params.user_id;
+  return get(`/api/v1/connections/${encodeURIComponent(integration)}/validate`, q);
+}
+
+export async function getConnectionErrors(
+  integration: string,
+  params?: { tenant_id?: string; user_id?: string; limit?: number }
+): Promise<{ ok: boolean; errors: { at: string; message: string }[] }> {
+  const q: Record<string, string | number> = {};
+  if (params?.tenant_id) q.tenant_id = params.tenant_id;
+  if (params?.user_id) q.user_id = params.user_id;
+  if (params?.limit) q.limit = params.limit;
+  return get(`/api/v1/connections/${encodeURIComponent(integration)}/errors`, q);
+}
+
+/** WebSocket URL for notifications (derived from NEXT_PUBLIC_API_URL). */
+export function getNotificationsWsUrl(): string {
+  const base = (typeof process !== "undefined" && process.env?.NEXT_PUBLIC_API_URL) || "http://localhost:8000";
+  const wsBase = base.replace(/^http/, "ws");
+  return `${wsBase.replace(/\/$/, "")}/ws/notifications`;
+}
+
+/** Base URL for API (for OAuth redirects). */
+export function getConnectionsOAuthStartUrl(
+  integration: "gmail" | "calendar" | "slack" | "notion",
+  params?: { tenant_id?: string; user_id?: string }
+): string {
+  const base = (typeof process !== "undefined" && process.env?.NEXT_PUBLIC_API_URL) || "http://localhost:8000";
+  const p = new URLSearchParams();
+  if (params?.tenant_id) p.set("tenant_id", params.tenant_id);
+  if (params?.user_id) p.set("user_id", params.user_id);
+  return `${base.replace(/\/$/, "")}/api/v1/connections/oauth/${integration}/start?${p.toString()}`;
+}

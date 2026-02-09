@@ -1,0 +1,6 @@
+# Qdrant + curl for Docker healthchecks (official image has no curl)
+FROM qdrant/qdrant:v1.10.1
+USER root
+RUN apt-get update && apt-get install -y --no-install-recommends curl \
+    && rm -rf /var/lib/apt/lists/*
+USER 0

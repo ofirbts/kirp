@@ -20,6 +20,9 @@ from src.agents import (
     self_improvement_spec,
 )
 from src.agents.meta_agent import meta_agent_spec
+from src.agents.future_obligations import future_obligations_spec
+from src.agents.reminder_agent import reminder_agent_spec
+from src.core.agents.specs import PHASE5_AGENT_SPECS
 
 logger = logging.getLogger(__name__)
 
@@ -38,6 +41,9 @@ def register_all_agents(agent_framework: AgentFramework) -> None:
         presentation_spec,
         self_improvement_spec,
         meta_agent_spec,
+        future_obligations_spec,
+        reminder_agent_spec,
+        *PHASE5_AGENT_SPECS,
     ]
     
     for spec in agents:

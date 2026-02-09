@@ -75,6 +75,24 @@ async def run_agent(
         input_context=dict(body or {}),
     )
     await engine.enqueue_run(run)
+    try:
+        from src.agents.kafka_event_agent import KafkaEventAgent, EventEnvelope
+        KafkaEventAgent().emit(EventEnvelope(
+            type="agent_run",
+            payload={
+                "run_id": str(run.run_id),
+                "agent_name": agent_id,
+                "tenant_id": ctx.tenant_id,
+                "space_id": ctx.space_id,
+                "user_id": ctx.user_id,
+                "input": body or {},
+            },
+            tenant_id=ctx.tenant_id,
+            space_id=ctx.space_id,
+            user_id=ctx.user_id,
+        ))
+    except Exception:
+        pass
     return RunAgentResponse(data={"decisionId": str(run.run_id), "status": AgentRunState.IDLE.value}, meta={})
 
 

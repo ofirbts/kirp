@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import VisualCard from "@/components/brand/VisualCard";
 import { ErrorState } from "@/components/feedback/ErrorState";
 import { apiClient } from "@/lib/apiClient";
+import { DEFAULT_TENANT_ID } from "@/lib/constants";
 import { useTenantContextStore } from "@/lib/stores/tenantContextStore";
 
 interface VisualEntry {
@@ -29,7 +30,7 @@ export default function VisualsPage() {
     setError(null);
     try {
       const res = await apiClient.listVisuals({
-        tenantId: tenantId ?? "default",
+        tenantId: DEFAULT_TENANT_ID,
         spaceId: spaceId ?? "all",
       });
       const raw = (res.data ?? []) as VisualEntry[];

@@ -2,14 +2,16 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { apiClient } from "@/lib/apiClient";
 
 interface ServiceRow {
   name: string;
   status: string;
   url?: string;
+  latency_ms?: number;
 }
 
-const OPTIONAL_SERVICES = ["brand_os_api", "brand_os_monitoring"];
+const OPTIONAL_SERVICES = ["brand_os_api", "brand_os_monitoring", "kafka"];
 
 const PORTS = [
   { port: 8000, service: "KIRP API" },
@@ -25,21 +27,34 @@ const PORTS = [
   { port: 8181, service: "OPA" },
 ];
 
+function serviceStatus(s: { status?: string }): string {
+  const v = s?.status;
+  if (v === "ok" || v === "healthy") return "healthy";
+  if (v === "error" || v === "unavailable" || v === "down") return "down";
+  return v ?? "unknown";
+}
+
 export default function MissionControlPage() {
   const [services, setServices] = useState<ServiceRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [errors, setErrors] = useState<string[]>([]);
 
   useEffect(() => {
-    fetch("/api/health")
-      .then((r) => r.json())
+    apiClient
+      .getObservabilityHealth()
       .then((d) => {
-        setServices(d.services || []);
-        const down = (d.services || []).filter((s: ServiceRow) => s.status !== "healthy");
-        const critical = down.filter((s: ServiceRow) => !OPTIONAL_SERVICES.includes(s.name));
-        setErrors(critical.map((s: ServiceRow) => s.name + " is " + s.status));
+        const raw = (d as { services?: Record<string, { status?: string; latency_ms?: number }> })?.services ?? {};
+        const list: ServiceRow[] = Object.entries(raw).map(([name, v]) => ({
+          name,
+          status: serviceStatus(v ?? {}),
+          latency_ms: typeof (v as { latency_ms?: number })?.latency_ms === "number" ? (v as { latency_ms: number }).latency_ms : undefined,
+        }));
+        setServices(list);
+        const down = list.filter((s) => s.status !== "healthy");
+        const critical = down.filter((s) => !OPTIONAL_SERVICES.includes(s.name));
+        setErrors(critical.map((s) => `${s.name} is ${s.status}`));
       })
-      .catch(() => setErrors(["Failed to fetch health"]))
+      .catch(() => setErrors(["Backend unreachable. Set NEXT_PUBLIC_API_URL to your API."]))
       .finally(() => setLoading(false));
   }, []);
 
@@ -69,6 +84,9 @@ export default function MissionControlPage() {
                       {s.status === "healthy" ? "OK" : "X"}
                     </span>
                     <span className="text-neutral-300">{s.name}</span>
+                    {s.latency_ms != null && (
+                      <span className="text-xs text-neutral-500">{Math.round(s.latency_ms)}ms</span>
+                    )}
                   </li>
                 ))}
               </ul>

@@ -45,6 +45,34 @@ class LLMClient:
                 logger.info("LLMClient initialized: Anthropic")
             except ImportError:
                 logger.warning("anthropic not installed")
+        elif self._provider == "groq":
+            try:
+                from langchain_groq import ChatGroq
+                api_key = os.getenv("GROQ_API_KEY", "")
+                if not api_key:
+                    logger.warning("GROQ_API_KEY not set")
+                    return
+                self._client = ChatGroq(
+                    model=os.getenv("GROQ_MODEL", "llama-3.1-8b-instant"),
+                    api_key=api_key,
+                )
+                logger.info("LLMClient initialized: Groq")
+            except ImportError:
+                logger.warning("langchain-groq not installed")
+        elif self._provider == "gemini":
+            try:
+                from langchain_google_genai import ChatGoogleGenerativeAI
+                api_key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY", "")
+                if not api_key:
+                    logger.warning("GEMINI_API_KEY not set")
+                    return
+                self._client = ChatGoogleGenerativeAI(
+                    model=os.getenv("GEMINI_MODEL", "gemini-1.5-flash"),
+                    google_api_key=api_key,
+                )
+                logger.info("LLMClient initialized: Gemini")
+            except ImportError:
+                logger.warning("langchain-google-genai not installed")
         elif self._provider == "ollama":
             self._ollama_url = os.getenv("OLLAMA_URL", "http://ollama:11434")
             self._ollama_model = os.getenv("OLLAMA_MODEL", "llama3")
@@ -88,6 +116,30 @@ class LLMClient:
                 return r.content[0].text if r.content else ""
             except Exception as e:
                 logger.error("Anthropic invoke failed: %s", e)
+                return f"LLM Error: {e}"
+        elif self._provider == "groq" and self._client:
+            try:
+                from langchain_core.messages import HumanMessage, SystemMessage
+                msgs = []
+                if system_prompt:
+                    msgs.append(SystemMessage(content=system_prompt))
+                msgs.append(HumanMessage(content=prompt))
+                r = await self._client.ainvoke(msgs)
+                return (r.content if hasattr(r, "content") else str(r)) or ""
+            except Exception as e:
+                logger.error("Groq invoke failed: %s", e)
+                return f"LLM Error: {e}"
+        elif self._provider == "gemini" and self._client:
+            try:
+                from langchain_core.messages import HumanMessage, SystemMessage
+                msgs = []
+                if system_prompt:
+                    msgs.append(SystemMessage(content=system_prompt))
+                msgs.append(HumanMessage(content=prompt))
+                r = await self._client.ainvoke(msgs)
+                return (r.content if hasattr(r, "content") else str(r)) or ""
+            except Exception as e:
+                logger.error("Gemini invoke failed: %s", e)
                 return f"LLM Error: {e}"
         elif self._provider == "ollama":
             try:

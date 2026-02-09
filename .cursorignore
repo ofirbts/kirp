@@ -1,0 +1,7 @@
+archive/
+logs/
+storage/
+n8n_data/
+node_modules/
+.venv/
+

@@ -1,8 +1,8 @@
 """
-V1 domain APIs — history, signals, visuals, content intelligence.
+V1 domain APIs — signals, visuals, content intelligence.
 
+(History 2.0 is in v1_history.)
 Backs:
-- GET/POST /api/v1/history (history = events)
 - GET/POST /api/v1/signals
 - GET/POST /api/v1/visuals
 - GET/POST /api/v1/content/intelligence
@@ -17,22 +17,9 @@ from pydantic import BaseModel
 
 from src.auth.tenant_context import TenantContext, get_effective_tenant_context
 from src.core import domain_store
-from src.services import events_service
 
 
 router = APIRouter(prefix="/api/v1", tags=["V1 Domain"])
-
-
-@router.get("/history")
-async def list_history(
-    ctx: TenantContext = Depends(get_effective_tenant_context),
-):
-    """History = events list for tenant/space (reuse events service)."""
-    events = await events_service.list_events(
-        tenant_id=ctx.tenant_id,
-        space_id=ctx.space_id or None,
-    )
-    return {"data": events, "meta": {"tenantId": ctx.tenant_id, "spaceId": ctx.space_id}}
 
 
 @router.get("/signals")

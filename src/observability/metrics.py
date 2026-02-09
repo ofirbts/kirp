@@ -2,14 +2,18 @@
 Prometheus metrics — Counters, gauges, histograms.
 
 Used by API, workers, agents, RAG, event pipeline.
+When DISABLE_PROMETHEUS=1, all metrics are no-op (avoids multiprocess conflicts).
 """
 
 from __future__ import annotations
 
 import logging
+import os
 from typing import Any
 
 logger = logging.getLogger(__name__)
+
+_DISABLED = os.getenv("DISABLE_PROMETHEUS", "").lower() in ("1", "true", "yes")
 
 try:
     from prometheus_client import Counter, Gauge, Histogram
@@ -19,13 +23,20 @@ except ImportError:
     Counter = Gauge = Histogram = None  # type: ignore
 
 
+def _metrics_enabled() -> bool:
+    return not _DISABLED and PROMETHEUS_AVAILABLE
+
+
 class MetricsCollector:
     """Prometheus-backed metrics. Namespace prefix: kirp_."""
 
     def __init__(self, namespace: str = "kirp") -> None:
         self._ns = namespace
-        if not PROMETHEUS_AVAILABLE:
-            logger.warning("prometheus_client not installed; metrics no-op")
+        if not _metrics_enabled():
+            if _DISABLED:
+                logger.debug("Prometheus disabled (DISABLE_PROMETHEUS=1); metrics no-op")
+            else:
+                logger.warning("prometheus_client not installed; metrics no-op")
             self._counters: dict[str, Any] = {}
             self._gauges: dict[str, Any] = {}
             self._histograms: dict[str, Any] = {}
@@ -39,7 +50,7 @@ class MetricsCollector:
 
     def inc(self, name: str, value: int = 1, labels: dict[str, str] | None = None) -> None:
         """Increment counter."""
-        if not PROMETHEUS_AVAILABLE:
+        if not _metrics_enabled():
             return
         k = self._key(name)
         if k not in self._counters:
@@ -48,7 +59,7 @@ class MetricsCollector:
 
     def gauge(self, name: str, value: float, labels: dict[str, str] | None = None) -> None:
         """Set gauge."""
-        if not PROMETHEUS_AVAILABLE:
+        if not _metrics_enabled():
             return
         k = self._key(name)
         if k not in self._gauges:
@@ -57,7 +68,7 @@ class MetricsCollector:
 
     def observe(self, name: str, value: float, labels: dict[str, str] | None = None) -> None:
         """Observe histogram (e.g. latency). With no labels use .observe() directly."""
-        if not PROMETHEUS_AVAILABLE:
+        if not _metrics_enabled():
             return
         k = self._key(name)
         if k not in self._histograms:

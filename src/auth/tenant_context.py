@@ -2,12 +2,14 @@
 Tenant context for multi-tenant isolation.
 
 Provides FastAPI dependencies to read and enforce tenant/space from
-request.state.user (set by JWT middleware). Callers can require that
-query params match the authenticated context or default to it.
+request.state.user (set by JWT middleware). In local/development mode
+(SKIP_AUTH=1 or ENV=local|development), always resolves a valid context
+and never raises 401/403.
 """
 
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass
 from typing import Optional
 
@@ -26,22 +28,55 @@ class TenantContext:
     roles: list[str]
 
 
+# Default context for local/development when unauthenticated (dashboard-friendly).
+DEFAULT_LOCAL_CONTEXT = TenantContext(
+    tenant_id="default",
+    space_id="default",
+    user_id="dev",
+    roles=["admin"],
+)
+
+
+def is_local_or_skip_auth() -> bool:
+    """True when ENV is local/development or SKIP_AUTH=1. In this mode, never 403 on tenant mismatch."""
+    skip = os.getenv("SKIP_AUTH", "").lower() in ("1", "true", "yes")
+    env = os.getenv("ENV", "").lower()
+    return skip or env in ("local", "development")
+
+
 def get_tenant_context(request: Request) -> TenantContext:
     """
     Read tenant context from request.state.user (set by JWT middleware).
-    Raises 401 if not authenticated (no user on state).
+    - If request.state.user exists with valid tenant_id and user_id → use EXACTLY as-is (no dev fallback).
+    - If no user AND (SKIP_AUTH=1 or local dev) → return DEFAULT_LOCAL_CONTEXT.
+    - If no user in production → 401.
+    - If user exists but missing tenant_id or user_id → 403 (never silently use "dev").
     """
     if not hasattr(request.state, "user") or not request.state.user:
+        if is_local_or_skip_auth():
+            return DEFAULT_LOCAL_CONTEXT
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Authentication required",
         )
     u = request.state.user
-    tenant_id = u.get("tenant_id") or ""
-    space_id = u.get("space_id") or ""
-    user_id = u.get("user_id") or ""
+    tenant_id = (u.get("tenant_id") or "").strip()
+    space_id = (u.get("space_id") or "").strip() or "all"
+    user_id_raw = u.get("user_id")
+    user_id = user_id_raw if isinstance(user_id_raw, str) and user_id_raw.strip() else None
     roles = u.get("roles") or []
+
+    # Never fall back to "dev" when JWT/user is present. Require valid user_id.
+    if not user_id:
+        if is_local_or_skip_auth():
+            return DEFAULT_LOCAL_CONTEXT
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="user_id required in token",
+        )
     if not tenant_id:
+        if is_local_or_skip_auth():
+            return DEFAULT_LOCAL_CONTEXT
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Tenant context missing",
@@ -49,7 +84,7 @@ def get_tenant_context(request: Request) -> TenantContext:
     return TenantContext(
         tenant_id=tenant_id,
         space_id=space_id,
-        user_id=user_id,
+        user_id=user_id.strip(),
         roles=roles,
     )
 
@@ -96,8 +131,9 @@ def require_tenant_context(
 
 
 def get_effective_tenant_context(request: Request) -> TenantContext:
-    tenant_id = request.headers.get("X-Tenant-ID", "default")
-    space_id = request.headers.get("X-Space-ID", "all")
-    user_id = request.headers.get("X-User-ID", "dev-user")
-    roles = ["owner"]
-    return TenantContext(tenant_id, space_id, user_id, roles)
+    """
+    Use get_tenant_context (JWT) for all authenticated flows.
+    When SKIP_AUTH=1 or local dev, get_tenant_context handles defaults.
+    When auth required, use JWT only — do not fall back to header defaults.
+    """
+    return get_tenant_context(request)

@@ -43,7 +43,12 @@ async def _get_components() -> tuple[EventStore, RAGEngine, AgentFramework, Meta
     """Get initialized components."""
     store = EventStore(os.getenv("MONGO_URI", "mongodb://root:example@mongodb:27017/kirp?authSource=admin"))
     await store.connect()
-    rag = RAGEngine(qdrant_url=os.getenv("QDRANT_URL", "http://qdrant:6333"))
+    rag = RAGEngine(
+        qdrant_url=os.getenv("QDRANT_URL", "http://qdrant:6333"),
+        qdrant_api_key=os.getenv("QDRANT_API_KEY"),
+        embedding_provider=os.getenv("EMBEDDING_PROVIDER", "openai"),
+        embedding_model=os.getenv("EMBEDDING_MODEL", "text-embedding-3-small"),
+    )
     await rag.connect()
     from src.core.agent_registry import get_agent_framework_with_all_agents
     af = get_agent_framework_with_all_agents()

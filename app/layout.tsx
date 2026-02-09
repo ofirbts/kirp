@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "@/app/globals.css";
 import { WrongPortBanner } from "@/components/WrongPortBanner";
+import { ThemeProvider } from "@/components/layout/ThemeProvider";
 
 export const metadata: Metadata = {
   title: "KIRP Intelligence OS",
@@ -13,10 +14,12 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className="dark" suppressHydrationWarning>
-      <body className="min-h-screen bg-neutral-950 text-neutral-100" suppressHydrationWarning>
-        <WrongPortBanner />
-        {children}
+    <html lang="en" suppressHydrationWarning>
+      <body className="min-h-screen bg-bg text-textMain" suppressHydrationWarning>
+        <ThemeProvider>
+          <WrongPortBanner />
+          {children}
+        </ThemeProvider>
       </body>
     </html>
   );

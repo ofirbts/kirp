@@ -1,38 +1,204 @@
-KIRP Enterprise — Short Working Rules for Cursor
-(Concise, strict, and safe)
-1. Architecture Rules (Do Not Break)
-Keep the structure exactly as:
-core/ engines, agents/ handlers, api/ routers, workers/ background tasks, ui/ dashboard.
-No new top‑level folders.
-No changes to docker-compose.yml or .env unless explicitly requested.
-2. Event‑Sourcing & Multi‑Tenancy
-No direct DB mutations. All changes must be events.
-Always propagate tenant_id, space_id, user_id.
-All external actions must go through Governance.
-3. RAG + Agents
-RAG context must be passed consistently.
-No direct LLM calls outside agents/.
-All new agents must use AgentFramework.register().
-4. Schema Engine
-Until fully implemented:
-No raw SQL.
-No assumptions about schema persistence.
-Use only the provided placeholders.
-5. Legacy Integration
-Use old KIRP code only as inspiration, not copy‑paste.
-Modernize and integrate into the new architecture.
-6. Allowed Work (Green Light)
-Implement Schema Engine (models, migrations, queries).
-Implement EventPipeline fully.
-Improve RAG (no zero vectors, better API usage).
-Upgrade agents and context handling.
-Migrate legacy agents into AgentFramework.
-7. Safety Checklist
-Before any change, verify:
-[ ] No imports or APIs were broken
-[ ] Event‑sourcing preserved
-[ ] Multi‑tenancy preserved
-[ ] Governance enforced
-[ ] No infra changes
-[ ] No duplicate logic
-[ ] Output validated (Pydantic preferred)
+# ============================================================
+# KIRP ENTERPRISE — CURSOR RULES (FINAL MERGED VERSION)
+# Clean, strict, safe, and production‑grade
+# ============================================================
+
+# ------------------------------------------------------------
+# 1. FILESYSTEM BOUNDARIES
+# ------------------------------------------------------------
+
+allow:
+  - src/**
+  - app/**
+  - components/**
+  - lib/**
+  - services/**
+  - public/**
+  - scripts/**
+  - tests/**
+  - docker-compose.yml
+  - Dockerfile.api
+  - Dockerfile.dashboard
+  - Dockerfile.agent
+  - requirements.txt
+  - package.json
+  - next.config.js
+  - tailwind.config.js
+  - tsconfig.json
+  - pyproject.toml
+
+deny:
+  # Legacy / archive (READ‑ONLY)
+  - archive/**
+  - brand_os_v3/**
+  - brand_os_cli/**
+  - brand_os_sdk/**
+  - brand_os_monitoring/**
+  - brand_os_scheduler/**
+  - brand_os_ui/**
+  - brand_os_integrations/**
+  - backup_pre_runmydocker/**
+  - KIRP_old/**
+  - static/**
+  - storage/**
+  - n8n_data/**
+  - logs/**
+  - reading/**
+  - transferring/**
+  - api/**            # old API version
+  - tools/archive/**
+
+  # System / accidental files (NEVER TOUCH)
+  - "--bootstrap-server"
+  - "--list"
+  - "Accept:"
+  - "GET"
+  - "User-Agent:"
+  - "[qdrant]"
+  - "[kirp-api]"
+  - "[kirp-worker]"
+  - "[kirp-dashboard]"
+  - ":USERPROFILE\\\\Desktop\\\\project_dump.txt"
+
+# ------------------------------------------------------------
+# 2. ARCHITECTURE GUARANTEES
+# ------------------------------------------------------------
+
+architecture:
+  rules:
+    - "Do NOT create new top-level folders unless explicitly requested."
+    - "Do NOT modify docker-compose.yml or .env unless explicitly requested."
+    - "Preserve the existing architecture: api/, agents/, workers/, schemas/, models/, ui/."
+    - "You MAY extend existing layers, but you MUST NOT invent new architectural layers or frameworks."
+
+  backend:
+    avoid:
+      - "Creating new API versions."
+      - "Duplicating routers."
+      - "Creating new workers unless explicitly requested."
+      - "Touching Alembic migrations unless explicitly requested."
+
+  frontend:
+    avoid:
+      - "Creating duplicate pages."
+      - "Creating duplicate components."
+      - "Modifying app/layout.tsx unless explicitly requested."
+
+# ------------------------------------------------------------
+# 3. EVENT-SOURCING & MULTI-TENANCY
+# ------------------------------------------------------------
+
+event_sourcing:
+  rules:
+    - "No direct DB mutations. All state changes must go through events."
+    - "Events must be append-only and immutable."
+
+multi_tenancy:
+  rules:
+    - "Every new Event type MUST include tenant_id, space_id, user_id fields."
+    - "Every Command and Query MUST receive tenant_id explicitly as an argument."
+    - "tenant_id, space_id, user_id MUST be passed through the entire call chain (API → service → event → handler)."
+    - "Do NOT fetch tenant_id implicitly from globals or shared state."
+    - "Do NOT return data without filtering by tenant_id."
+    - "Do NOT mix data from multiple tenants in a single response."
+
+governance:
+  rules:
+    - "All external actions must go through the Governance layer."
+    - "Do NOT call external APIs directly from random modules."
+
+# ------------------------------------------------------------
+# 4. RAG & AGENTS
+# ------------------------------------------------------------
+
+rag_and_agents:
+  rules:
+    - "Do NOT call LLMs directly; use the Agent framework."
+    - "Always pass RAG context explicitly."
+    - "Do NOT bypass retrieval or send empty contexts when context is required."
+    - "All new agents must be registered via AgentFramework.register()."
+    - "Legacy agents may be modernized but NOT copied as-is."
+
+# ------------------------------------------------------------
+# 5. SCHEMA ENGINE & DATA ACCESS
+# ------------------------------------------------------------
+
+schema_engine:
+  rules:
+    - "Do NOT write raw SQL until Schema Engine is fully implemented."
+    - "Use only the provided interfaces and placeholders."
+
+data_access:
+  rules:
+    - "Do NOT introduce new ORMs."
+    - "Use typed models and Pydantic schemas."
+
+# ------------------------------------------------------------
+# 6. ALLOWED WORK (GREEN LIGHT)
+# ------------------------------------------------------------
+
+allowed_work:
+  backend:
+    - "Implement and extend the Schema Engine."
+    - "Extend the EventPipeline."
+    - "Improve RAG retrieval and context handling."
+    - "Upgrade agents to use the Agent framework."
+    - "Migrate legacy agents safely into the new architecture."
+
+  frontend:
+    - "Improve dashboard UX."
+    - "Add typed components."
+    - "Add tests for multi-tenant and governance flows."
+
+# ------------------------------------------------------------
+# 7. SAFETY CHECKLIST
+# ------------------------------------------------------------
+
+safety_checklist:
+  - "No imports or public APIs broken."
+  - "Event-sourcing preserved."
+  - "Multi-tenancy preserved."
+  - "Governance enforced."
+  - "No infra changes."
+  - "No duplicate logic."
+  - "All inputs/outputs validated."
+
+# ------------------------------------------------------------
+# 8. STYLE & QUALITY
+# ------------------------------------------------------------
+
+style:
+  python:
+    - "PEP8, typed, clean imports."
+  typescript:
+    - "Strict mode, no unused exports."
+  react:
+    - "Prefer Server Components."
+  naming:
+    - "Descriptive, consistent."
+
+tests:
+  - "Add tests for new behavior."
+  - "Cover multi-tenant and event-sourcing flows."
+
+# ------------------------------------------------------------
+# 9. HIGH-LEVEL GOALS
+# ------------------------------------------------------------
+
+goals:
+  - "Keep the project clean and stable."
+  - "Improve KIRP Enterprise incrementally."
+  - "Learn from legacy without modifying it."
+  - "Avoid regressions."
+  - "Respect architecture, event-sourcing, and multi-tenant boundaries."
+
+# ------------------------------------------------------------
+# 10. ARCHIVE (READ-ONLY ANALYSIS)
+# ------------------------------------------------------------
+
+archive_analysis:
+  rules:
+    - "You MAY read any code under archive/** for inspiration and pattern analysis."
+    - "You MUST NOT modify, move, or delete any file under archive/**."
+    - "You MAY propose improvements for the core system (src/, app/, components/, services/) based on patterns found in archive/**."
+    - "All implementation MUST stay within the current architecture and allowed folders."

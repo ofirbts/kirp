@@ -30,26 +30,27 @@ export default function ObservabilityPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[40vh]">
-        <p className="text-muted-foreground">Loading observability…</p>
+        <p className="text-sm text-textSoft">Loading observability…</p>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-4 text-destructive">
+      <div className="rounded-2xl border border-destructive/40 bg-destructive/10 p-4 text-destructive">
         <p className="font-medium">Error</p>
         <p className="text-sm mt-1">{error}</p>
       </div>
     );
   }
 
-  const radialData = [
-    { name: "HTTP", value: 340 },
-    { name: "Pipeline", value: 180 },
-    { name: "RAG", value: 95 },
-    { name: "Worker", value: 42 },
-  ];
+  const rawServices = health && typeof health === "object" && "services" in health
+    ? (health.services as Record<string, { status?: string; latency_ms?: number }>) ?? {}
+    : {};
+  const radialData = Object.entries(rawServices).map(([name, v]) => ({
+    name,
+    value: v?.status === "ok" || v?.status === "healthy" ? (typeof v?.latency_ms === "number" ? Math.min(500, Math.round(v.latency_ms)) : 1) : 0,
+  })).filter((d) => d.name);
 
   const namespaceCount = Array.isArray(metrics?.namespaces)
     ? (metrics.namespaces as string[]).length
@@ -61,15 +62,15 @@ export default function ObservabilityPage() {
   return (
     <div className="space-y-6" suppressHydrationWarning>
       <div suppressHydrationWarning>
-        <h1 className="text-2xl font-bold tracking-tight">Observability</h1>
-        <p className="text-muted-foreground text-sm mt-1">
+        <h1 className="text-2xl font-bold tracking-tight text-textMain">Observability</h1>
+        <p className="text-sm text-textSoft mt-1">
           Health, metrics snapshot, and monitoring.
         </p>
       </div>
 
       <div className="grid gap-4 md:grid-cols-2">
         <StatsCard
-          title="Observability health"
+          title="Backend health"
           value={health?.status ? String(health.status) : "—"}
           icon={Activity}
         />
@@ -81,13 +82,24 @@ export default function ObservabilityPage() {
         />
       </div>
 
+      {radialData.length > 0 && (
+        <div className="rounded-2xl border border-[color:var(--color-border-subtle)] bg-surface1/90 p-6 shadow-soft">
+          <h3 className="text-sm font-medium text-textMain mb-4">
+            Service health (latency / status)
+          </h3>
+          <RadialChart data={radialData} height={260} />
+        </div>
+      )}
+
       <div className="grid gap-4 md:grid-cols-2">
         <Card>
           <CardHeader>
-            <CardTitle>Metrics by namespace</CardTitle>
+            <CardTitle>Metrics namespaces</CardTitle>
           </CardHeader>
           <CardContent>
-            <RadialChart data={radialData} height={260} />
+            <p className="text-sm text-textSoft">
+              {namespaceList || "—"}
+            </p>
           </CardContent>
         </Card>
         <Card>

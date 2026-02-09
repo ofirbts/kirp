@@ -15,14 +15,27 @@ logger = logging.getLogger(__name__)
 
 
 class CalendarIntegration:
-    """Google Calendar / CalDAV."""
+    """Google Calendar / CalDAV. Supports OAuth access_token or service account file."""
 
-    def __init__(self) -> None:
+    def __init__(self, access_token: str | None = None) -> None:
         import os
         self._creds_path = os.getenv("GOOGLE_CREDENTIALS_PATH", "")
+        self._access_token = access_token
         self._client: Any = None
 
-    def connect(self) -> None:
+    def connect(self, access_token: str | None = None) -> None:
+        token = access_token or self._access_token
+        if token:
+            try:
+                from google.oauth2.credentials import Credentials
+                from googleapiclient.discovery import build
+                creds = Credentials(token=token)
+                self._client = build("calendar", "v3", credentials=creds)
+                logger.info("CalendarIntegration connected (OAuth)")
+                return
+            except Exception as e:
+                logger.error("Calendar OAuth init failed: %s", e)
+                return
         if not self._creds_path:
             logger.warning("Calendar credentials missing")
             return
@@ -65,6 +78,7 @@ class CalendarIntegration:
 
             r = await asyncio.to_thread(_list)
             for ev in r.get("items", []):
+                ev_id = ev.get("id")
                 start = ev.get("start", {}).get("dateTime") or ev.get("start", {}).get("date", "")
                 events.append({
                     "tenant_id": tenant_id,
@@ -72,7 +86,7 @@ class CalendarIntegration:
                     "user_id": user_id,
                     "source": "calendar",
                     "content": ev.get("summary", "") + "\n" + (ev.get("description") or ""),
-                    "metadata": {"id": ev.get("id"), "start": start, "calendar": calendar_id},
+                    "metadata": {"external_id": ev_id, "id": ev_id, "start": start, "calendar": calendar_id},
                 })
         except Exception as e:
             logger.error("Calendar list failed: %s", e)

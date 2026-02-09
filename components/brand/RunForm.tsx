@@ -4,9 +4,10 @@ import { useState } from "react";
 import { runBrandOs, type RunResult } from "@/lib/brandOsApi";
 import PostCard from "@/components/brand/PostCard";
 import VisualCard from "@/components/brand/VisualCard";
+import { DEFAULT_TENANT_ID } from "@/lib/constants";
 
 export default function RunForm() {
-  const [tenantId, setTenantId] = useState("default");
+  const [tenantId, setTenantId] = useState(DEFAULT_TENANT_ID);
   const [platform, setPlatform] = useState("linkedin");
   const [topicHint, setTopicHint] = useState("");
   const [loading, setLoading] = useState(false);
@@ -20,7 +21,7 @@ export default function RunForm() {
     setLoading(true);
     try {
       const data = await runBrandOs({
-        tenant_id: tenantId,
+        tenant_id: DEFAULT_TENANT_ID,
         platform,
         topic_hint: topicHint,
       });

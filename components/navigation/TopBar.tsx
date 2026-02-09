@@ -2,9 +2,10 @@
 
 import React from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { Bell, ChevronDown, User } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { ChevronDown, LogOut, Moon, Sun, User } from "lucide-react";
+import { NotificationBell } from "@/components/notifications/NotificationBell";
 import { cn } from "@/lib/utils";
+import { DEFAULT_TENANT_ID } from "@/lib/constants";
 import { useTenantContextStore } from "@/lib/stores/tenantContextStore";
 import { apiClient } from "@/lib/apiClient";
 import {
@@ -16,6 +17,9 @@ import {
 } from "@/components/ui/select";
 import { useToastStore } from "@/lib/stores/toastStore";
 import { useAuthStore } from "@/lib/stores/authStore";
+import { Breadcrumbs } from "@/components/navigation/Breadcrumbs";
+import { BackButton } from "@/components/navigation/BackButton";
+import { useTheme } from "next-themes";
 
 type SectionMeta = {
   title: string;
@@ -27,8 +31,12 @@ const SECTIONS: SectionMeta[] = [
   { prefix: "/mission-control", title: "Mission Control", subtitle: "System health, ports, and activity." },
   { prefix: "/system-control", title: "System Control", subtitle: "Port scanner, Docker, and actions." },
   { prefix: "/dashboard", title: "Dashboard", subtitle: "System health, KPIs, and overview." },
+  { prefix: "/notifications", title: "Activity Center", subtitle: "Notifications and activity." },
   { prefix: "/observability", title: "Observability", subtitle: "Health, metrics, and monitoring." },
   { prefix: "/agents", title: "Agents", subtitle: "Manage and inspect intelligence agents." },
+  { prefix: "/tasks", title: "Tasks", subtitle: "Life-object tasks from ingest and Notion." },
+  { prefix: "/insights", title: "Insights", subtitle: "Workload, patterns, commitments, and recommendations." },
+  { prefix: "/second-brain/graph", title: "Life Graph", subtitle: "Knowledge graph of tasks, projects, commitments, events." },
   { prefix: "/events", title: "Events", subtitle: "Event stream and filters." },
   { prefix: "/decisions", title: "Decisions", subtitle: "Browse and explore decisions." },
   { prefix: "/graph", title: "Knowledge Graph", subtitle: "Explore entities and relationships." },
@@ -37,7 +45,7 @@ const SECTIONS: SectionMeta[] = [
   { prefix: "/visuals", title: "Visuals", subtitle: "Generated visual prompts from runs." },
   { prefix: "/signals", title: "Signals", subtitle: "World context, trends, signals." },
   { prefix: "/run", title: "Run", subtitle: "Trigger Brand OS pipeline." },
-  { prefix: "/history", title: "History", subtitle: "Past runs from Content Memory Log." },
+  { prefix: "/history", title: "History", subtitle: "Human-readable timeline of your activity." },
   { prefix: "/governance/audit", title: "Audit & Compliance", subtitle: "Who did what, when." },
   { prefix: "/tenants", title: "Tenants", subtitle: "Tenant and space management." },
   { prefix: "/settings/users-roles", title: "Users & Roles", subtitle: "Directory and permissions." },
@@ -59,8 +67,9 @@ export const TopBar: React.FC = () => {
   const pathname = usePathname();
   const router = useRouter();
   const meta = getSectionMeta(pathname);
-  const { tenantId, spaceId, setTenant, setSpace } = useTenantContextStore();
+  const { spaceId, setSpace } = useTenantContextStore();
   const { show } = useToastStore();
+  const { theme, setTheme } = useTheme();
 
   const [tenants, setTenants] = React.useState<
     { id: string; name: string }[]
@@ -70,22 +79,9 @@ export const TopBar: React.FC = () => {
   );
   const [loadingTenants, setLoadingTenants] = React.useState(false);
   const [loadingSpaces, setLoadingSpaces] = React.useState(false);
-  const [notificationsCount, setNotificationsCount] = React.useState(0);
   const { user, logout } = useAuthStore();
 
-  React.useEffect(() => {
-    let cancelled = false;
-    apiClient.getStats().then((s) => {
-      if (cancelled) return;
-      const n = typeof (s as Record<string, unknown>)?.notifications === "number"
-        ? (s as Record<string, number>).notifications
-        : 0;
-      setNotificationsCount(Math.min(99, Math.max(0, n)));
-    }).catch(() => { });
-    return () => { cancelled = true; };
-  }, [tenantId]);
-
-  // Load tenants on mount.
+  // Load tenants on mount (display only). Root-level tenant is always "default"; do not overwrite from API.
   React.useEffect(() => {
     let cancelled = false;
     const loadTenants = async () => {
@@ -95,12 +91,6 @@ export const TopBar: React.FC = () => {
         if (cancelled) return;
         const tenantsList = res.data ?? [];
         setTenants(tenantsList);
-        // If current tenant is not in the list, default to the first tenant.
-        if (!tenantsList.find((t) => t.id === tenantId) && tenantsList.length > 0) {
-          setTenant(tenantsList[0].id);
-        } else if (tenantsList.length === 0 && !tenantId) {
-          setTenant("default");
-        }
       } catch (err) {
         if (cancelled) return;
         const message =
@@ -120,16 +110,15 @@ export const TopBar: React.FC = () => {
     return () => {
       cancelled = true;
     };
-  }, [setTenant, show, tenantId]);
+  }, [show]);
 
-  // Load spaces whenever tenant changes.
+  // Load spaces for the fixed tenant.
   React.useEffect(() => {
     let cancelled = false;
     const loadSpaces = async () => {
-      if (!tenantId) return;
       setLoadingSpaces(true);
       try {
-        const res = await apiClient.listSpacesForTenant(tenantId);
+        const res = await apiClient.listSpacesForTenant(DEFAULT_TENANT_ID);
         if (cancelled) return;
         const spacesList = res.data ?? [];
         setSpaces(spacesList);
@@ -159,51 +148,50 @@ export const TopBar: React.FC = () => {
     return () => {
       cancelled = true;
     };
-  }, [tenantId]);
+  }, []);
 
   return (
-    <header className="flex h-14 flex-shrink-0 items-center border-b border-neutral-800 bg-neutral-950/80 px-4 backdrop-blur" suppressHydrationWarning>
-      {/* Left: section title + breadcrumbs placeholder */}
+    <div className="flex h-14 w-full items-center justify-between gap-3" suppressHydrationWarning>
+      {/* Left: back, breadcrumbs, section title + scope */}
       <div className="flex min-w-0 flex-1 items-center gap-3" suppressHydrationWarning>
-        <div className="flex flex-col" suppressHydrationWarning>
-          <span className="truncate text-sm font-semibold text-neutral-100">
-            {meta.title}
-          </span>
-          <span className="text-xs text-neutral-500">
+        <div className="hidden sm:flex">
+          <BackButton />
+        </div>
+        <div className="flex flex-col min-w-0" suppressHydrationWarning>
+          <div className="flex items-center gap-2">
+            <span className="truncate text-sm font-semibold text-textMain">
+              {meta.title}
+            </span>
+          </div>
+          <span className="text-xs text-textSoft truncate">
             {meta.subtitle ?? `KIRP / ${meta.title}`}
           </span>
-          <span className="mt-0.5 text-[11px] text-neutral-500">
-            Scope:{" "}
-            <span className="rounded-full bg-neutral-900 px-2 py-0.5 text-[10px] text-neutral-200">
-              tenant {tenantId || "not set"}
+          <Breadcrumbs className="mt-0.5" />
+          <div className="mt-1 flex flex-wrap gap-1 text-[11px] text-textSoft">
+            <span className="rounded-full bg-surface2 px-2 py-0.5 text-[10px] text-textMain">
+              tenant {DEFAULT_TENANT_ID}
             </span>
-            <span className="ml-1 rounded-full bg-neutral-900 px-2 py-0.5 text-[10px] text-neutral-200">
+            <span className="rounded-full bg-surface2 px-2 py-0.5 text-[10px] text-textMain">
               space {spaceId || "all"}
             </span>
-          </span>
+          </div>
         </div>
 
         {/* Tenant / Space selectors */}
         <div className="ml-4 flex items-center gap-2" suppressHydrationWarning>
           <Select
-            value={tenantId ?? ""}
-            onValueChange={(value) => {
-              setTenant(value || undefined);
-            }}
-            disabled={loadingTenants || tenants.length === 0}
+            value={DEFAULT_TENANT_ID}
+            onValueChange={() => {}}
+            disabled
           >
-            <SelectTrigger
-              className={cn(
-                "h-8 w-44 border-neutral-700 bg-neutral-900 text-xs text-neutral-200 hover:bg-neutral-800",
-              )}
-            >
+            <SelectTrigger className="h-8 w-40 rounded-full border border-[color:var(--color-border-subtle)] bg-surface2 text-xs text-textMain hover:bg-surface3">
               <SelectValue
                 placeholder={
                   loadingTenants ? "Loading tenants…" : "Select tenant"
                 }
               />
             </SelectTrigger>
-            <SelectContent className="border-neutral-700 bg-neutral-950 text-xs text-neutral-100">
+            <SelectContent className="border border-[color:var(--color-border-subtle)] bg-surface1 text-xs text-textMain">
               {tenants.map((t) => (
                 <SelectItem key={t.id} value={t.id}>
                   {t.name ?? t.id}
@@ -215,12 +203,11 @@ export const TopBar: React.FC = () => {
           <Select
             value={spaceId ?? ""}
             onValueChange={(value) => {
-              const next = value || undefined;
-              setSpace(next);
+              setSpace(value || null);
             }}
             disabled={loadingSpaces || spaces.length === 0}
           >
-            <SelectTrigger className="h-8 w-40 border-neutral-700 bg-neutral-900 text-xs text-neutral-200 hover:bg-neutral-800">
+            <SelectTrigger className="h-8 w-36 rounded-full border border-[color:var(--color-border-subtle)] bg-surface2 text-xs text-textMain hover:bg-surface3">
               <SelectValue
                 placeholder={
                   loadingSpaces
@@ -231,7 +218,7 @@ export const TopBar: React.FC = () => {
                 }
               />
             </SelectTrigger>
-            <SelectContent className="border-neutral-700 bg-neutral-950 text-xs text-neutral-100">
+            <SelectContent className="border border-[color:var(--color-border-subtle)] bg-surface1 text-xs text-textMain">
               {spaces.map((s) => (
                 <SelectItem key={s.id} value={s.id}>
                   {s.name ?? s.id}
@@ -242,41 +229,45 @@ export const TopBar: React.FC = () => {
         </div>
       </div>
 
-      {/* Right: alerts + user menu placeholders */}
-      <div className="flex items-center gap-3 pl-4" suppressHydrationWarning>
+      {/* Right: alerts + user menu */}
+      <div className="flex items-center gap-3 pl-2 md:pl-4" suppressHydrationWarning>
+        <NotificationBell />
+
+        {/* Theme toggle */}
         <button
           type="button"
-          className="relative inline-flex h-8 w-8 items-center justify-center rounded-full border border-neutral-700 bg-neutral-900 text-neutral-300 hover:border-cyan-500 hover:text-cyan-400"
+          className="hidden md:inline-flex h-7 w-7 items-center justify-center rounded-full border border-[color:var(--color-border-subtle)] bg-surface2 text-xs text-textSoft hover:border-primary/60 hover:text-primary"
+          onClick={() => setTheme(theme === "light" ? "dark" : "light")}
+          aria-label="Toggle theme"
         >
-          <Bell className="h-4 w-4" />
-          {notificationsCount > 0 && (
-            <span className="absolute -right-0.5 -top-0.5 inline-flex h-3 w-3 items-center justify-center rounded-full bg-red-500 text-[9px] font-semibold text-white">
-              {notificationsCount > 99 ? "99" : notificationsCount}
-            </span>
+          {theme === "light" ? (
+            <Moon className="h-3.5 w-3.5" />
+          ) : (
+            <Sun className="h-3.5 w-3.5" />
           )}
         </button>
 
         {user ? (
           <button
             type="button"
-            className="flex items-center gap-2 rounded-full border border-neutral-700 bg-neutral-900 px-2 py-1 text-xs text-neutral-200 hover:border-cyan-500 hover:text-cyan-300"
+            className="hidden md:flex items-center gap-2 rounded-full border border-[color:var(--color-border-subtle)] bg-surface2 px-2 py-1 text-xs text-textMain hover:border-primary/60 hover:text-primary"
             onClick={() => {
               logout();
-              router.push("/login");
+              router.push("/logout");
             }}
           >
-            <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-neutral-800">
+            <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-surface3">
               <User className="h-3.5 w-3.5" />
             </span>
             <span className="max-w-[120px] truncate">
               {user.email}
             </span>
-            <ChevronDown className="h-3 w-3" />
+            <LogOut className="h-3 w-3" />
           </button>
         ) : (
           <button
             type="button"
-            className="flex items-center gap-2 rounded-full border border-cyan-600 bg-neutral-900 px-3 py-1 text-xs text-cyan-300 hover:bg-neutral-800"
+            className="hidden md:flex items-center gap-2 rounded-full border border-primary/70 bg-surface2 px-3 py-1 text-xs text-primary hover:bg-surface3"
             onClick={() => router.push("/login")}
           >
             <User className="h-3.5 w-3.5" />
@@ -284,7 +275,7 @@ export const TopBar: React.FC = () => {
           </button>
         )}
       </div>
-    </header>
+    </div>
   );
 };
 

@@ -163,6 +163,52 @@ class EventStore:
         doc = await self._db.events.find_one({"_id": str(event_id)})
         return Event.from_doc(doc) if doc else None
 
+    async def find_by_external_id(
+        self,
+        tenant_id: str,
+        source: str,
+        external_id: str,
+    ) -> Event | None:
+        """Find an event by tenant, source, and external_id (idempotency key). Returns None if not found."""
+        if self._db is None:
+            await self.connect()
+        doc = await self._db.events.find_one({
+            "tenant_id": tenant_id,
+            "source": source,
+            "metadata.external_id": external_id,
+        })
+        return Event.from_doc(doc) if doc else None
+
+    async def update_by_external_id(
+        self,
+        tenant_id: str,
+        source: str,
+        external_id: str,
+        content: str,
+        metadata: dict[str, Any] | None = None,
+    ) -> bool:
+        """
+        Update an existing event's content and metadata by external_id (e.g. Notion page_id).
+        Used by bi-directional sync when Notion webhook reports a page change.
+        Returns True if a document was updated.
+        """
+        if self._db is None:
+            await self.connect()
+        update: dict[str, Any] = {"$set": {"content": content, "timestamp": datetime.now(timezone.utc)}}
+        if metadata is not None:
+            update["$set"]["metadata"] = metadata
+        res = await self._db.events.update_one(
+            {
+                "tenant_id": tenant_id,
+                "source": source,
+                "metadata.external_id": external_id,
+            },
+            update,
+        )
+        if res.modified_count:
+            logger.info("EventStore updated by external_id: %s source=%s", external_id, source)
+        return res.modified_count > 0
+
     async def list(
         self,
         tenant_id: str,
@@ -271,7 +317,7 @@ class EventStore:
         return await self._db.events.count_documents(q)
 
     async def close(self) -> None:
-        if self._client:
+        if self._client is not None:
             self._client.close()
             self._client = None
             self._db = None

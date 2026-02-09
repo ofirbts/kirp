@@ -1,47 +1,49 @@
 "use client";
 
 import { create } from "zustand";
+import { DEFAULT_TENANT_ID, DEFAULT_USER_ID } from "@/lib/constants";
 
 interface TenantContextState {
-  tenantId: string | null;
+  tenantId: string;
   spaceId: string | null;
+  userId: string;
   setTenant: (tenantId: string | null) => void;
   setSpace: (spaceId: string | null) => void;
+  setUserId: (userId: string | null) => void;
 }
 
+/** Single identity for the whole app. setTenant/setUserId are no-ops; no API or localStorage may override. */
 export const useTenantContextStore = create<TenantContextState>((set) => ({
-  tenantId: null,
+  tenantId: DEFAULT_TENANT_ID,
   spaceId: null,
+  userId: DEFAULT_USER_ID,
 
-  setTenant: (tenantId) =>
-    set(() => {
-      if (typeof window !== "undefined") {
-        if (tenantId) {
-          localStorage.setItem("kirp_tenant_id", tenantId);
-        } else {
-          localStorage.removeItem("kirp_tenant_id");
-        }
-      }
-      return { tenantId, spaceId: null };
-    }),
+  setTenant: () => {
+    // No-op: tenant is always DEFAULT_TENANT_ID. Do not persist or read from localStorage.
+  },
 
   setSpace: (spaceId) =>
     set(() => {
       if (typeof window !== "undefined") {
-        if (spaceId) {
-          localStorage.setItem("kirp_space_id", spaceId);
-        } else {
-          localStorage.removeItem("kirp_space_id");
-        }
+        if (spaceId) localStorage.setItem("kirp_space_id", spaceId);
+        else localStorage.removeItem("kirp_space_id");
       }
       return { spaceId };
     }),
+
+  setUserId: () => {
+    // No-op: user is always DEFAULT_USER_ID.
+  },
 }));
 
-// Load initial values on client only
+// On client: clear any stale tenant/user from localStorage and ensure state is set.
 if (typeof window !== "undefined") {
-  const tenantId = localStorage.getItem("kirp_tenant_id") || "default";
+  localStorage.removeItem("kirp_tenant_id");
+  localStorage.removeItem("kirp_user_id");
   const spaceId = localStorage.getItem("kirp_space_id") || "all";
-
-  useTenantContextStore.setState({ tenantId, spaceId });
+  useTenantContextStore.setState({
+    tenantId: DEFAULT_TENANT_ID,
+    userId: DEFAULT_USER_ID,
+    spaceId,
+  });
 }

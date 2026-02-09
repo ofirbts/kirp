@@ -38,7 +38,12 @@ async def generate_content(req: ContentRequest) -> dict[str, Any]:
     """
     try:
         # Initialize components
-        rag = RAGEngine(qdrant_url=os.getenv("QDRANT_URL", "http://localhost:6333"))
+        rag = RAGEngine(
+            qdrant_url=os.getenv("QDRANT_URL", "http://localhost:6333"),
+            qdrant_api_key=os.getenv("QDRANT_API_KEY"),
+            embedding_provider=os.getenv("EMBEDDING_PROVIDER", "openai"),
+            embedding_model=os.getenv("EMBEDDING_MODEL", "text-embedding-3-small"),
+        )
         await rag.connect()
         
         af = AgentFramework()

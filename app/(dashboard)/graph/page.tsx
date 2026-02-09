@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { apiClient } from "@/lib/apiClient";
+import { DEFAULT_TENANT_ID, DEFAULT_USER_ID } from "@/lib/constants";
 import { useTenantContextStore } from "@/lib/stores/tenantContextStore";
 import { PageSkeleton } from "@/components/dashboard/PageSkeleton";
 import { ErrorState } from "@/components/feedback/ErrorState";
@@ -41,7 +42,7 @@ function GraphContent() {
     setLoadingGraph(true);
     try {
       const res = await apiClient.getGraph({
-        tenantId: tenantId ?? "default",
+        tenantId: DEFAULT_TENANT_ID,
         spaceId: spaceId ?? "all",
       });
       setNodes((res.data?.nodes ?? []) as GraphNode[]);
@@ -52,7 +53,7 @@ function GraphContent() {
     } finally {
       setLoadingGraph(false);
     }
-  }, [tenantId, spaceId]);
+  }, [spaceId]);
 
   useEffect(() => {
     loadGraph();
@@ -65,9 +66,9 @@ function GraphContent() {
     setResults(null);
     try {
       const res = await apiClient.queryV1({
-        tenant_id: tenantId ?? "default",
+        tenant_id: DEFAULT_TENANT_ID,
         space_id: spaceId ?? "all",
-        user_id: "dashboard",
+        user_id: DEFAULT_USER_ID,
         query: query.trim(),
         k: 10,
       });
@@ -77,7 +78,7 @@ function GraphContent() {
     } finally {
       setLoading(false);
     }
-  }, [query, tenantId, spaceId]);
+  }, [query, spaceId]);
 
   return (
     <div className="space-y-6" suppressHydrationWarning>

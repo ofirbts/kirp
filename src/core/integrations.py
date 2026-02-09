@@ -173,13 +173,24 @@ def get_cassandra_session(use_bootcamp: bool = False):
 
 
 # === Kafka ===
+# Docker-internal hostname so producer and consumer connect to the same broker (avoids UNKNOWN_TOPIC_OR_PART).
+KAFKA_BOOTSTRAP_DEFAULT = "kafka:9092"
+
+
+def _kafka_bootstrap(use_bootcamp: bool = False) -> str:
+    """Resolve Kafka bootstrap servers. Prefer Docker hostname kafka:9092 over localhost."""
+    if use_bootcamp:
+        return os.getenv("BOOTCAMP_KAFKA_BOOTSTRAP", "node128.codingbc.com:9092")
+    raw = os.getenv("KAFKA_BOOTSTRAP_SERVERS", KAFKA_BOOTSTRAP_DEFAULT)
+    if raw in ("localhost:9092", "127.0.0.1:9092"):
+        return KAFKA_BOOTSTRAP_DEFAULT
+    return raw
+
+
 @lru_cache
 def get_kafka_producer(use_bootcamp: bool = False):
-    """Get Kafka producer."""
-    if use_bootcamp:
-        bootstrap = os.getenv("BOOTCAMP_KAFKA_BOOTSTRAP", "node128.codingbc.com:9092")
-    else:
-        bootstrap = os.getenv("KAFKA_BOOTSTRAP_SERVERS", "kafka:9092")
+    """Get Kafka producer. Uses kafka:9092 by default (Docker hostname)."""
+    bootstrap = _kafka_bootstrap(use_bootcamp)
     try:
         from confluent_kafka import Producer
         return Producer({"bootstrap.servers": bootstrap})
@@ -188,12 +199,9 @@ def get_kafka_producer(use_bootcamp: bool = False):
         return None
 
 
-def get_kafka_consumer(group_id: str, topics: list[str], use_bootcamp: bool = False):
-    """Get Kafka consumer."""
-    if use_bootcamp:
-        bootstrap = os.getenv("BOOTCAMP_KAFKA_BOOTSTRAP", "node128.codingbc.com:9092")
-    else:
-        bootstrap = os.getenv("KAFKA_BOOTSTRAP_SERVERS", "kafka:9092")
+def get_kafka_consumer(group_id: str, topics: list[str], use_bootcamp: bool = False, subscribe: bool = True):
+    """Get Kafka consumer. Uses kafka:9092 by default (Docker hostname). If subscribe=False, caller must call consumer.subscribe() after topic is ready."""
+    bootstrap = _kafka_bootstrap(use_bootcamp)
     try:
         from confluent_kafka import Consumer
         consumer = Consumer(
@@ -203,7 +211,8 @@ def get_kafka_consumer(group_id: str, topics: list[str], use_bootcamp: bool = Fa
                 "auto.offset.reset": "earliest",
             }
         )
-        consumer.subscribe(topics)
+        if subscribe:
+            consumer.subscribe(topics)
         return consumer
     except ImportError:
         logger.warning("confluent-kafka not installed")

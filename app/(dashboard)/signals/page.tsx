@@ -3,7 +3,7 @@
 import React, { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import { apiClient } from "@/lib/apiClient";
-import { useTenantContextStore } from "@/lib/stores/tenantContextStore";
+import { DEFAULT_TENANT_ID } from "@/lib/constants";
 import { PageSkeleton } from "@/components/dashboard/PageSkeleton";
 import { ErrorState } from "@/components/feedback/ErrorState";
 
@@ -16,8 +16,6 @@ interface SignalRow {
 }
 
 export default function SignalsPage() {
-  const tenantId = "default";
-  const spaceId = "all";
   const [items, setItems] = useState<SignalRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -27,8 +25,8 @@ export default function SignalsPage() {
     setError(null);
     try {
       const res = await apiClient.listSignals({
-        tenantId: tenantId ?? "default",
-        spaceId: spaceId ?? "all",
+        tenantId: DEFAULT_TENANT_ID,
+        spaceId: "all",
       });
       setItems((res.data ?? []) as SignalRow[]);
     } catch (e) {
@@ -36,7 +34,7 @@ export default function SignalsPage() {
     } finally {
       setLoading(false);
     }
-  }, [tenantId, spaceId]);
+  }, []);
 
   useEffect(() => {
     load();

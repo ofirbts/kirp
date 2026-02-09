@@ -51,6 +51,7 @@ class Settings(BaseSettings):
         default="kirp_vectors",
         env="QDRANT_COLLECTION",
     )
+    qdrant_api_key: str | None = Field(default=None, env="QDRANT_API_KEY")
     # Governance / security
     opa_url: str | None = Field(default=None, env="OPA_URL")
     jwt_secret: str = Field(default="dev-secret-change-me", env="JWT_SECRET")

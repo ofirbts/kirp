@@ -1,4 +1,4 @@
-# Databases - אסור להעתיק, זה נוצר בתוך ה-Container או ב-Volumes
+# Databases - אסור להעתיק, נוצר ב-Container/Volumes
 mongo_data/
 qdrant_data/
 data/faiss_index/
@@ -27,3 +27,23 @@ storage/jobs.json
 docker-compose.yml
 Dockerfile
 .dockerignore
+
+# Next.js (API/worker/agent images don't need frontend)
+node_modules/
+.next/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Env with secrets (inject at runtime, not bake into image)
+.env
+.env.local
+.env.*.local
+.env.runmydocker
+
+# === רק מקורות אמת — לא גיבויים ולא עותקים ישנים ===
+backup_pre_runmydocker/
+opa_policies_live/
+KIRP_old/
+final.yml
+n8n_data/

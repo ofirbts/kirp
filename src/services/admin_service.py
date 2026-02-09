@@ -17,6 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.models.tenant import Tenant, Space
 from src.models.user import User, Role
+from src.services.users_service import get_or_create_role_in_session
 
 
 class BootstrapError(Exception):
@@ -60,20 +61,19 @@ async def bootstrap_system(
     )
     session.add(tenant)
 
-    # --- Roles ---
+    # --- Roles --- (idempotent: get or create by name to avoid duplicate key)
     roles_by_name: dict[str, Role] = {}
     for role_spec in roles_payload:
         name = str(role_spec.get("name") or "").strip()
         if not name:
             raise BootstrapError("Role name is required")
-        role = Role(
-            id=uuid4(),
+        role = await get_or_create_role_in_session(
+            session,
             name=name,
             tenant_id=str(tenant.id),
             permissions=role_spec.get("permissions") or [],
-            created_at=now,
+            now=now,
         )
-        session.add(role)
         roles_by_name[name] = role
 
     # --- Spaces ---

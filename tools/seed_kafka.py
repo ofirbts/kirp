@@ -39,7 +39,7 @@ def main() -> None:
 
   seed = load_seed_definition()
   topics = seed["topics"]
-  broker = os.getenv("KAFKA_BROKER_URL", "localhost:9092")
+  broker = os.getenv("KAFKA_BROKER_URL", os.getenv("KAFKA_BOOTSTRAP_SERVERS", "kafka:9092"))
 
   producer = KafkaProducer(
     bootstrap_servers=[broker],

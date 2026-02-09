@@ -1,4 +1,5 @@
 # KIRP Enterprise — Full Stack
+# נתיבים קנוניים: API=src.main, OPA=deploy/opa/policies, ראה deploy/CANONICAL_PATHS.md
 
 networks:
   kirp-net:
@@ -123,8 +124,7 @@ services:
       ZOOKEEPER_CLIENT_PORT: 2181
       ZOOKEEPER_TICK_TIME: 2000
       ZOO_4LW_COMMANDS_WHITELIST: "ruok,stat,conf,isro,mntr,srvr"
-      ZOO_CFG_EXTRA: |
-        4lw.commands.whitelist=ruok,stat,conf,isro,mntr,srvr
+      ZOO_CFG_EXTRA: "4lw.commands.whitelist=ruok,stat,conf,isro,mntr,srvr"
     ports:
       - "2181:2181"
     volumes:
@@ -133,12 +133,11 @@ services:
     networks:
       - kirp-net
     healthcheck:
-      # Confluent image only enables 4lw "srvr"; use it and check response contains Mode
-      test: ["CMD-SHELL", "bash -c 'exec 3<>/dev/tcp/localhost/2181 && echo srvr >&3 && cat <&3 | grep -q Mode'"]
+      test: ["CMD-SHELL", "echo ruok | nc localhost 2181 2>/dev/null | grep -q imok || exit 1"]
       interval: 10s
       timeout: 5s
-      retries: 5
-      start_period: 20s
+      retries: 10
+      start_period: 45s
 
   # === Kafka ===
   kafka:
@@ -147,7 +146,7 @@ services:
     restart: always
     depends_on:
       zookeeper:
-        condition: service_healthy
+        condition: service_started
     ports:
       - "9092:9092"
       - "9093:9093"
@@ -265,30 +264,7 @@ services:
     networks:
       - kirp-net
 
-  # === Brand OS API (port 8002 for UI) ===
-  brand-os-api:
-    build:
-      context: .
-      dockerfile: Dockerfile.brand_os_api
-    image: kirp-brand-os-api:local
-    container_name: kirp-brand-os-api
-    restart: unless-stopped
-    ports:
-      - "8002:8000"
-    environment:
-      BRAND_OS_V3_PATH: /app/brand_os_v3
-      PYTHONPATH: /app
-    command: uvicorn api.main:app --host 0.0.0.0 --port 8000
-    networks:
-      - kirp-net
-    healthcheck:
-      test: ["CMD-SHELL", "curl -sf http://localhost:8000/health || exit 1"]
-      interval: 15s
-      timeout: 5s
-      retries: 5
-      start_period: 30s
-
-  # === API ===
+  # === KIRP API  ===
   kirp-api:
     build:
       context: .
@@ -300,7 +276,7 @@ services:
     env_file: .env
     environment:
       ENV: development
-      SKIP_AUTH: "1"
+      SKIP_AUTH: "0"
       DEV_TOKEN: dev-local-token
       MONGO_URI: mongodb://root:example@mongodb:27017/kirp?authSource=admin
       POSTGRES_URI: postgresql+asyncpg://kirp_user:kirp_password@postgres:5432/kirp
@@ -319,9 +295,9 @@ services:
       postgres: { condition: service_healthy }
       qdrant: { condition: service_healthy }
       redis: { condition: service_healthy }
-      kafka: { condition: service_healthy }
+      kafka: { condition: service_started }
       opa: { condition: service_started }
-    command: sh -c "echo 'Waiting for PostgreSQL...' && sleep 2 && alembic upgrade head && echo 'Migrations complete, starting API...' && uvicorn src.main:app --host 0.0.0.0 --port 8000"
+    command: sh -c "sleep 2 && alembic upgrade head && uvicorn src.main:app --host 0.0.0.0 --port 8000"
     networks:
       - kirp-net
     healthcheck:
@@ -330,33 +306,6 @@ services:
       timeout: 10s
       retries: 10
       start_period: 120s
-
-  # === Celery Worker ===
-  kirp-worker:
-    build:
-      context: .
-      dockerfile: Dockerfile.worker
-    container_name: kirp-worker
-    restart: unless-stopped
-    env_file: .env
-    environment:
-      MONGO_URI: mongodb://root:example@mongodb:27017/kirp?authSource=admin
-      POSTGRES_URI: postgresql+asyncpg://kirp_user:kirp_password@postgres:5432/kirp
-      QDRANT_URL: http://qdrant:6333
-      REDIS_URL: redis://redis:6379/0
-      CELERY_BROKER_URL: redis://redis:6379/1
-      CELERY_RESULT_BACKEND: redis://redis:6379/1
-      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
-      OPA_URL: http://opa:8181
-      PYTHONPATH: /app
-    depends_on:
-      kirp-api: { condition: service_healthy }
-      redis: { condition: service_healthy }
-      kafka: { condition: service_healthy }
-      opa: { condition: service_started }
-    command: celery -A src.workers.celery_app worker -l info -c 4
-    networks:
-      - kirp-net
 
   # === Agent Processor ===
   kirp-agent-processor:
@@ -367,6 +316,7 @@ services:
     restart: unless-stopped
     env_file: .env
     environment:
+      DISABLE_PROMETHEUS: "1"
       MONGO_URI: mongodb://root:example@mongodb:27017/kirp?authSource=admin
       POSTGRES_URI: postgresql+asyncpg://kirp_user:kirp_password@postgres:5432/kirp
       QDRANT_URL: http://qdrant:6333
@@ -376,29 +326,29 @@ services:
       PYTHONPATH: /app
     depends_on:
       kirp-api: { condition: service_healthy }
-      kafka: { condition: service_healthy }
+      kafka: { condition: service_started }
     command: python -m src.workers.kafka_processor
     networks:
       - kirp-net
 
-  # === Dashboard ===
+  # === Dashboard (Next.js UI on port 3100) ===
   kirp-dashboard:
     build:
       context: .
       dockerfile: Dockerfile.dashboard
+      args:
+        NEXT_PUBLIC_API_URL: http://localhost:8000
+        NEXT_PUBLIC_SKIP_AUTH: "0"
     container_name: kirp-dashboard
     restart: unless-stopped
     ports:
-      - "8501:8501"
-    env_file: .env
+      - "3100:3100"
     environment:
-      API_URL: http://kirp-api:8000
-      NEXT_PUBLIC_API_URL: http://kirp-api:8000
-      EXTERNAL_URL: http://localhost:8501
-      PYTHONPATH: /app
+      NEXT_PUBLIC_API_URL: http://localhost:8000
+      NEXT_PUBLIC_SKIP_AUTH: "0"
     depends_on:
       kirp-api:
         condition: service_healthy
-    command: streamlit run src/ui/master_dashboard.py --server.port 8501 --server.address 0.0.0.0
+    command: ["npm", "run", "start"]
     networks:
       - kirp-net

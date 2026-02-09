@@ -630,8 +630,10 @@ services:
     command:
       - run
       - --server
+      - --addr=0.0.0.0:8181
       - --log-level=info
       - --set=decision_logs.console=true
+      - /policies
     container_name: kirp-opa
     image: openpolicyagent/opa:latest
     networks:

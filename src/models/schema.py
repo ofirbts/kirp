@@ -19,8 +19,13 @@ from src.models.base import Base
 class SchemaEntity(str, Enum):
     TASK = "task"
     PROJECT = "project"
+    COMMITMENT = "commitment"
     LIFE_AREA = "life_area"
     CATEGORY = "category"
+
+
+# Canonical Life Areas for Second Brain (Work, Family, Health, Learning)
+LIFE_AREA_NAMES = ("Work", "Family", "Health", "Learning")
 
 
 class SchemaNode(Base):

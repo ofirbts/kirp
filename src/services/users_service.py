@@ -1,21 +1,81 @@
 """
 Users & Roles service — Postgres-backed list.
 
-Uses SchemaEngine (Postgres) for User and Role. Ensures default user "ofir" when empty.
+Uses SchemaEngine (Postgres) for User and Role. Idempotent initialization:
+create_role_if_not_exists, ensure_default_user (no duplicate roles).
 """
 
 from __future__ import annotations
 
 import uuid
 from datetime import datetime, timezone
-from typing import List
+from typing import Any, List
 
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import selectinload
 
 from src.core.schema_engine import get_schema_engine
 from src.models.user import User, Role, user_roles
 from src.schemas.api_models import User as UserSchema, Role as RoleSchema, Permission
+
+
+async def get_or_create_role_in_session(
+    session: Any,
+    name: str,
+    tenant_id: str | None = None,
+    permissions: List[str] | None = None,
+    now: datetime | None = None,
+) -> Role:
+    """Within an existing async session: get role by name or create. No commit. Idempotent."""
+    result = await session.execute(select(Role).where(Role.name == name).limit(1))
+    existing = result.scalar_one_or_none()
+    if existing:
+        return existing
+    role = Role(
+        id=uuid.uuid4(),
+        name=name,
+        tenant_id=tenant_id,
+        permissions=permissions or [],
+        created_at=now or datetime.now(timezone.utc),
+    )
+    session.add(role)
+    await session.flush()
+    return role
+
+
+async def create_role_if_not_exists(
+    name: str,
+    tenant_id: str | None = None,
+    permissions: List[str] | None = None,
+) -> str:
+    """Create a role by name if it does not exist. Returns role id (str). Idempotent."""
+    engine = await get_schema_engine()
+    session = await engine.get_session()
+    try:
+        result = await session.execute(select(Role).where(Role.name == name).limit(1))
+        existing = result.scalar_one_or_none()
+        if existing:
+            return str(existing.id)
+        role = Role(
+            id=uuid.uuid4(),
+            name=name,
+            tenant_id=tenant_id,
+            permissions=permissions or [],
+            created_at=datetime.now(timezone.utc),
+        )
+        session.add(role)
+        await session.commit()
+        return str(role.id)
+    except IntegrityError:
+        await session.rollback()
+        result = await session.execute(select(Role).where(Role.name == name).limit(1))
+        existing = result.scalar_one_or_none()
+        if existing:
+            return str(existing.id)
+        raise
+    finally:
+        await session.close()
 
 
 def _user_to_schema(u: User, role_ids: List[str]) -> UserSchema:
@@ -94,7 +154,7 @@ async def list_roles() -> List[RoleSchema]:
 
 
 async def ensure_default_user() -> None:
-    """Create default user 'ofir' and role 'owner' if none exist."""
+    """Create default user 'ofir' with role 'owner' if no user exists. Idempotent."""
     from src.services import tenants_service
     await tenants_service.ensure_default_tenant()
     engine = await get_schema_engine()
@@ -104,18 +164,14 @@ async def ensure_default_user() -> None:
         if result.scalar_one_or_none() is not None:
             return
         from src.models.tenant import Tenant
-        tenant_result = await session.execute(select(Tenant).limit(1))
+        tenant_result = await session.execute(select(Tenant).order_by(Tenant.name).limit(1))
         tenant = tenant_result.scalar_one_or_none()
         tenant_id_str = str(tenant.id) if tenant else "default"
-        role = Role(
-            id=uuid.uuid4(),
-            name="owner",
+        owner_role_id = await create_role_if_not_exists(
+            "owner",
             tenant_id=tenant_id_str,
             permissions=["read", "write", "execute", "admin"],
-            created_at=datetime.now(timezone.utc),
         )
-        session.add(role)
-        await session.flush()
         user = User(
             id=uuid.uuid4(),
             username="ofir",
@@ -126,7 +182,9 @@ async def ensure_default_user() -> None:
         )
         session.add(user)
         await session.flush()
-        await session.execute(user_roles.insert().values(user_id=user.id, role_id=role.id))
+        await session.execute(user_roles.insert().values(user_id=user.id, role_id=uuid.UUID(owner_role_id)))
         await session.commit()
+    except IntegrityError:
+        await session.rollback()
     finally:
         await session.close()

@@ -12,6 +12,7 @@ RAG Engine — Hybrid search, multi-hop retrieval, context builder.
 from __future__ import annotations
 
 import logging
+import os
 import re
 from collections import defaultdict
 from dataclasses import dataclass
@@ -61,6 +62,7 @@ class RAGEngine:
         self,
         qdrant_url: str,
         collection: str = "kirp_vectors",
+        qdrant_api_key: str | None = None,
         embedding_provider: str = "openai",
         embedding_model: str = "text-embedding-3-small",
         enable_bm25: bool = True,
@@ -70,6 +72,7 @@ class RAGEngine:
     ) -> None:
         self._qdrant_url = qdrant_url
         self._collection = collection
+        self._qdrant_api_key = (qdrant_api_key or "").strip() or None
         self._embedding_provider = embedding_provider
         self._embedding_model = embedding_model
         self._enable_bm25 = enable_bm25
@@ -88,20 +91,37 @@ class RAGEngine:
         try:
             from qdrant_client import QdrantClient
             from qdrant_client.http import models
-            self._client = QdrantClient(url=self._qdrant_url)
+            client_kw: dict[str, Any] = {"url": self._qdrant_url}
+            if self._qdrant_api_key:
+                client_kw["api_key"] = self._qdrant_api_key
+            self._client = QdrantClient(**client_kw)
+            embedding_dim = int(os.environ.get("EMBEDDING_DIMENSION", "1536"))
             collections = self._client.get_collections().collections
             if not any(c.name == self._collection for c in collections):
                 self._client.create_collection(
                     collection_name=self._collection,
                     vectors_config=models.VectorParams(
-                        size=1536,
+                        size=embedding_dim,
                         distance=models.Distance.COSINE,
                     ),
                 )
                 logger.info("RAGEngine created Qdrant collection: %s", self._collection)
+            # Ensure payload indexes for filter (tenant_id, space_id, user_id) — required by Qdrant Cloud
+            for field in ("tenant_id", "space_id", "user_id"):
+                try:
+                    self._client.create_payload_index(
+                        collection_name=self._collection,
+                        field_name=field,
+                        field_schema=models.PayloadSchemaType.KEYWORD,
+                    )
+                    logger.info("RAGEngine created payload index: %s", field)
+                except Exception as idx_err:
+                    if "already exists" in str(idx_err).lower() or "exist" in str(idx_err).lower():
+                        logger.debug("Payload index %s already exists", field)
+                    else:
+                        logger.warning("Payload index %s: %s", field, idx_err)
 
             if self._embedding_provider == "openai":
-                import os
                 try:
                     from langchain_openai import OpenAIEmbeddings
                     if os.environ.get("OPENAI_API_KEY"):
@@ -112,8 +132,22 @@ class RAGEngine:
                 except Exception as e:
                     self._embedder = None
                     logger.warning("OpenAI embedder init failed (%s); embeddings disabled", e)
+            elif self._embedding_provider == "gemini":
+                try:
+                    from langchain_google_genai import GoogleGenerativeAIEmbeddings
+                    api_key = os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY", "")
+                    if api_key:
+                        self._embedder = GoogleGenerativeAIEmbeddings(
+                            model=self._embedding_model or "models/text-embedding-004",
+                            google_api_key=api_key,
+                        )
+                    else:
+                        self._embedder = None
+                        logger.warning("GEMINI_API_KEY not set; embeddings disabled")
+                except Exception as e:
+                    self._embedder = None
+                    logger.warning("Gemini embedder init failed (%s); embeddings disabled", e)
             else:
-                # Fallback: use a stub; plug in Ollama/local later
                 self._embedder = None
             logger.info("RAGEngine connected to Qdrant at %s", self._qdrant_url)
         except Exception as e:
@@ -245,14 +279,14 @@ class RAGEngine:
         tenant_id: str,
         space_id: str | None = None,
         limit: int = 10,
+        allowed_space_ids: list[str] | None = None,
     ) -> list[tuple[dict[str, Any], float]]:
-        """BM25 keyword search."""
+        """BM25 keyword search. Respects allowed_space_ids for membership."""
         if not self._enable_bm25:
             return []
         
         # Get documents for tenant
         if tenant_id not in self._text_cache:
-            # Fetch from Qdrant to build index
             await self._refresh_bm25_index(tenant_id, space_id)
         
         if tenant_id not in self._bm25_index:
@@ -266,8 +300,10 @@ class RAGEngine:
         if not documents:
             return []
         
-        # Filter by space_id if provided
-        if space_id:
+        # Filter by space: allowed set or single space_id
+        if allowed_space_ids:
+            documents = [d for d in documents if d.get("space_id") in allowed_space_ids]
+        elif space_id:
             documents = [d for d in documents if d.get("space_id") == space_id]
         
         if BM25_AVAILABLE:
@@ -287,13 +323,12 @@ class RAGEngine:
         return scored_docs[:limit]
 
     async def _refresh_bm25_index(self, tenant_id: str, space_id: str | None = None) -> None:
-        """Refresh BM25 index from Qdrant."""
+        """Refresh BM25 index from Qdrant (tenant-wide; space filtering applied at search time)."""
         if self._client is None:
             await self.connect()
         
         from qdrant_client.http import models
         
-        # Fetch all documents for tenant
         must = [models.FieldCondition(key="tenant_id", match=models.MatchValue(value=tenant_id))]
         if space_id:
             must.append(models.FieldCondition(key="space_id", match=models.MatchValue(value=space_id)))
@@ -330,19 +365,24 @@ class RAGEngine:
         user_id: str | None = None,
         limit: int = 10,
         max_hops: int = 2,
+        allowed_space_ids: list[str] | None = None,
     ) -> RAGResponse:
         """
         Multi-hop retrieval: query rewriting, context expansion, iterative retrieval.
+        Respects allowed_space_ids for membership.
         """
         if not self._enable_multihop or max_hops <= 1:
-            # Fallback to single-hop
-            return await self._single_hop_search(query, tenant_id, space_id, user_id, limit)
+            return await self._single_hop_search(
+                query, tenant_id, space_id, user_id, limit, allowed_space_ids=allowed_space_ids
+            )
         
         from src.core.llm_client import get_llm
         llm = get_llm()
         
         # Initial retrieval
-        initial_results = await self._single_hop_search(query, tenant_id, space_id, user_id, limit * 2)
+        initial_results = await self._single_hop_search(
+            query, tenant_id, space_id, user_id, limit * 2, allowed_space_ids=allowed_space_ids
+        )
         all_results = {r.text: r for r in initial_results.results}  # Deduplicate by text
         
         # Iterative refinement
@@ -381,7 +421,8 @@ Return JSON:
                 expansion_queries = expansion.get("sub_queries", [])[:3]  # Limit to 3
                 for exp_query in expansion_queries:
                     exp_results = await self._single_hop_search(
-                        exp_query, tenant_id, space_id, user_id, limit // 2
+                        exp_query, tenant_id, space_id, user_id, limit // 2,
+                        allowed_space_ids=allowed_space_ids,
                     )
                     for r in exp_results.results:
                         if r.text not in all_results:
@@ -423,8 +464,9 @@ Return JSON:
         limit: int = 10,
         since: datetime | None = None,
         source: str | None = None,
+        allowed_space_ids: list[str] | None = None,
     ) -> RAGResponse:
-        """Single-hop hybrid search (semantic + BM25)."""
+        """Single-hop hybrid search (semantic + BM25). Respects allowed_space_ids for membership."""
         if self._client is None:
             await self.connect()
         from qdrant_client.http import models
@@ -432,7 +474,9 @@ Return JSON:
         # Semantic search
         vec = await self.embed(query)
         must = [models.FieldCondition(key="tenant_id", match=models.MatchValue(value=tenant_id))]
-        if space_id:
+        if allowed_space_ids:
+            must.append(models.FieldCondition(key="space_id", match=models.MatchAny(any=allowed_space_ids)))
+        elif space_id:
             must.append(models.FieldCondition(key="space_id", match=models.MatchValue(value=space_id)))
         if user_id:
             must.append(models.FieldCondition(key="user_id", match=models.MatchValue(value=user_id)))
@@ -469,7 +513,9 @@ Return JSON:
         bm25_results: dict[str, tuple[dict[str, Any], float]] = {}
         if self._enable_bm25:
             try:
-                bm25_hits = await self._bm25_search(query, tenant_id, space_id, limit * 2)
+                bm25_hits = await self._bm25_search(
+                    query, tenant_id, space_id, limit * 2, allowed_space_ids=allowed_space_ids
+                )
                 for doc, score in bm25_hits:
                     content = doc.get("content", "")
                     if content:
@@ -542,9 +588,11 @@ Return JSON:
         since: datetime | None = None,
         source: str | None = None,
         use_multihop: bool | None = None,
+        allowed_space_ids: list[str] | None = None,
     ) -> RAGResponse:
         """
         Hybrid search with tenant/space/time/source scoping.
+        When allowed_space_ids is set, results are restricted to those spaces (membership-aware).
         Supports multi-hop reasoning if enabled.
         Returns context + explainability + confidence.
         """
@@ -561,9 +609,14 @@ Return JSON:
         )
 
         if use_multihop:
-            resp = await self._multi_hop_retrieval(query, tenant_id, space_id, user_id, limit)
+            resp = await self._multi_hop_retrieval(
+                query, tenant_id, space_id, user_id, limit, allowed_space_ids=allowed_space_ids
+            )
         else:
-            resp = await self._single_hop_search(query, tenant_id, space_id, user_id, limit, since, source)
+            resp = await self._single_hop_search(
+                query, tenant_id, space_id, user_id, limit, since, source,
+                allowed_space_ids=allowed_space_ids,
+            )
 
         results_count = len(resp.results)
         self._metrics.observe(

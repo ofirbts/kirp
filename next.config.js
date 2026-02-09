@@ -1,5 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // Standalone: for production deploy, copy .next/static and public/ into standalone dir
+  // so /_next/static/* and static assets resolve. See docs/APP_ROUTER_STRUCTURE.md.
   output: "standalone",
   reactStrictMode: true,
   webpack(config) {

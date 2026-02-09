@@ -1,7 +1,12 @@
 import { NextResponse } from "next/server";
 
+const KIRP_API_BASE =
+  typeof process !== "undefined" && process.env.NEXT_PUBLIC_API_URL
+    ? process.env.NEXT_PUBLIC_API_URL.replace(/\/$/, "")
+    : "http://localhost:8000";
+
 const SERVICES = [
-  { name: "kirp-api", url: "http://127.0.0.1:8000/health" },
+  { name: "kirp-api", url: `${KIRP_API_BASE}/health` },
   { name: "brand_os_api", url: "http://127.0.0.1:8002/health" },
   { name: "brand_os_monitoring", url: "http://127.0.0.1:8001/metrics" },
   { name: "qdrant", url: "http://127.0.0.1:6333/collections" },

@@ -71,13 +71,14 @@ class EmailIntegration:
                             break
                 else:
                     body = msg.get_payload(decode=True).decode(errors="ignore") if msg.get_payload() else ""
+                uid = uid.decode() if isinstance(uid, bytes) else str(uid)
                 events.append({
                     "tenant_id": tenant_id,
                     "space_id": space_id,
                     "user_id": user_id,
                     "source": "email",
                     "content": f"{subj}\n\n{body[:5000]}",
-                    "metadata": {"from": msg.get("From"), "date": msg.get("Date")},
+                    "metadata": {"external_id": uid, "from": msg.get("From"), "date": msg.get("Date")},
                 })
             m.logout()
         except Exception as e:

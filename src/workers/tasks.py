@@ -30,6 +30,7 @@ def ingest_task(self: Any, payload: dict[str, Any]) -> dict[str, Any]:
     user_id = payload.get("user_id", "")
     content = payload.get("content", "")
     source = payload.get("source", "worker")
+    metadata = payload.get("metadata")
 
     async def _run() -> dict[str, Any]:
         from src.core.pipeline import EventPipeline
@@ -40,14 +41,26 @@ def ingest_task(self: Any, payload: dict[str, Any]) -> dict[str, Any]:
         from src.core.agent_registry import get_agent_framework_with_all_agents
         store = EventStore(os.getenv("MONGO_URI", "mongodb://root:example@localhost:27017/kirp?authSource=admin"))
         await store.connect()
-        rag = RAGEngine(qdrant_url=os.getenv("QDRANT_URL", "http://localhost:6333"))
+        rag = RAGEngine(
+            qdrant_url=os.getenv("QDRANT_URL", "http://localhost:6333"),
+            qdrant_api_key=os.getenv("QDRANT_API_KEY"),
+            embedding_provider=os.getenv("EMBEDDING_PROVIDER", "openai"),
+            embedding_model=os.getenv("EMBEDDING_MODEL", "text-embedding-3-small"),
+        )
         await rag.connect()
         schema = SchemaEngine(os.getenv("POSTGRES_URI", "postgresql+asyncpg://kirp_user:kirp_password@localhost:5432/kirp"))
         await schema.connect()
         gov = GovernanceEngine(os.getenv("OPA_URL"))
         af = get_agent_framework_with_all_agents()
         pipe = EventPipeline(store, rag, schema, gov, af)
-        ev_id = await pipe.run(tenant_id=tenant_id, space_id=space_id, user_id=user_id, source=source, content=content)
+        ev_id = await pipe.run(
+            tenant_id=tenant_id,
+            space_id=space_id,
+            user_id=user_id,
+            source=source,
+            content=content,
+            metadata=metadata,
+        )
         _worker_metrics.inc("ingest_success_total", labels={"tenant_id": tenant_id or "unknown"})
         return {"ok": True, "event_id": str(ev_id)}
 
@@ -61,6 +74,84 @@ def ingest_task(self: Any, payload: dict[str, Any]) -> dict[str, Any]:
         logger.exception("ingest_task failed: %s", e)
         _worker_metrics.inc("ingest_failure_total", labels={"tenant_id": tenant_id or "unknown"})
         return {"ok": False, "error": str(e)}
+
+
+def _run_async_sync(coro):
+    """Run async connector sync in Celery worker."""
+    import asyncio
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    try:
+        return loop.run_until_complete(coro)
+    finally:
+        loop.close()
+
+
+@celery_app.task(bind=True, name="gmail_sync_task")
+def gmail_sync_task(self: Any, tenant_id: str, space_id: str, user_id: str, max_results: int = 50) -> dict[str, Any]:
+    """Scheduled pull from Gmail → ingest (idempotent)."""
+    from src.workers.connector_sync import run_gmail_sync
+    return _run_async_sync(run_gmail_sync(tenant_id=tenant_id, space_id=space_id, user_id=user_id, max_results=max_results))
+
+
+@celery_app.task(bind=True, name="calendar_sync_task")
+def calendar_sync_task(self: Any, tenant_id: str, space_id: str, user_id: str, limit: int = 100) -> dict[str, Any]:
+    """Scheduled pull from Calendar → ingest (idempotent)."""
+    from src.workers.connector_sync import run_calendar_sync
+    return _run_async_sync(run_calendar_sync(tenant_id=tenant_id, space_id=space_id, user_id=user_id, limit=limit))
+
+
+@celery_app.task(bind=True, name="slack_sync_task")
+def slack_sync_task(
+    self: Any,
+    tenant_id: str,
+    space_id: str,
+    user_id: str,
+    channel_id: str,
+    limit: int = 50,
+) -> dict[str, Any]:
+    """Scheduled pull from Slack channel → ingest (idempotent)."""
+    from src.workers.connector_sync import run_slack_sync
+    return _run_async_sync(
+        run_slack_sync(
+            tenant_id=tenant_id,
+            space_id=space_id,
+            user_id=user_id,
+            channel_id=channel_id,
+            limit=limit,
+        )
+    )
+
+
+@celery_app.task(bind=True, name="notion_sync_task")
+def notion_sync_task(self: Any, tenant_id: str, space_id: str, user_id: str) -> dict[str, Any]:
+    """Scheduled pull from Notion DB → ingest (idempotent)."""
+    from src.workers.notion_sync import run_notion_sync
+    return _run_async_sync(run_notion_sync(tenant_id=tenant_id, space_id=space_id, user_id=user_id))
+
+
+@celery_app.task(bind=True, name="reminder_run_task")
+def reminder_run_task(
+    self: Any,
+    tenant_id: str = "default",
+    space_id: str = "all",
+    user_id: str = "system",
+    horizon_days: int = 7,
+) -> dict[str, Any]:
+    """Run ReminderAgent: detect upcoming obligations and send reminders (WhatsApp, Email, Notification)."""
+    from src.core.agent_registry import get_agent_framework_with_all_agents
+
+    async def _run() -> dict[str, Any]:
+        af = get_agent_framework_with_all_agents()
+        return await af.run(
+            "ReminderAgent",
+            tenant_id=tenant_id,
+            space_id=space_id,
+            user_id=user_id,
+            context={"horizon_days": horizon_days},
+        )
+
+    return _run_async_sync(_run())
 
 
 @celery_app.task(bind=True, name="refresh_missing_embeddings_task")
@@ -91,6 +182,9 @@ def refresh_missing_embeddings_task(
             rag = RAGEngine(
                 qdrant_url=settings.qdrant_url,
                 collection=settings.qdrant_collection,
+                qdrant_api_key=settings.qdrant_api_key,
+                embedding_provider=os.getenv("EMBEDDING_PROVIDER", "openai"),
+                embedding_model=os.getenv("EMBEDDING_MODEL", "text-embedding-3-small"),
             )
             await rag.connect()
 
@@ -227,7 +321,12 @@ def self_improvement_task(self: Any, tenant_id: str = "default") -> dict[str, An
         try:
             store = EventStore(os.getenv("MONGO_URI", "mongodb://root:example@localhost:27017/kirp?authSource=admin"))
             await store.connect()
-            rag = RAGEngine(qdrant_url=os.getenv("QDRANT_URL", "http://localhost:6333"))
+            rag = RAGEngine(
+                qdrant_url=os.getenv("QDRANT_URL", "http://localhost:6333"),
+                qdrant_api_key=os.getenv("QDRANT_API_KEY"),
+                embedding_provider=os.getenv("EMBEDDING_PROVIDER", "openai"),
+                embedding_model=os.getenv("EMBEDDING_MODEL", "text-embedding-3-small"),
+            )
             await rag.connect()
             
             af = get_agent_framework_with_all_agents()

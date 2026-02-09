@@ -34,6 +34,9 @@ export default function SystemControlPage() {
       <div suppressHydrationWarning>
         <h1 className="text-2xl font-bold tracking-tight text-neutral-100">System Control Center</h1>
         <p className="mt-1 text-sm text-muted-foreground">Port scanner, Docker control. Use START.sh for full control.</p>
+        <p className="mt-2 rounded bg-amber-500/10 border border-amber-500/30 px-3 py-2 text-sm text-amber-200">
+          Local development only. Data below is static. In production, use <strong>Mission Control</strong> for real backend health.
+        </p>
       </div>
       <section className="rounded-lg border border-neutral-800 bg-neutral-900/70 p-6 shadow-sm">
         <h2 className="text-lg font-semibold text-neutral-100">Port Scanner</h2>

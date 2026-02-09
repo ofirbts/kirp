@@ -20,13 +20,13 @@ EVENT_TOPIC = "kirp-events"
 
 @dataclass
 class EventEnvelope:
-    """Event envelope for Kafka."""
+    """Event envelope for Kafka. tenant_id, space_id, user_id must be provided (no defaults)."""
 
     type: str
     payload: dict[str, Any]
-    tenant_id: str = "system"
-    space_id: str = "system"
-    user_id: str = "system"
+    tenant_id: str
+    space_id: str
+    user_id: str
 
 
 class KafkaEventAgent:
@@ -39,10 +39,17 @@ class KafkaEventAgent:
             logger.warning("Kafka producer not available")
             return False
         try:
+            envelope = {
+                "type": event.type,
+                "data": event.payload,
+                "tenant_id": event.tenant_id,
+                "space_id": event.space_id,
+                "user_id": event.user_id,
+            }
             producer.produce(
                 EVENT_TOPIC,
-                key=event.type,
-                value=json.dumps(event.payload).encode("utf-8"),
+                key=event.type.encode("utf-8"),
+                value=json.dumps(envelope, default=str).encode("utf-8"),
             )
             producer.flush(timeout=5.0)
             logger.info("KafkaEventAgent emitted: %s", event.type)

@@ -9,6 +9,7 @@ Core Intelligence Engine.
 """
 
 from src.core.event_store import Event, EventStore
+from src.core.event_registry import EventRegistry, get_event_registry
 from src.core.rag_engine import RAGEngine, RAGResponse, RetrievalResult
 from src.core.agent_framework import AgentFramework, AgentSpec, AutonomyLevel
 from src.core.schema_engine import SchemaEngine, SchemaEntity, SchemaNode
@@ -17,6 +18,8 @@ from src.core.governance import GovernanceEngine, GovernanceCheck, ApprovalStatu
 __all__ = [
     "Event",
     "EventStore",
+    "EventRegistry",
+    "get_event_registry",
     "RAGEngine",
     "RAGResponse",
     "RetrievalResult",

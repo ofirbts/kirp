@@ -15,6 +15,7 @@ import { DataTable } from "@/components/dashboard/DataTable";
 import { PageSkeleton } from "@/components/dashboard/PageSkeleton";
 import { ErrorState } from "@/components/feedback/ErrorState";
 import { apiClient } from "@/lib/apiClient";
+import { DEFAULT_TENANT_ID } from "@/lib/constants";
 import { useTenantContextStore } from "@/lib/stores/tenantContextStore";
 import type { Event, EventSeverity } from "@/lib/types";
 
@@ -36,7 +37,7 @@ function EventsContent() {
     setError(null);
     try {
       const res = await apiClient.listEvents({
-        tenantId: tenantId ?? "default",
+        tenantId: DEFAULT_TENANT_ID,
         spaceId: spaceId ?? "all",
         topic: topic || undefined,
         severity: (severity as EventSeverity) || undefined,
@@ -50,7 +51,7 @@ function EventsContent() {
     } finally {
       setLoading(false);
     }
-  }, [tenantId, spaceId, topic, severity, status, from, to]);
+  }, [spaceId, topic, severity, status, from, to]);
 
   useEffect(() => {
     load();

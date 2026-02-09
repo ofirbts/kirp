@@ -1,66 +1,100 @@
 "use client";
 
 import { create } from "zustand";
-import { apiClient } from "@/lib/apiClient";
-
-export type AuthUser = {
-  id: string;
-  email: string;
-  name: string;
-};
+import { apiClient, type AuthUserV1 } from "@/lib/apiClient";
 
 type AuthState = {
-  user: AuthUser | null;
+  user: AuthUserV1 | null;
   token: string | null;
   loggingIn: boolean;
+  loaded: boolean;
   login: (email: string, password: string) => Promise<void>;
+  signup: (email: string, password: string, name: string) => Promise<void>;
   logout: () => void;
+  loadUser: () => Promise<void>;
 };
 
 export const useAuthStore = create<AuthState>((set) => ({
   user: null,
   token: null,
   loggingIn: false,
+  loaded: false,
   async login(email: string, password: string) {
     set({ loggingIn: true });
     try {
-      // We don't yet have a typed login API; call a backend helper if present.
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const clientAsAny = apiClient as any;
-      if (typeof clientAsAny.login === "function") {
-        const res = await clientAsAny.login({ email, password });
-        const token = res.token ?? null;
-        const user = res.user ?? { id: "unknown", email, name: email };
-
-        // Persist JWT token for subsequent API calls.
+      const res = await apiClient.loginV1({ email, password });
+      const token = res.access_token ?? null;
+      const user = res.user;
+      if (typeof window !== "undefined") {
         if (token) {
-          if (typeof window !== "undefined") {
-            window.localStorage.setItem("kirp_auth_token", token);
-          }
-        } else if (typeof window !== "undefined") {
+          window.localStorage.setItem("kirp_auth_token", token);
+        } else {
           window.localStorage.removeItem("kirp_auth_token");
         }
-
-        set({ user, token, loggingIn: false });
-        return;
       }
-
-      // Fallback: demo-only local login without real auth.
-      set({
-        user: { id: "demo", email, name: email },
-        token: null,
-        loggingIn: false,
-      });
-    } catch {
+      set({ user, token, loggingIn: false, loaded: true });
+    } catch (err) {
       set({ loggingIn: false });
-      throw new Error("Login failed. Check backend logs or credentials.");
+      throw err instanceof Error ? err : new Error("Login failed");
+    }
+  },
+  async signup(email: string, password: string, name: string) {
+    set({ loggingIn: true });
+    try {
+      const res = await apiClient.signupV1({ email, password, name });
+      const token = res.access_token ?? null;
+      const user = res.user;
+      if (typeof window !== "undefined") {
+        if (token) {
+          window.localStorage.setItem("kirp_auth_token", token);
+        } else {
+          window.localStorage.removeItem("kirp_auth_token");
+        }
+      }
+      set({ user, token, loggingIn: false, loaded: true });
+    } catch (err) {
+      set({ loggingIn: false });
+      throw err instanceof Error ? err : new Error("Signup failed");
     }
   },
   logout() {
     if (typeof window !== "undefined") {
       window.localStorage.removeItem("kirp_auth_token");
     }
-    set({ user: null, token: null });
+    set({ user: null, token: null, loaded: true });
   },
-}));
+  async loadUser() {
+    if (typeof window === "undefined") {
+      set({ loaded: true });
+      return;
+    }
+  
+    const token = window.localStorage.getItem("kirp_auth_token");
+    const skipAuth = process.env.NEXT_PUBLIC_SKIP_AUTH === "1";
+  
+    // No token → SKIP_AUTH mode
+    if (!token) {
+      if (skipAuth) {
+        try {
+          const me = await apiClient.meV1();
+          set({ user: me, token: null, loaded: true });
+          return;
+        } catch {
+          set({ user: null, token: null, loaded: true });
+        }
+      } else {
+        set({ user: null, token: null, loaded: true });
+      }
+      return;
+    }
 
+    try {
+      const me = await apiClient.meV1();
+      set({ user: me, token, loaded: true });
+    } catch {
+      window.localStorage.removeItem("kirp_auth_token");
+      set({ user: null, token: null, loaded: true });
+    }
+  }
+  
+}));
