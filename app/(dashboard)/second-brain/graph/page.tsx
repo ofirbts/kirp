@@ -61,7 +61,7 @@ export default function SecondBrainGraphPage() {
     setError(null);
     try {
       const res = await apiClient.getGraphV1({
-        tenant_id: DEFAULT_TENANT_ID,
+        tenant_id: tenantId ?? DEFAULT_TENANT_ID,
         space_id: spaceId ?? "all",
         life_area: filterLifeArea || undefined,
         project_id: filterProject || undefined,

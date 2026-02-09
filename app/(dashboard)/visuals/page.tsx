@@ -30,7 +30,7 @@ export default function VisualsPage() {
     setError(null);
     try {
       const res = await apiClient.listVisuals({
-        tenantId: DEFAULT_TENANT_ID,
+        tenantId: tenantId ?? DEFAULT_TENANT_ID,
         spaceId: spaceId ?? "all",
       });
       const raw = (res.data ?? []) as VisualEntry[];

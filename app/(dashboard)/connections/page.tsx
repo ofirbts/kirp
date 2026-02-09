@@ -7,6 +7,7 @@ import { PageSkeleton } from "@/components/dashboard/PageSkeleton";
 import { ErrorState } from "@/components/feedback/ErrorState";
 import { apiClient, type ConnectorStatus } from "@/lib/apiClient";
 import { DEFAULT_TENANT_ID, DEFAULT_USER_ID } from "@/lib/constants";
+import { useTenantContextStore } from "@/lib/stores/tenantContextStore";
 import {
   Link2,
   Link2Off,
@@ -272,6 +273,7 @@ function ConnectorCard({
 }
 
 function ConnectionsContent() {
+  const { tenantId, userId } = useTenantContextStore();
   const [connectors, setConnectors] = useState<ConnectorStatus[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -281,8 +283,8 @@ function ConnectionsContent() {
     setError(null);
     try {
       const res = await apiClient.listConnections({
-        tenant_id: DEFAULT_TENANT_ID,
-        user_id: DEFAULT_USER_ID,
+        tenant_id: tenantId ?? DEFAULT_TENANT_ID,
+        user_id: userId ?? DEFAULT_USER_ID,
       });
       setConnectors(res.connectors ?? []);
     } catch (e) {
@@ -290,7 +292,7 @@ function ConnectionsContent() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [tenantId, userId]);
 
   useEffect(() => {
     load();
@@ -340,8 +342,8 @@ function ConnectionsContent() {
           <ConnectorCard
             key={conn.integration}
             conn={conn}
-            tenantId={DEFAULT_TENANT_ID}
-            userId={DEFAULT_USER_ID}
+            tenantId={tenantId ?? DEFAULT_TENANT_ID}
+            userId={userId ?? DEFAULT_USER_ID}
             onRefresh={load}
           />
         ))}

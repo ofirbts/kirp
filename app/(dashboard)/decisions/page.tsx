@@ -24,7 +24,7 @@ interface DecisionRow {
 }
 
 function DecisionsContent() {
-  const { tenantId, spaceId } = useTenantContextStore();
+  const { tenantId, spaceId, userId } = useTenantContextStore();
   const [query, setQuery] = useState("");
   const [result, setResult] = useState<Record<string, unknown> | null>(null);
   const [decisions, setDecisions] = useState<DecisionRow[]>([]);
@@ -36,7 +36,7 @@ function DecisionsContent() {
     setLoadingList(true);
     try {
       const res = await apiClient.listDecisions({
-        tenantId: DEFAULT_TENANT_ID,
+        tenantId: tenantId ?? DEFAULT_TENANT_ID,
         spaceId: spaceId ?? "all",
       });
       setDecisions((res.data ?? []) as DecisionRow[]);
@@ -45,7 +45,7 @@ function DecisionsContent() {
     } finally {
       setLoadingList(false);
     }
-  }, [spaceId]);
+  }, [tenantId, spaceId]);
 
   useEffect(() => {
     loadDecisions();
@@ -58,9 +58,9 @@ function DecisionsContent() {
     setResult(null);
     try {
       const res = await apiClient.queryV1({
-        tenant_id: DEFAULT_TENANT_ID,
+        tenant_id: tenantId ?? DEFAULT_TENANT_ID,
         space_id: spaceId ?? "all",
-        user_id: DEFAULT_USER_ID,
+        user_id: userId ?? DEFAULT_USER_ID,
         query: query.trim(),
         k: 6,
       });
@@ -70,7 +70,7 @@ function DecisionsContent() {
     } finally {
       setLoading(false);
     }
-  }, [query, spaceId]);
+  }, [query, tenantId, spaceId, userId]);
 
   return (
     <div className="space-y-6" suppressHydrationWarning>

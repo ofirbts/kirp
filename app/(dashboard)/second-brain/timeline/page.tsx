@@ -35,7 +35,7 @@ function TimelineContent() {
     setError(null);
     try {
       const res = await apiClient.getRemindersUpcoming({
-        tenant_id: DEFAULT_TENANT_ID,
+        tenant_id: tenantId ?? DEFAULT_TENANT_ID,
         space_id: spaceId ?? "all",
         horizon_days: 14,
       });

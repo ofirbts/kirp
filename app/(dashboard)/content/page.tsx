@@ -6,6 +6,7 @@ import { DataTable } from "@/components/dashboard/DataTable";
 import { ErrorState } from "@/components/feedback/ErrorState";
 import { apiClient } from "@/lib/apiClient";
 import { DEFAULT_TENANT_ID } from "@/lib/constants";
+import { useTenantContextStore } from "@/lib/stores/tenantContextStore";
 
 interface ContentEntry {
   id?: string;
@@ -17,6 +18,7 @@ interface ContentEntry {
 }
 
 export default function ContentPage() {
+  const { tenantId, spaceId } = useTenantContextStore();
   const [entries, setEntries] = useState<ContentEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -26,8 +28,8 @@ export default function ContentPage() {
     setError(null);
     try {
       const res = await apiClient.listContentIntelligence({
-        tenantId: DEFAULT_TENANT_ID,
-        spaceId: "all",
+        tenantId: tenantId ?? DEFAULT_TENANT_ID,
+        spaceId: spaceId ?? "all",
       });
       setEntries((res.data ?? []) as ContentEntry[]);
     } catch (e) {
@@ -35,7 +37,7 @@ export default function ContentPage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [tenantId, spaceId]);
 
   useEffect(() => {
     load();

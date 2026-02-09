@@ -67,7 +67,7 @@ export const TopBar: React.FC = () => {
   const pathname = usePathname();
   const router = useRouter();
   const meta = getSectionMeta(pathname);
-  const { spaceId, setSpace } = useTenantContextStore();
+  const { tenantId, spaceId, setSpace } = useTenantContextStore();
   const { show } = useToastStore();
   const { theme, setTheme } = useTheme();
 
@@ -118,7 +118,7 @@ export const TopBar: React.FC = () => {
     const loadSpaces = async () => {
       setLoadingSpaces(true);
       try {
-        const res = await apiClient.listSpacesForTenant(DEFAULT_TENANT_ID);
+        const res = await apiClient.listSpacesForTenant(tenantId ?? DEFAULT_TENANT_ID);
         if (cancelled) return;
         const spacesList = res.data ?? [];
         setSpaces(spacesList);
@@ -148,7 +148,7 @@ export const TopBar: React.FC = () => {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [tenantId]);
 
   return (
     <div className="flex h-14 w-full items-center justify-between gap-3" suppressHydrationWarning>
@@ -169,7 +169,7 @@ export const TopBar: React.FC = () => {
           <Breadcrumbs className="mt-0.5" />
           <div className="mt-1 flex flex-wrap gap-1 text-[11px] text-textSoft">
             <span className="rounded-full bg-surface2 px-2 py-0.5 text-[10px] text-textMain">
-              tenant {DEFAULT_TENANT_ID}
+              tenant {tenantId ?? DEFAULT_TENANT_ID}
             </span>
             <span className="rounded-full bg-surface2 px-2 py-0.5 text-[10px] text-textMain">
               space {spaceId || "all"}
@@ -180,7 +180,7 @@ export const TopBar: React.FC = () => {
         {/* Tenant / Space selectors */}
         <div className="ml-4 flex items-center gap-2" suppressHydrationWarning>
           <Select
-            value={DEFAULT_TENANT_ID}
+            value={tenantId ?? DEFAULT_TENANT_ID}
             onValueChange={() => {}}
             disabled
           >

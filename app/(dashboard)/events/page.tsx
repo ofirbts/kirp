@@ -37,7 +37,7 @@ function EventsContent() {
     setError(null);
     try {
       const res = await apiClient.listEvents({
-        tenantId: DEFAULT_TENANT_ID,
+        tenantId: tenantId ?? DEFAULT_TENANT_ID,
         spaceId: spaceId ?? "all",
         topic: topic || undefined,
         severity: (severity as EventSeverity) || undefined,
@@ -51,7 +51,7 @@ function EventsContent() {
     } finally {
       setLoading(false);
     }
-  }, [spaceId, topic, severity, status, from, to]);
+  }, [tenantId, spaceId, topic, severity, status, from, to]);
 
   useEffect(() => {
     load();

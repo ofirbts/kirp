@@ -10,7 +10,7 @@ import { useNotificationsWs } from "@/lib/hooks/useNotificationsWs";
 import { useAuthStore } from "@/lib/stores/authStore";
 
 export function NotificationBell() {
-  const { user, loaded } = useAuthStore();
+  const { user } = useAuthStore();
   const unreadCount = useNotificationStore((s) => s.unreadCount);
   const pulse = useNotificationStore((s) => s.pulse);
   const [panelOpen, setPanelOpen] = useState(false);
@@ -19,8 +19,10 @@ export function NotificationBell() {
 
   useEffect(() => {
     let cancelled = false;
+    const tenant_id = user?.tenant_id ?? DEFAULT_TENANT_ID;
+    const user_id = user?.id ?? DEFAULT_USER_ID;
     apiClient
-      .getUnreadCountV1({ tenant_id: DEFAULT_TENANT_ID, user_id: DEFAULT_USER_ID })
+      .getUnreadCountV1({ tenant_id, user_id })
       .then((n) => {
         if (!cancelled) useNotificationStore.getState().setUnreadCount(n);
       })
@@ -28,7 +30,7 @@ export function NotificationBell() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [user?.tenant_id, user?.id]);
 
   return (
     <>

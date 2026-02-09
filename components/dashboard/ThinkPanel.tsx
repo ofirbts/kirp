@@ -33,7 +33,7 @@ export const ThinkPanel = () => {
     try {
       // For now we call /api/v1/ask and wrap the response into the ThinkResult shape.
       const res = await apiClient.askV1({
-        tenant_id: DEFAULT_TENANT_ID,
+        tenant_id: tenantId ?? DEFAULT_TENANT_ID,
         space_id: spaceId ?? "all",
         query: query.trim(),
       });

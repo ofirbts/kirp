@@ -3,6 +3,7 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { apiClient, type NotificationV1 } from "@/lib/apiClient";
 import { DEFAULT_TENANT_ID, DEFAULT_USER_ID } from "@/lib/constants";
+import { useTenantContextStore } from "@/lib/stores/tenantContextStore";
 import { NotificationCard } from "@/components/notifications/NotificationCard";
 import { Button } from "@/components/ui/button";
 import { CheckCheck, Loader2 } from "lucide-react";
@@ -24,11 +25,12 @@ function filterByTab(list: NotificationV1[], tab: string): NotificationV1[] {
 }
 
 export default function NotificationsPage() {
+  const { tenantId, userId } = useTenantContextStore();
   const [notifications, setNotifications] = useState<NotificationV1[]>([]);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState("all");
-  const tenant_id = DEFAULT_TENANT_ID;
-  const user_id = DEFAULT_USER_ID;
+  const tenant_id = tenantId ?? DEFAULT_TENANT_ID;
+  const user_id = userId ?? DEFAULT_USER_ID;
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -43,7 +45,7 @@ export default function NotificationsPage() {
     } finally {
       setLoading(false);
     }
-  }, [tab]);
+  }, [tab, tenant_id, user_id]);
 
   useEffect(() => {
     load();

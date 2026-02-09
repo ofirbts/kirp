@@ -31,6 +31,11 @@ export const AppShell: React.FC<React.PropsWithChildren> = ({ children }) => {
         tenantId: user.tenant_id ?? DEFAULT_TENANT_ID,
         userId: user.id ?? "",
       });
+    } else {
+      useTenantContextStore.setState({
+        tenantId: DEFAULT_TENANT_ID,
+        userId: "",
+      });
     }
   }, [user]);
 

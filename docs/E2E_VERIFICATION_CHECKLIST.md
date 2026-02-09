@@ -39,8 +39,16 @@ Use this checklist to verify the full stack after deployment.
 - [ ] **No hardcoded kirp-api:8000**: All use env or BASE
 - [ ] **Login flow**: Can login with dev@localhost / dev
 - [ ] **Auth guard**: Unauthenticated users redirected to /login
+- [ ] **tenantContextStore sync**: AppShell syncs tenantId/userId from auth on load
 - [ ] **History page**: Loads and displays entries
-- [ ] **Insights / Graph / Scenarios**: Work with authenticated context
+- [ ] **Open Tasks**: Dashboard and Tasks page show tasks for authenticated tenant
+- [ ] **Today's Insights**: askV1 returns focus suggestion
+- [ ] **Activity Center (Notifications)**: Bell and panel use tenant_id/user_id from auth
+- [ ] **Second Brain**: Inbox, Timeline, Life Areas, Suggestions load
+- [ ] **Life Graph**: Nodes/edges display from getGraphV1
+- [ ] **Connections**: List and ConnectorCard use tenant/user from store
+- [ ] **Think panel**: askV1 uses tenant from store
+- [ ] **Insights / Graph / Agents / Decisions**: Work with authenticated context
 
 ## 6. DOCKER SERVICES
 

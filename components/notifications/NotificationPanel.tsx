@@ -29,8 +29,8 @@ export function NotificationPanel({
   const [notifications, setNotifications] = useState<NotificationV1[]>([]);
   const [loading, setLoading] = useState(false);
   const [tab, setTab] = useState("all");
-  const tenant_id = DEFAULT_TENANT_ID;
-  const user_id = DEFAULT_USER_ID;
+  const tenant_id = user?.tenant_id ?? DEFAULT_TENANT_ID;
+  const user_id = user?.id ?? DEFAULT_USER_ID;
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -46,7 +46,7 @@ export function NotificationPanel({
     } finally {
       setLoading(false);
     }
-  }, [tab]);
+  }, [tab, tenant_id, user_id]);
 
   useEffect(() => {
     if (open) load();

@@ -32,8 +32,8 @@ function SecondBrainContent() {
     setError(null);
     try {
       const [upcomingRes, askRes] = await Promise.all([
-        apiClient.getRemindersUpcoming({ tenant_id: DEFAULT_TENANT_ID, space_id: spaceId ?? "all", horizon_days: 7 }),
-        apiClient.askV1({ tenant_id: DEFAULT_TENANT_ID, space_id: spaceId ?? "all", query: "What should I focus on today? One short paragraph." }).then((r) => r.answer).catch(() => null),
+        apiClient.getRemindersUpcoming({ tenant_id: tenantId ?? DEFAULT_TENANT_ID, space_id: spaceId ?? "all", horizon_days: 7 }),
+        apiClient.askV1({ tenant_id: tenantId ?? DEFAULT_TENANT_ID, space_id: spaceId ?? "all", query: "What should I focus on today? One short paragraph." }).then((r) => r.answer).catch(() => null),
       ]);
       setObligations(upcomingRes.obligations ?? []);
       setInsight(askRes);
@@ -42,7 +42,7 @@ function SecondBrainContent() {
     } finally {
       setLoading(false);
     }
-  }, [spaceId]);
+  }, [tenantId, spaceId]);
 
   useEffect(() => { load(); }, [load]);
 

@@ -38,7 +38,7 @@ function AgentsContent() {
   const [activeTab, setActiveTab] = useState<"agents" | "logs" | "actions">("agents");
 
   const skipAuth = process.env.NEXT_PUBLIC_SKIP_AUTH === "1";
-  const tenant_id = DEFAULT_TENANT_ID;
+  const tenant_id = tenantId ?? DEFAULT_TENANT_ID;
 
   const load = useCallback(async () => {
     setLoading(true);

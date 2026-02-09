@@ -67,8 +67,11 @@ This document summarizes the production-grade verification and corrections appli
 
 ### Pages Using Auth Context
 
+- **AppShell**: Syncs `tenantContextStore` with `user.tenant_id` and `user.id` when user loads; all pages using the store receive correct tenant/user.
 - **Dashboard**: `user?.tenant_id ?? DEFAULT_TENANT_ID`, `user?.id ?? DEFAULT_USER_ID` for ingest, askV1, listTasks, listEvents, etc.
 - **History**: Same pattern for `listHistoryV1`.
+- **Tasks, Think, Insights, Second Brain, Graph, Events, Content, Signals, Visuals, Agents, Decisions, Connections, Notifications**: Use `tenantId` and `userId` from `tenantContextStore` (synced from auth).
+- **NotificationPanel, NotificationBell**: Use `user?.tenant_id`, `user?.id` from auth store.
 - **WebSocket**: `useNotificationsWs` uses `user?.tenant_id` and `user?.id`.
 
 ---
@@ -166,4 +169,13 @@ curl http://localhost:8000/api/v1/history -H "Authorization: Bearer $TOKEN"
 
 - `src/main.py` — Auth middleware dev fallback logic; ingest/stats multi-tenancy (already correct)
 - `docker-compose.yml` — API kafka dependency, Zookeeper healthcheck
+- `components/layout/AppShell.tsx` — Sync tenantContextStore from auth user
+- `app/(dashboard)/tasks/page.tsx` — Use tenantId from store
+- `components/dashboard/ThinkPanel.tsx` — Use tenantId from store for askV1
+- `app/(dashboard)/second-brain/*` — All sub-pages use tenantId from store
+- `app/(dashboard)/graph/page.tsx`, `events/page.tsx`, `insights/page.tsx`, `content/page.tsx`, `signals/page.tsx`, `visuals/page.tsx` — Use tenantId from store
+- `app/(dashboard)/agents/page.tsx`, `decisions/page.tsx`, `connections/page.tsx`, `notifications/page.tsx` — Use tenantId, userId from store
+- `components/notifications/NotificationPanel.tsx`, `NotificationBell.tsx` — Use user from auth
+- `components/navigation/TopBar.tsx` — Use tenantId from store for listSpacesForTenant and display
 - `docs/E2E_FIXES_SUMMARY.md` — This document
+- `docs/DASHBOARD_VERIFICATION_REPORT.md` — Comprehensive dashboard audit and fixes

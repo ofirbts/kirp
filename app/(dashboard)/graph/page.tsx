@@ -29,7 +29,7 @@ interface GraphEdge {
 }
 
 function GraphContent() {
-  const { tenantId, spaceId } = useTenantContextStore();
+  const { tenantId, spaceId, userId } = useTenantContextStore();
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<Record<string, unknown> | null>(null);
   const [nodes, setNodes] = useState<GraphNode[]>([]);
@@ -42,7 +42,7 @@ function GraphContent() {
     setLoadingGraph(true);
     try {
       const res = await apiClient.getGraph({
-        tenantId: DEFAULT_TENANT_ID,
+        tenantId: tenantId ?? DEFAULT_TENANT_ID,
         spaceId: spaceId ?? "all",
       });
       setNodes((res.data?.nodes ?? []) as GraphNode[]);
@@ -53,7 +53,7 @@ function GraphContent() {
     } finally {
       setLoadingGraph(false);
     }
-  }, [spaceId]);
+  }, [tenantId, spaceId]);
 
   useEffect(() => {
     loadGraph();
@@ -66,9 +66,9 @@ function GraphContent() {
     setResults(null);
     try {
       const res = await apiClient.queryV1({
-        tenant_id: DEFAULT_TENANT_ID,
+        tenant_id: tenantId ?? DEFAULT_TENANT_ID,
         space_id: spaceId ?? "all",
-        user_id: DEFAULT_USER_ID,
+        user_id: userId ?? DEFAULT_USER_ID,
         query: query.trim(),
         k: 10,
       });
@@ -78,7 +78,7 @@ function GraphContent() {
     } finally {
       setLoading(false);
     }
-  }, [query, spaceId]);
+  }, [query, tenantId, spaceId, userId]);
 
   return (
     <div className="space-y-6" suppressHydrationWarning>

@@ -30,7 +30,7 @@ function SuggestionsContent() {
     setAnswer(null);
     try {
       const res = await apiClient.askV1({
-        tenant_id: DEFAULT_TENANT_ID,
+        tenant_id: tenantId ?? DEFAULT_TENANT_ID,
         space_id: spaceId ?? "all",
         query: query.trim(),
       });

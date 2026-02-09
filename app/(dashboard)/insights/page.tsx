@@ -30,7 +30,7 @@ export default function InsightsPage() {
     setError(null);
     try {
       const data = await apiClient.getInsightsV1({
-        tenant_id: DEFAULT_TENANT_ID,
+        tenant_id: tenantId ?? DEFAULT_TENANT_ID,
         space_id: spaceId ?? "all",
         limit: 100,
       });
@@ -40,7 +40,7 @@ export default function InsightsPage() {
     } finally {
       setLoading(false);
     }
-  }, [spaceId]);
+  }, [tenantId, spaceId]);
 
   useEffect(() => {
     load();

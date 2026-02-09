@@ -27,7 +27,7 @@ function InboxContent() {
     setError(null);
     try {
       const res = await apiClient.listEvents({
-        tenantId: DEFAULT_TENANT_ID,
+        tenantId: tenantId ?? DEFAULT_TENANT_ID,
         spaceId: spaceId ?? "all",
       });
       const list = ((res.data ?? []) as InboxEvent[]).slice(0, 50);
@@ -42,7 +42,7 @@ function InboxContent() {
     } finally {
       setLoading(false);
     }
-  }, [spaceId]);
+  }, [tenantId, spaceId]);
 
   useEffect(() => { load(); }, [load]);
 

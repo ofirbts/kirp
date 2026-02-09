@@ -35,21 +35,22 @@ function LifeAreasContent() {
     setLoading(true);
     setError(null);
     try {
+      const tid = tenantId ?? DEFAULT_TENANT_ID;
       const [lifeRes, commitmentRes, taskRes] = await Promise.all([
         apiClient.listNodesV1({
-          tenant_id: DEFAULT_TENANT_ID,
+          tenant_id: tid,
           space_id: spaceId ?? "all",
           entity: "life_area",
           limit: 50,
         }),
         apiClient.listNodesV1({
-          tenant_id: DEFAULT_TENANT_ID,
+          tenant_id: tid,
           space_id: spaceId ?? "all",
           entity: "commitment",
           limit: 200,
         }),
         apiClient.listNodesV1({
-          tenant_id: DEFAULT_TENANT_ID,
+          tenant_id: tid,
           space_id: spaceId ?? "all",
           entity: "task",
           limit: 200,

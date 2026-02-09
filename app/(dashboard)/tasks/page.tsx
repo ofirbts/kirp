@@ -100,7 +100,7 @@ export default function TasksPage() {
   const [taskOrder, setTaskOrder] = useState<string[]>([]);
 
   const skipAuth = process.env.NEXT_PUBLIC_SKIP_AUTH === "1";
-  const tenant_id = DEFAULT_TENANT_ID;
+  const tenant_id = tenantId ?? DEFAULT_TENANT_ID;
 
   const load = useCallback(async () => {
     setLoading(true);
