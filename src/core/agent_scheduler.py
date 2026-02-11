@@ -95,13 +95,22 @@ class AgentScheduler:
     def set_interval_minutes(self, minutes: int) -> None:
         self._interval_minutes = max(1, minutes)
 
-    async def run_agent_and_log(self, agent_name: str, tenant_id: str, space_id: str, user_id: str, trigger: str) -> dict[str, Any]:
-        """Run one agent and append log to MongoDB."""
+    async def run_agent_and_log(
+        self,
+        agent_name: str,
+        tenant_id: str,
+        space_id: str,
+        user_id: str,
+        trigger: str,
+        initial_context: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        """Run one agent and append log to MongoDB. initial_context is merged with trigger (e.g. rag_response)."""
         started = time.perf_counter()
         result_count = 0
         errors: list[str] = []
+        context = {**(initial_context or {}), "trigger": trigger}
         try:
-            result = await self._framework.run(agent_name, tenant_id, space_id, user_id, {"trigger": trigger})
+            result = await self._framework.run(agent_name, tenant_id, space_id, user_id, context)
             if result.get("ok"):
                 result_count = len(result.get("actions", [])) + len(result.get("insights", []))
             else:

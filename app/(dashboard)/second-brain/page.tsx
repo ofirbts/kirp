@@ -33,7 +33,7 @@ function SecondBrainContent() {
     try {
       const [upcomingRes, askRes] = await Promise.all([
         apiClient.getRemindersUpcoming({ tenant_id: tenantId ?? DEFAULT_TENANT_ID, space_id: spaceId ?? "all", horizon_days: 7 }),
-        apiClient.askV1({ tenant_id: tenantId ?? DEFAULT_TENANT_ID, space_id: spaceId ?? "all", query: "What should I focus on today? One short paragraph." }).then((r) => r.answer).catch(() => null),
+        apiClient.askV1({ query: "What should I focus on today? One short paragraph." }).then((r) => r.answer).catch(() => null),
       ]);
       setObligations(upcomingRes.obligations ?? []);
       setInsight(askRes);

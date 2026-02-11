@@ -8,8 +8,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { PageSkeleton } from "@/components/dashboard/PageSkeleton";
 import { ErrorState } from "@/components/feedback/ErrorState";
 import { apiClient, type AgentV1, type AgentLogV1, type AgentActionV1 } from "@/lib/apiClient";
-import { DEFAULT_TENANT_ID, DEFAULT_USER_ID } from "@/lib/constants";
-import { useTenantContextStore } from "@/lib/stores/tenantContextStore";
 import { useAuthStore } from "@/lib/stores/authStore";
 import { Play, RefreshCw, List, Zap, FileText } from "lucide-react";
 
@@ -23,7 +21,6 @@ function formatDate(s: string | null | undefined): string {
 }
 
 function AgentsContent() {
-  const { tenantId } = useTenantContextStore();
   const { user, loaded } = useAuthStore();
   const [agents, setAgents] = useState<AgentV1[]>([]);
   const [logs, setLogs] = useState<AgentLogV1[]>([]);
@@ -38,16 +35,15 @@ function AgentsContent() {
   const [activeTab, setActiveTab] = useState<"agents" | "logs" | "actions">("agents");
 
   const skipAuth = process.env.NEXT_PUBLIC_SKIP_AUTH === "1";
-  const tenant_id = tenantId ?? DEFAULT_TENANT_ID;
 
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
       const [agentsRes, logsRes, actionsRes] = await Promise.all([
-        apiClient.listAgentsV1({ tenant_id }),
-        apiClient.getAgentLogsV1({ tenant_id, limit: 100 }),
-        apiClient.getAgentActionsV1({ tenant_id, limit: 100 }),
+        apiClient.listAgentsV1(),
+        apiClient.getAgentLogsV1({ limit: 100 }),
+        apiClient.getAgentActionsV1({ limit: 100 }),
       ]);
       setAgents(Array.isArray(agentsRes) ? agentsRes : []);
       setLogs(Array.isArray(logsRes) ? logsRes : []);
@@ -57,7 +53,7 @@ function AgentsContent() {
     } finally {
       setLoading(false);
     }
-  }, [tenant_id]);
+  }, []);
 
   useEffect(() => {
     if (loaded && (user || skipAuth)) load();
@@ -68,11 +64,7 @@ function AgentsContent() {
       setRunningId(agent.id);
       setRunResult(null);
       try {
-        const res =         await apiClient.runAgentV1(agent.id, {
-          tenant_id,
-          space_id: "all",
-          user_id: DEFAULT_USER_ID,
-        });
+        const res = await apiClient.runAgentV1(agent.id);
         setRunResult({ ok: res.ok, agent_id: res.agent_id, result: res.result });
         await load();
       } catch (err) {
@@ -81,7 +73,7 @@ function AgentsContent() {
         setRunningId(null);
       }
     },
-    [tenant_id, load]
+    [load]
   );
 
   const filteredAgents = useMemo(

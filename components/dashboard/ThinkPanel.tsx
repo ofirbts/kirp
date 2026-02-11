@@ -7,7 +7,6 @@ import { Input } from "@/components/ui/input";
 import { Sparkles, ArrowRight, BrainCircuit, Globe, Database } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { apiClient } from "@/lib/apiClient";
-import { DEFAULT_TENANT_ID } from "@/lib/constants";
 import { useTenantContextStore } from "@/lib/stores/tenantContextStore";
 
 type ThinkResult = {
@@ -31,12 +30,8 @@ export const ThinkPanel = () => {
     setError(null);
 
     try {
-      // For now we call /api/v1/ask and wrap the response into the ThinkResult shape.
-      const res = await apiClient.askV1({
-        tenant_id: tenantId ?? DEFAULT_TENANT_ID,
-        space_id: spaceId ?? "all",
-        query: query.trim(),
-      });
+      // /api/v1/ask uses JWT for tenant/space; body is only { query }.
+      const res = await apiClient.askV1({ query: query.trim() });
 
       const wrapped: ThinkResult = {
         answer: res.answer,

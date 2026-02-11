@@ -14,7 +14,7 @@ from typing import Any
 import logging
 
 from src.core.rag_engine import RAGEngine, RAGResponse
-from src.core.llm_client import get_llm
+from src.core.llm_router import get_llm_for_task
 
 logger = logging.getLogger(__name__)
 
@@ -37,22 +37,23 @@ class InsightAgent:
         tenant_id: str,
         space_id: str,
         query: str,
+        user_id: str | None = None,
     ) -> InsightAnswer:
         """
         Run a scoped RAG query and turn it into an insight answer.
 
         The agent does NOT call external web search; it only uses the user's data
-        and the existing RAG indexes.
+        and the existing RAG indexes. Pass user_id for user-scoped retrieval when available.
         """
-        logger.info("InsightAgent.ask start tenant=%s space=%s", tenant_id, space_id)
+        logger.info("InsightAgent.ask start tenant=%s space=%s user=%s", tenant_id, space_id, user_id)
 
         # Reuse existing RAG behavior (semantic search + context building).
-        # Do NOT over‑filter by user_id so we see all knowledge for this tenant/space.
+        # When user_id is provided (e.g. from JWT), use it for scoping; otherwise tenant/space only.
         resp: RAGResponse = await self._rag.search(  # type: ignore[assignment]
             query=query,
             tenant_id=tenant_id,
             space_id=space_id,
-            user_id=None,
+            user_id=user_id,
             limit=10,
         )
 
@@ -85,8 +86,8 @@ class InsightAgent:
             )
             return InsightAnswer(answer=answer, sources=sources, needs_external_info=True)
 
-        # Summarize with LLM over the retrieved context.
-        llm = get_llm()
+        # Summarize with LLM over the retrieved context (reasoning-grade).
+        llm = get_llm_for_task("reasoning")
         context_snippets = "\n".join(
             f"- [{r.source}] {r.text}" for r in resp.results[:10] if r.text
         )

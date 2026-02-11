@@ -12,7 +12,7 @@ from datetime import datetime, timezone
 
 from src.core.agent_framework import AgentSpec, AutonomyLevel
 from src.core.schema_engine import SchemaEngine, SchemaEntity
-from src.core.llm_client import get_llm
+from src.core.llm_router import get_llm_for_task
 
 logger = logging.getLogger(__name__)
 
@@ -89,7 +89,8 @@ Return JSON:
 """
     
     try:
-        llm = get_llm()
+        # UI/content suggestions → use UI-grade provider.
+        llm = get_llm_for_task("ui")
         response = await llm.invoke(prompt, temperature=0.7, max_tokens=1000)
         
         # Parse JSON

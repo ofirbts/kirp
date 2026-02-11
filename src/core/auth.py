@@ -139,3 +139,53 @@ def get_user_store(mongo_uri: Optional[str] = None) -> UserStore:
             mongo_uri or os.getenv("MONGO_URI", "mongodb://root:example@localhost:27017/kirp?authSource=admin")
         )
     return _user_store
+
+
+# FastAPI auth dependency for current user (from JWT / middleware)
+try:  # Avoid hard dependency when FastAPI is not installed (e.g. tooling)
+    from fastapi import Request, HTTPException, status  # type: ignore[import]
+except Exception:  # pragma: no cover - FastAPI not available in some tooling contexts
+    Request = Any  # type: ignore
+    HTTPException = Exception  # type: ignore
+    status = type("status", (), {"HTTP_401_UNAUTHORIZED": 401})  # type: ignore
+
+
+async def get_current_user(request: Request) -> User:
+    """
+    Resolve the current authenticated user from request.state.user.
+
+    - request.state.user is populated by the auth middleware in src.main or by /api/v1/auth/me
+    - When missing, this dependency raises 401 (no dev fallback here; that behavior
+      is handled separately by SKIP_AUTH-aware endpoints like /api/v1/auth/me).
+    """
+    state_user = getattr(request.state, "user", None)
+    if not state_user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authentication required",
+        )
+
+    tenant_id = str(state_user.get("tenant_id") or "").strip()
+    user_id = str(state_user.get("user_id") or "").strip()
+    roles = list(state_user.get("roles") or [])
+
+    if not user_id or not tenant_id:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid authentication context",
+        )
+
+    # We only need tenant_id, user_id, and roles for RAG / multi-tenant flows.
+    # Other fields are filled with safe defaults.
+    return User(
+        id=user_id,
+        email="",
+        password_hash="",
+        name=user_id,
+        created_at=datetime.now(timezone.utc),
+        last_login_at=None,
+        roles=roles,
+        tenant_id=tenant_id,
+        meta={},
+    )
+

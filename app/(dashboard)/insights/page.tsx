@@ -2,7 +2,6 @@
 
 import React, { useCallback, useEffect, useState } from "react";
 import { apiClient, type InsightV1 } from "@/lib/apiClient";
-import { DEFAULT_TENANT_ID } from "@/lib/constants";
 import { useTenantContextStore } from "@/lib/stores/tenantContextStore";
 import { PageSkeleton } from "@/components/dashboard/PageSkeleton";
 import { ErrorState } from "@/components/feedback/ErrorState";
@@ -19,7 +18,7 @@ const CATEGORY_ICONS: Record<string, React.ComponentType<{ className?: string }>
 const CATEGORY_DEFAULT = Zap;
 
 export default function InsightsPage() {
-  const { tenantId, spaceId } = useTenantContextStore();
+  const { spaceId } = useTenantContextStore();
   const [insights, setInsights] = useState<InsightV1[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -30,7 +29,6 @@ export default function InsightsPage() {
     setError(null);
     try {
       const data = await apiClient.getInsightsV1({
-        tenant_id: tenantId ?? DEFAULT_TENANT_ID,
         space_id: spaceId ?? "all",
         limit: 100,
       });
@@ -40,7 +38,7 @@ export default function InsightsPage() {
     } finally {
       setLoading(false);
     }
-  }, [tenantId, spaceId]);
+  }, [spaceId]);
 
   useEffect(() => {
     load();

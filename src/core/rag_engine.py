@@ -376,8 +376,9 @@ class RAGEngine:
                 query, tenant_id, space_id, user_id, limit, allowed_space_ids=allowed_space_ids
             )
         
-        from src.core.llm_client import get_llm
-        llm = get_llm()
+        from src.core.llm_router import get_llm_for_task
+        # Multi-hop query rewriting → reasoning-grade provider.
+        llm = get_llm_for_task("reasoning")
         
         # Initial retrieval
         initial_results = await self._single_hop_search(
@@ -631,3 +632,22 @@ Return JSON:
         )
 
         return resp
+
+
+# Shared singleton for use by main and agents (avoids circular imports).
+_shared_engine: RAGEngine | None = None
+
+
+async def get_shared_rag_engine() -> RAGEngine:
+    """Return a shared RAGEngine instance (from env). Used by main and by agents when they need to fetch RAG context."""
+    global _shared_engine
+    if _shared_engine is None:
+        _shared_engine = RAGEngine(
+            qdrant_url=os.getenv("QDRANT_URL", "http://localhost:6333"),
+            collection=os.getenv("QDRANT_COLLECTION", "kirp_vectors"),
+            qdrant_api_key=os.getenv("QDRANT_API_KEY"),
+            embedding_provider=os.getenv("EMBEDDING_PROVIDER", "openai"),
+            embedding_model=os.getenv("EMBEDDING_MODEL", "text-embedding-3-small"),
+        )
+        await _shared_engine.connect()
+    return _shared_engine

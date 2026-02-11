@@ -46,7 +46,6 @@ function DashboardContent() {
         apiClient.listEvents({}).then((r) => r.data ?? []),
         apiClient.listAgents({}).then((r) => r.data ?? []),
         apiClient.getInsightsV1({
-          tenant_id: tenantId,
           space_id: spaceId ?? "all",
           limit: 30,
         }).catch(() => []),
@@ -97,11 +96,7 @@ function DashboardContent() {
     setAskAnswer(null);
     setAskSources(null);
     try {
-      const res = await apiClient.askV1({
-        tenant_id: tenantId,
-        space_id: spaceId ?? "all",
-        query: askQuery.trim(),
-      });
+      const res = await apiClient.askV1({ query: askQuery.trim() });
       setAskAnswer(res.answer);
       setAskSources(res.sources);
     } catch (e) {
@@ -378,11 +373,7 @@ function RealDashboardContent() {
           .catch(() => []),
         apiClient.getObservabilityHealth().catch(() => null),
         apiClient
-          .askV1({
-            tenant_id: tenantId,
-            space_id: spaceId ?? "default",
-            query: "What should I focus on today?",
-          })
+          .askV1({ query: "What should I focus on today?" })
           .catch(() => null),
       ]);
       setTasks((tasksRes as { data?: TaskV1[] }).data ?? []);

@@ -26,6 +26,10 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from src.api import governance, observability, whatsapp_os, brand
 import src.api.command as command
+from src.core.auth import get_current_user, User
+from src.core.jwt_utils import require_auth
+from src.core.auth import get_current_user, User
+from src.core.jwt_utils import require_auth
 
 
 logging.basicConfig(level=os.getenv("LOG_LEVEL", "INFO"))
@@ -52,8 +56,7 @@ class QueryRequest(BaseModel):
 
 
 class AskRequest(BaseModel):
-    tenant_id: str
-    space_id: str
+    """Body for POST /api/v1/ask. Only query is required; tenant_id/user_id/space_id come from JWT."""
     query: str
 
 
@@ -83,18 +86,10 @@ async def get_event_store() -> Any:
 async def get_rag_engine() -> Any:
     global _rag_engine
     if _rag_engine is None:
-        from src.core.rag_engine import RAGEngine
-        _rag_engine = RAGEngine(
-            qdrant_url=os.getenv("QDRANT_URL", "http://localhost:6333"),
-            collection=os.getenv("QDRANT_COLLECTION", "kirp_vectors"),
-            qdrant_api_key=os.getenv("QDRANT_API_KEY"),
-            embedding_provider=os.getenv("EMBEDDING_PROVIDER", "openai"),
-            embedding_model=os.getenv("EMBEDDING_MODEL", "text-embedding-3-small"),
-        )
+        from src.core.rag_engine import get_shared_rag_engine
         try:
-            await _rag_engine.connect()
+            _rag_engine = await get_shared_rag_engine()
         except Exception as e:
-            _rag_engine = None
             logger.warning("RAGEngine connection failed (will retry on next request): %s", e)
             raise
     return _rag_engine
@@ -398,22 +393,28 @@ async def query(req: QueryRequest) -> dict[str, Any]:
 
 
 @app.post("/api/v1/ask")
-async def ask(req: AskRequest) -> dict[str, Any]:
+async def ask(
+    req: AskRequest,
+    _auth: dict = Depends(require_auth),
+    user: User = Depends(get_current_user),
+) -> dict[str, Any]:
     """
-    Ask/Search/Insights API.
-
-    Uses the InsightAgent on top of the existing RAG engine to answer questions
-    over the tenant/space-scoped data only.
+    Ask/Search/Insights API. Uses JWT for tenant/user; request body is only { "query": "..." }.
+    Uses InsightAgent on top of RAG, scoped to current_user.tenant_id and current_user.id.
     """
     try:
         rag = await get_rag_engine()
         from src.agents.insight import InsightAgent
 
         agent = InsightAgent(rag)
+        tenant_id = user.tenant_id
+        space_id = "all"
+        user_id = user.id
         result = await agent.ask(
-            tenant_id=req.tenant_id,
-            space_id=req.space_id,
+            tenant_id=tenant_id,
+            space_id=space_id,
             query=req.query,
+            user_id=user_id,
         )
         return {
             "answer": result.answer,
@@ -426,11 +427,15 @@ async def ask(req: AskRequest) -> dict[str, Any]:
 
 
 @app.get("/api/v1/agents")
-async def list_agents_v1(tenant_id: str = "default") -> list[dict[str, Any]]:
-    """List registered agents with last_run from logs (id = name for E2E and callability)."""
+async def list_agents_v1(
+    _auth: dict = Depends(require_auth),
+    user: User = Depends(get_current_user),
+) -> list[dict[str, Any]]:
+    """List registered agents with last_run from logs (id = name for E2E and callability). Tenant from JWT."""
     agents = await get_agent_framework()
     from src.core.agent_scheduler import get_agent_logs_store
     logs_store = get_agent_logs_store()
+    tenant_id = user.tenant_id
     try:
         await logs_store.connect()
         all_logs = await logs_store.list_(tenant_id=tenant_id, limit=500)
@@ -456,18 +461,39 @@ async def list_agents_v1(tenant_id: str = "default") -> list[dict[str, Any]]:
 
 
 @app.post("/api/v1/agents/{agent_id}/run")
-async def run_agent_v1(agent_id: str, body: dict | None = None) -> dict[str, Any]:
-    """Run agent now and log result. Returns run outcome."""
+async def run_agent_v1(
+    agent_id: str,
+    body: dict | None = None,
+    _auth: dict = Depends(require_auth),
+    user: User = Depends(get_current_user),
+) -> dict[str, Any]:
+    """Run agent now and log result. Tenant/user/space from JWT; agents get RAG context internally when needed."""
     from src.core.agent_scheduler import AgentScheduler, get_agent_logs_store
     agents = await get_agent_framework()
     spec = agents.get(agent_id)
     if not spec:
         raise HTTPException(status_code=404, detail=f"Agent not found: {agent_id}")
-    tenant_id = (body or {}).get("tenant_id", "default")
-    space_id = (body or {}).get("space_id", "all")
-    user_id = (body or {}).get("user_id", "system")
+    tenant_id = user.tenant_id
+    space_id = "all"
+    user_id = user.id
+    # Inject RAG context so agents that need it (e.g. PatternAnalyzerAgent) do not return missing_rag_context.
+    initial_context: dict[str, Any] = {}
+    try:
+        rag = await get_rag_engine()
+        rag_response = await rag.search(
+            query="recent activity and patterns",
+            tenant_id=tenant_id,
+            space_id=space_id,
+            user_id=user_id,
+            limit=10,
+        )
+        initial_context["rag_response"] = rag_response
+    except Exception as e:
+        logger.warning("run_agent_v1: could not pre-fetch RAG context for %s: %s", agent_id, e)
     scheduler = AgentScheduler(agents, None)
-    result = await scheduler.run_agent_and_log(agent_id, tenant_id, space_id, user_id, "manual")
+    result = await scheduler.run_agent_and_log(
+        agent_id, tenant_id, space_id, user_id, "manual", initial_context=initial_context
+    )
     try:
         from src.core.notifications import notify_user
         if result.get("ok"):
@@ -498,33 +524,47 @@ async def run_agent_v1(agent_id: str, body: dict | None = None) -> dict[str, Any
 
 
 @app.get("/api/v1/agents/logs")
-async def list_agent_logs_v1(tenant_id: str = "default", agent_name: str | None = None, limit: int = 100) -> list[dict[str, Any]]:
-    """List agent run logs (run_at, duration_ms, result_count, errors)."""
+async def list_agent_logs_v1(
+    agent_name: str | None = None,
+    limit: int = 100,
+    _auth: dict = Depends(require_auth),
+    user: User = Depends(get_current_user),
+) -> list[dict[str, Any]]:
+    """List agent run logs (run_at, duration_ms, result_count, errors). Tenant from JWT."""
     try:
         from src.core.agent_scheduler import get_agent_logs_store
         store = get_agent_logs_store()
         await store.connect()
-        return await store.list_(tenant_id=tenant_id, agent_name=agent_name, limit=limit)
+        return await store.list_(tenant_id=user.tenant_id, agent_name=agent_name, limit=limit)
     except Exception as e:
         logging.warning("Agent logs store unavailable: %s", e)
         return []
 
 
 @app.get("/api/v1/agents/actions")
-async def list_agent_actions_v1(tenant_id: str = "default", status: str | None = None, agent: str | None = None, limit: int = 200) -> list[dict[str, Any]]:
-    """List agent actions (pending, executed, failed)."""
+async def list_agent_actions_v1(
+    status: str | None = None,
+    agent: str | None = None,
+    limit: int = 200,
+    _auth: dict = Depends(require_auth),
+    user: User = Depends(get_current_user),
+) -> list[dict[str, Any]]:
+    """List agent actions (pending, executed, failed). Tenant from JWT."""
     try:
         from src.core.agent_actions import get_agent_actions_store
         store = get_agent_actions_store()
         await store.connect()
-        return await store.list_(tenant_id=tenant_id, status=status, agent=agent, limit=limit)
+        return await store.list_(tenant_id=user.tenant_id, status=status, agent=agent, limit=limit)
     except Exception as e:
         logging.warning("Agent actions store unavailable: %s", e)
         return []
 
 
 @app.get("/api/v1/agents/{agent_id}/status")
-async def agent_status_v1(agent_id: str) -> dict[str, Any]:
+async def agent_status_v1(
+    agent_id: str,
+    _auth: dict = Depends(require_auth),
+) -> dict[str, Any]:
     """Agent status (idle when no run in progress). E2E expects valid JSON."""
     agents = await get_agent_framework()
     if not agents.get(agent_id):
@@ -534,20 +574,20 @@ async def agent_status_v1(agent_id: str) -> dict[str, Any]:
 
 @app.get("/api/v1/insights")
 async def insights(
-    tenant_id: str,
-    user_id: str | None = None,
     space_id: str | None = None,
     limit: int = 50,
+    _auth: dict = Depends(require_auth),
+    user: User = Depends(get_current_user),
 ) -> list[dict[str, Any]]:
-    """Real insights from workload, patterns, commitments, connections, and recommendations."""
+    """Real insights from workload, patterns, commitments, connections, and recommendations. Tenant/user from JWT."""
     from src.core.insights_engine import InsightsEngine
     schema = await get_schema_engine()
     store = await get_event_store()
     engine = InsightsEngine(schema, store)
     raw = await engine.compute_insights(
-        tenant_id=tenant_id,
-        space_id=space_id,
-        user_id=user_id,
+        tenant_id=user.tenant_id,
+        space_id=space_id or "all",
+        user_id=user.id,
         limit=limit,
     )
     return [i.to_dict() for i in raw]
@@ -598,7 +638,9 @@ from src.api import (
     v1_domain,
     ws_notifications,
     v1_notifications,
+    v1_rag,
 )
+from src.api.routes.llm_usage import router as llm_usage_router
 
 app.include_router(ws_notifications.router)
 app.include_router(governance.router)
@@ -616,6 +658,7 @@ app.include_router(decisions.router)
 app.include_router(graph.router)
 app.include_router(audit_api.router)
 app.include_router(v1_domain.router)
+app.include_router(v1_rag.router)
 
 from src.api import v1_tasks, v1_ingestion, v1_reminders, v1_execute, v1_context, v1_connections, v1_graph, v1_history, v1_tenants_spaces, v1_events, v1_users, v1_scenarios
 app.include_router(v1_history.router)
@@ -631,6 +674,7 @@ app.include_router(v1_events.router)
 app.include_router(v1_users.router)
 app.include_router(v1_scenarios.router)
 app.include_router(v1_notifications.router)
+app.include_router(llm_usage_router, prefix="/api/v1")
 
 if __name__ == "__main__":
     import uvicorn

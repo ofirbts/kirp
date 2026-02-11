@@ -13,7 +13,7 @@ from datetime import datetime, timezone
 
 from src.core.agent_framework import AgentSpec, AutonomyLevel
 from src.core.schema_engine import SchemaEngine, SchemaEntity
-from src.core.llm_client import get_llm
+from src.core.llm_router import get_llm_for_task
 
 logger = logging.getLogger(__name__)
 
@@ -107,7 +107,8 @@ Only extract entities that are clearly mentioned. Be conservative - quality over
 """
     
     try:
-        llm = get_llm()
+        # Schema extraction / enrichment → bulk provider.
+        llm = get_llm_for_task("bulk")
         response = await llm.invoke(prompt, temperature=0.3, max_tokens=2000)
         
         # Parse JSON response

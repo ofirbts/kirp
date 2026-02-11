@@ -8,6 +8,7 @@ import logging
 from typing import Any
 
 from src.core.agent_framework import AgentSpec, AutonomyLevel
+from src.core.llm_router import get_llm_for_task
 
 logger = logging.getLogger(__name__)
 
@@ -18,12 +19,18 @@ async def _handler(
     user_id: str,
     context: dict[str, Any],
 ) -> dict[str, Any]:
-    """Run pattern analysis over RAG context."""
-    from src.core.llm_client import get_llm
+    """Run pattern analysis over RAG context. Fetches RAG internally when not provided."""
     rag = context.get("rag_response")
     if not rag:
-        return {"ok": False, "error": "missing_rag_context"}
-
+        from src.core.rag_engine import get_shared_rag_engine
+        engine = await get_shared_rag_engine()
+        rag = await engine.search(
+            query="recent activity patterns",
+            tenant_id=tenant_id,
+            space_id=space_id or "all",
+            user_id=user_id,
+            limit=10,
+        )
     context_text = rag.context_text if hasattr(rag, "context_text") else str(rag)
     prompt = f"""
 Analyze the following user activity and detect patterns:
@@ -44,7 +51,8 @@ Return JSON:
   "summary": "Overall pattern summary"
 }}
 """
-    llm = get_llm()
+    # Pattern analysis / enrichment → bulk provider.
+    llm = get_llm_for_task("bulk")
     response = await llm.invoke(prompt, temperature=0.3)
     import json
     try:

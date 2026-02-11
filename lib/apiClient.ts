@@ -26,8 +26,13 @@ const DEV_TOKEN =
 
 function getRuntimeToken(): string | null {
   if (typeof window === "undefined") return DEV_TOKEN || null;
-  const stored = window.localStorage.getItem("kirp_auth_token");
-  return stored || DEV_TOKEN || null;
+  const fromLocal =
+    window.localStorage.getItem("kirp_auth_token") ??
+    window.localStorage.getItem("kirp_token");
+  const fromSession =
+    window.sessionStorage.getItem("kirp_auth_token") ??
+    window.sessionStorage.getItem("kirp_token");
+  return fromLocal || fromSession || DEV_TOKEN || null;
 }
 
 function authHeaders(): Record<string, string> {
@@ -128,6 +133,20 @@ export async function getStats(): Promise<Record<string, unknown>> {
   return get<Record<string, unknown>>("/api/v1/stats");
 }
 
+// ---------- LLM Usage ----------
+
+export interface LlmUsageResponse {
+  groq: Record<string, unknown>;
+  openai: Record<string, unknown>;
+  anthropic: Record<string, unknown>;
+  gemini: Record<string, unknown>;
+  recommendation: string;
+}
+
+export async function getLlmUsage(): Promise<LlmUsageResponse> {
+  return get<LlmUsageResponse>("/api/v1/llm/usage");
+}
+
 // ---------- Ask / Insights ----------
 
 export interface AskResponse {
@@ -136,11 +155,8 @@ export interface AskResponse {
   needs_external_info: boolean;
 }
 
-export async function askV1(body: {
-  tenant_id: string;
-  space_id: string;
-  query: string;
-}): Promise<AskResponse> {
+/** Ask API: body is only { query }. Tenant/user/space are derived from JWT on the backend. */
+export async function askV1(body: { query: string }): Promise<AskResponse> {
   return post<AskResponse>("/api/v1/ask", body);
 }
 
@@ -156,16 +172,13 @@ export interface InsightV1 {
   created_at: string;
 }
 
+/** Insights; tenant/user from JWT. */
 export async function getInsightsV1(params?: {
-  tenant_id?: string;
   space_id?: string;
-  user_id?: string;
   limit?: number;
 }): Promise<InsightV1[]> {
   const q: Record<string, string | number | undefined> = {};
-  if (params?.tenant_id) q.tenant_id = params.tenant_id;
   if (params?.space_id) q.space_id = params.space_id;
-  if (params?.user_id) q.user_id = params.user_id;
   if (params?.limit != null) q.limit = params.limit;
   const json = await get<InsightV1[]>("/api/v1/insights", q);
   return Array.isArray(json) ? json : [];
@@ -211,16 +224,16 @@ export interface AgentV1 {
   next_run?: string | null;
 }
 
-export async function listAgentsV1(params?: { tenant_id?: string }): Promise<AgentV1[]> {
-  const q: Record<string, string> = {};
-  if (params?.tenant_id) q.tenant_id = params.tenant_id;
-  const json = await get<AgentV1[]>("/api/v1/agents", q);
+/** List agents; tenant is derived from JWT. */
+export async function listAgentsV1(): Promise<AgentV1[]> {
+  const json = await get<AgentV1[]>("/api/v1/agents");
   return Array.isArray(json) ? json : [];
 }
 
+/** Run agent; tenant/user/space come from JWT. No need to send tenant_id/space_id/user_id in body. */
 export async function runAgentV1(
   agentId: string,
-  body?: { tenant_id?: string; space_id?: string; user_id?: string },
+  body?: Record<string, unknown>,
 ): Promise<{ ok: boolean; agent_id: string; result?: Record<string, unknown> }> {
   return post<{ ok: boolean; agent_id: string; result?: Record<string, unknown> }>(
     `/api/v1/agents/${encodeURIComponent(agentId)}/run`,
@@ -239,13 +252,12 @@ export interface AgentLogV1 {
   trigger: string;
 }
 
+/** Agent logs; tenant from JWT. */
 export async function getAgentLogsV1(params?: {
-  tenant_id?: string;
   agent_name?: string;
   limit?: number;
 }): Promise<AgentLogV1[]> {
   const q: Record<string, string | number | undefined> = {};
-  if (params?.tenant_id) q.tenant_id = params.tenant_id;
   if (params?.agent_name) q.agent_name = params.agent_name;
   if (params?.limit != null) q.limit = params.limit;
   const json = await get<AgentLogV1[]>("/api/v1/agents/logs", q);
@@ -265,14 +277,13 @@ export interface AgentActionV1 {
   error?: string | null;
 }
 
+/** Agent actions; tenant from JWT. */
 export async function getAgentActionsV1(params?: {
-  tenant_id?: string;
   status?: string;
   agent?: string;
   limit?: number;
 }): Promise<AgentActionV1[]> {
   const q: Record<string, string | number | undefined> = {};
-  if (params?.tenant_id) q.tenant_id = params.tenant_id;
   if (params?.status) q.status = params.status;
   if (params?.agent) q.agent = params.agent;
   if (params?.limit != null) q.limit = params.limit;
@@ -785,6 +796,7 @@ export const apiClient = {
   getObservabilityHealth,
   getMetricsSnapshot,
   getStats,
+  getLlmUsage,
   askV1,
   getInsightsV1,
   listTenants,

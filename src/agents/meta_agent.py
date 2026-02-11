@@ -12,7 +12,7 @@ import re
 from typing import Any
 
 from src.core.agent_framework import AgentFramework, AgentSpec, AutonomyLevel
-from src.core.llm_client import get_llm
+from src.core.llm_router import get_llm_for_task
 
 logger = logging.getLogger(__name__)
 
@@ -25,7 +25,8 @@ class MetaAgent:
 
     def __init__(self, agent_framework: AgentFramework) -> None:
         self._framework = agent_framework
-        self._llm = get_llm()
+        # Orchestrator uses critical-grade provider (high reliability).
+        self._llm = get_llm_for_task("critical")
         self._agent_scores: dict[str, float] = {}  # Agent name -> success score (0-1)
 
     def _score_agent(self, agent_name: str, success: bool) -> None:

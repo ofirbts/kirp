@@ -273,7 +273,8 @@ services:
     restart: unless-stopped
     ports:
       - "8000:8000"
-    env_file: .env
+    # Default to development env file; switch to .env.staging / .env.production in CI/CD as needed.
+    env_file: .env.development
     environment:
       ENV: development
       SKIP_AUTH: "0"
@@ -314,7 +315,8 @@ services:
       dockerfile: Dockerfile.agent
     container_name: kirp-agent-processor
     restart: unless-stopped
-    env_file: .env
+    # Share the same base env configuration as kirp-api in development.
+    env_file: .env.development
     environment:
       DISABLE_PROMETHEUS: "1"
       MONGO_URI: mongodb://root:example@mongodb:27017/kirp?authSource=admin
