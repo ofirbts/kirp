@@ -56,6 +56,14 @@ Use this checklist to verify the full stack after deployment.
 - [ ] **Healthchecks**: All pass
 - [ ] **Env consistency**: MONGO_URI, POSTGRES_URI, KAFKA_BOOTSTRAP_SERVERS match across API and Processor
 
+## Post-activation (steps 6–8)
+
+After completing activation steps 1–5 and 6–8:
+
+- [ ] **Step 6 – JWT on all v1 APIs**: Graph, Reminders, Connections use `get_tenant_context(request)`; no tenant_id/user_id from query for scoping (query params ignored when auth present). Verify: same token returns your data on `/api/v1/graph`, `/api/v1/reminders/upcoming`, `/api/v1/connections`.
+- [ ] **Step 7 – Error and empty states**: Decisions page shows error and retry when list fails; Insights/History/Tasks show clear empty states. No silent failures on load.
+- [ ] **Step 8 – This checklist**: Run the Quick Verify script below before release.
+
 ## Quick Test Commands
 
 ```bash
@@ -67,4 +75,20 @@ curl -X POST http://localhost:8000/api/v1/ingest -H "Authorization: Bearer TOKEN
 
 # History
 curl http://localhost:8000/api/v1/history -H "Authorization: Bearer TOKEN"
+```
+
+## Quick Verify (post-activation)
+
+Run `./scripts/verify_activation.sh` (or set API_URL and run the commands below) to sanity-check auth and JWT-backed endpoints.
+
+```bash
+# Get token first, then:
+export TOKEN="<access_token from login response>"
+export API_URL="${API_URL:-http://localhost:8000}"
+
+curl -s -o /dev/null -w "%{http_code}" -H "Authorization: Bearer $TOKEN" "$API_URL/api/v1/history?limit=5"        # expect 200
+curl -s -o /dev/null -w "%{http_code}" -H "Authorization: Bearer $TOKEN" "$API_URL/api/v1/notifications"       # expect 200
+curl -s -o /dev/null -w "%{http_code}" -H "Authorization: Bearer $TOKEN" "$API_URL/api/v1/graph?limit_nodes=10" # expect 200
+curl -s -o /dev/null -w "%{http_code}" -H "Authorization: Bearer $TOKEN" "$API_URL/api/v1/reminders/upcoming"   # expect 200
+curl -s -o /dev/null -w "%{http_code}" -H "Authorization: Bearer $TOKEN" "$API_URL/api/v1/connections"         # expect 200
 ```

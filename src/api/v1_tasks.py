@@ -38,7 +38,7 @@ def _task_from_node(node: dict[str, Any]) -> dict[str, Any]:
 @router.get("/tasks")
 async def list_tasks_v1(
     request: Request,
-    tenant_id: str = Query("default", description="Tenant ID"),
+    tenant_id: str = Query("default", description="Tenant ID"),  # kept for backwards compat; ignored for auth flows
     space_id: str | None = Query(None, description="Optional space filter"),
     status: str | None = Query(None, description="Optional status filter"),
     limit: int = Query(500, ge=1, le=2000),
@@ -48,9 +48,8 @@ async def list_tasks_v1(
     Returns id, title, due_date, source, source_event_id, tenant_id, space_id, user_id, status.
     """
     ctx = get_tenant_context(request)
-    tid = ctx.tenant_id if is_local_or_skip_auth() else (tenant_id or ctx.tenant_id)
-    if not is_local_or_skip_auth() and tid != ctx.tenant_id:
-        raise HTTPException(status_code=403, detail="Tenant mismatch")
+    # For authenticated flows, always derive tenant_id from context (JWT), not query param.
+    tid = ctx.tenant_id
     schema = await get_schema_engine()
     nodes = await schema.list_nodes(
         tenant_id=tid,
@@ -67,7 +66,7 @@ async def list_tasks_v1(
 @router.get("/nodes")
 async def list_nodes_v1(
     request: Request,
-    tenant_id: str = Query("default", description="Tenant ID"),
+    tenant_id: str = Query("default", description="Tenant ID"),  # ignored for auth flows; kept for compat
     space_id: str | None = Query(None, description="Optional space filter"),
     entity: str | None = Query(None, description="Filter by entity: task, commitment, project, life_area"),
     status: str | None = Query(None, description="Optional status filter"),
@@ -77,9 +76,7 @@ async def list_nodes_v1(
     List schema nodes (tasks, commitments, projects, life areas) for Second Brain UI.
     """
     ctx = get_tenant_context(request)
-    tid = ctx.tenant_id if is_local_or_skip_auth() else (tenant_id or ctx.tenant_id)
-    if not is_local_or_skip_auth() and tid != ctx.tenant_id:
-        raise HTTPException(status_code=403, detail="Tenant mismatch")
+    tid = ctx.tenant_id
     schema = await get_schema_engine()
     entity_enum = None
     if entity:
@@ -102,13 +99,11 @@ async def list_nodes_v1(
 async def get_node_v1(
     node_id: str,
     request: Request,
-    tenant_id: str = Query("default"),
+    tenant_id: str = Query("default"),  # ignored for auth flows; kept for compat
 ) -> dict[str, Any]:
     """Get a single schema node by ID."""
     ctx = get_tenant_context(request)
-    tid = ctx.tenant_id if is_local_or_skip_auth() else (tenant_id or ctx.tenant_id)
-    if not is_local_or_skip_auth() and tid != ctx.tenant_id:
-        raise HTTPException(status_code=403, detail="Tenant mismatch")
+    tid = ctx.tenant_id
     schema = await get_schema_engine()
     node = await schema.get_node(node_id, tid)
     if not node:
@@ -121,7 +116,7 @@ async def get_node_v1(
 async def update_node_v1(
     node_id: str,
     request: Request,
-    tenant_id: str = Query("default"),
+    tenant_id: str = Query("default"),  # ignored for auth flows; kept for compat
     user_id: str = Query("system"),
     title: str | None = Body(None),
     description: str | None = Body(None),
@@ -133,9 +128,7 @@ async def update_node_v1(
     """Partial update of a schema node (task, commitment, project)."""
     from datetime import datetime, timezone
     ctx = get_tenant_context(request)
-    tid = ctx.tenant_id if is_local_or_skip_auth() else (tenant_id or ctx.tenant_id)
-    if not is_local_or_skip_auth() and tid != ctx.tenant_id:
-        raise HTTPException(status_code=403, detail="Tenant mismatch")
+    tid = ctx.tenant_id
     schema = await get_schema_engine()
     due_dt = None
     if due_date is not None:
@@ -184,7 +177,7 @@ async def update_node_v1(
 @router.post("/tasks")
 async def create_task_v1(
     request: Request,
-    tenant_id: str = Query("default"),
+    tenant_id: str = Query("default"),  # ignored for auth flows; kept for compat
     space_id: str = Query("all"),
     user_id: str = Query("system"),
     title: str = Body(..., embed=True),
@@ -197,9 +190,7 @@ async def create_task_v1(
     from datetime import datetime, timezone
     import uuid as uuid_mod
     ctx = get_tenant_context(request)
-    tid = ctx.tenant_id if is_local_or_skip_auth() else (tenant_id or ctx.tenant_id)
-    if not is_local_or_skip_auth() and tid != ctx.tenant_id:
-        raise HTTPException(status_code=403, detail="Tenant mismatch")
+    tid = ctx.tenant_id
     schema = await get_schema_engine()
     due_dt = None
     if due_date:
@@ -239,7 +230,7 @@ async def create_task_v1(
 @router.post("/nodes")
 async def create_node_v1(
     request: Request,
-    tenant_id: str = Query("default"),
+    tenant_id: str = Query("default"),  # ignored for auth flows; kept for compat
     space_id: str = Query("all"),
     user_id: str = Query("system"),
     entity: str = Body("task", embed=True),
@@ -254,9 +245,7 @@ async def create_node_v1(
     from datetime import datetime, timezone
     import uuid as uuid_mod
     ctx = get_tenant_context(request)
-    tid = ctx.tenant_id if is_local_or_skip_auth() else (tenant_id or ctx.tenant_id)
-    if not is_local_or_skip_auth() and tid != ctx.tenant_id:
-        raise HTTPException(status_code=403, detail="Tenant mismatch")
+    tid = ctx.tenant_id
     try:
         entity_enum = SchemaEntity(entity.strip().lower())
     except ValueError:

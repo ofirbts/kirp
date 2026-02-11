@@ -14,6 +14,16 @@ interface InboxEvent {
   topic?: string;
   source?: string;
   timestamp?: string;
+  payloadPreview?: string;
+}
+
+/** First ~3 words or 50 chars for snippet column. */
+function snippet(preview: string | undefined, topic: string | undefined): string {
+  const raw = (preview || topic || "").trim();
+  if (!raw) return "—";
+  const words = raw.split(/\s+/).filter(Boolean).slice(0, 3);
+  const s = words.join(" ");
+  return s.length > 50 ? s.slice(0, 47) + "…" : s || "—";
 }
 
 function InboxContent() {
@@ -30,11 +40,21 @@ function InboxContent() {
         tenantId: tenantId ?? DEFAULT_TENANT_ID,
         spaceId: spaceId ?? "all",
       });
-      const list = ((res.data ?? []) as InboxEvent[]).slice(0, 50);
-      list.sort((a, b) => {
-        const ta = a.timestamp ? new Date(a.timestamp).getTime() : 0;
-        const tb = b.timestamp ? new Date(b.timestamp).getTime() : 0;
+      const raw = ((res.data ?? []) as InboxEvent[]).slice(0, 50);
+      raw.sort((a, b) => {
+        const at = (a as unknown as { timestamp?: string }).timestamp;
+        const bt = (b as unknown as { timestamp?: string }).timestamp;
+        const ta = at ? new Date(at).getTime() : 0;
+        const tb = bt ? new Date(bt).getTime() : 0;
         return tb - ta;
+      });
+      const list = raw.map((e) => {
+        const o = e as unknown as { timestamp?: string; payloadPreview?: string };
+        return {
+          ...e,
+          timestamp: e.timestamp ?? o.timestamp,
+          payloadPreview: e.payloadPreview ?? o.payloadPreview,
+        };
       });
       setEvents(list);
     } catch (e) {
@@ -84,6 +104,7 @@ function InboxContent() {
               <thead className="border-b border-[color:var(--color-border-subtle)] bg-surface2 text-textSoft">
                 <tr>
                   <th className="px-4 py-3 font-medium">Topic / Source</th>
+                  <th className="px-4 py-3 font-medium">Snippet</th>
                   <th className="px-4 py-3 font-medium">Time</th>
                   <th className="px-4 py-3 font-medium">Source</th>
                 </tr>
@@ -92,6 +113,9 @@ function InboxContent() {
                 {events.map((e) => (
                   <tr key={e.id} className="hover:bg-surface2/70">
                     <td className="px-4 py-3 text-textMain">{e.topic || e.source || "—"}</td>
+                    <td className="px-4 py-3 text-textSoft max-w-[180px] truncate" title={e.payloadPreview || e.topic || ""}>
+                      {snippet(e.payloadPreview, e.topic)}
+                    </td>
                     <td className="px-4 py-3 text-textSoft">{e.timestamp ? new Date(e.timestamp).toLocaleString() : "—"}</td>
                     <td className="px-4 py-3 text-textSoft">{e.source ?? "—"}</td>
                   </tr>

@@ -34,14 +34,16 @@ function DecisionsContent() {
 
   const loadDecisions = useCallback(async () => {
     setLoadingList(true);
+    setError(null);
     try {
       const res = await apiClient.listDecisions({
         tenantId: tenantId ?? DEFAULT_TENANT_ID,
         spaceId: spaceId ?? "all",
       });
       setDecisions((res.data ?? []) as DecisionRow[]);
-    } catch {
+    } catch (e) {
       setDecisions([]);
+      setError(e instanceof Error ? e.message : "Failed to load decisions");
     } finally {
       setLoadingList(false);
     }
@@ -122,7 +124,16 @@ function DecisionsContent() {
         </CardContent>
       </Card>
 
-      {error && <ErrorState message={error} onRetry={search} />}
+      {error && (
+        <ErrorState
+          message={error}
+          onRetry={() => {
+            setError(null);
+            loadDecisions();
+            if (query.trim()) void search();
+          }}
+        />
+      )}
 
       <div className="grid gap-4 md:grid-cols-2">
         <Card className="border-neutral-800 bg-neutral-900/70">

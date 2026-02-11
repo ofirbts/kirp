@@ -97,6 +97,17 @@ async def fetch_gemini_usage() -> Dict[str, Any]:
     return {"status": "not_implemented"}
 
 
+def _placeholder_response() -> Dict[str, Any]:
+    """Always-valid JSON so the dashboard never gets HTML or 500."""
+    return {
+        "groq": {"status": "missing_key"},
+        "openai": {"status": "missing_key"},
+        "anthropic": {"status": "missing_key"},
+        "gemini": {"status": "not_implemented"},
+        "recommendation": "Configure at least one provider API key for usage data.",
+    }
+
+
 @router.get("/llm/usage")
 async def llm_usage(
     _auth: Dict[str, Any] = Depends(require_auth),
@@ -105,28 +116,36 @@ async def llm_usage(
     Aggregate usage across Groq, OpenAI, Anthropic, Gemini.
 
     - Requires valid JWT (same as other /api/v1 endpoints).
-    - Does NOT expose raw API keys.
+    - Always returns 200 with a JSON object (never HTML or 5xx).
     """
-    groq, openai, anthropic, gemini = await fetch_groq_usage(), await fetch_openai_usage(), await fetch_anthropic_usage(), await fetch_gemini_usage()
+    try:
+        groq = await fetch_groq_usage()
+        openai = await fetch_openai_usage()
+        anthropic = await fetch_anthropic_usage()
+        gemini = await fetch_gemini_usage()
+    except Exception:
+        return _placeholder_response()
 
-    # Recommendation logic (best‑effort heuristic).
-    # When cost field is missing, fall back to a large sentinel so it won't be chosen.
-    costs: Dict[str, float] = {
-        "groq": float(groq.get("cost_usd") or 999.0),
-        "openai": float(
-            (openai.get("raw") or {}).get("total_usage") or 999.0
-        ),
-        "anthropic": float(
-            (anthropic.get("raw") or {}).get("total_usage") or 999.0
-        ),
-    }
-    best = min(costs, key=costs.get)
+    try:
+        costs: Dict[str, float] = {
+            "groq": float(groq.get("cost_usd") or 999.0),
+            "openai": float(
+                (openai.get("raw") or {}).get("total_usage") or 999.0
+            ),
+            "anthropic": float(
+                (anthropic.get("raw") or {}).get("total_usage") or 999.0
+            ),
+        }
+        best = min(costs, key=costs.get)
+        recommendation = f"{best} is the cheapest provider right now"
+    except Exception:
+        recommendation = "Unable to compare provider costs."
 
     return {
         "groq": groq,
         "openai": openai,
         "anthropic": anthropic,
         "gemini": gemini,
-        "recommendation": f"{best} is the cheapest provider right now",
+        "recommendation": recommendation,
     }
 

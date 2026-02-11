@@ -150,7 +150,7 @@ export default function TasksPage() {
     try {
       await apiClient.createTaskV1(
         { title: quickAdd.trim() },
-        { tenant_id: tenant_id, space_id: spaceId ?? "all" }
+        { tenant_id: tenant_id, space_id: spaceId ?? "all", user_id: user?.id }
       );
       setQuickAdd("");
       await load();
@@ -195,7 +195,7 @@ export default function TasksPage() {
           priority: editForm.priority || undefined,
           description: editForm.description || undefined,
         },
-        { tenant_id: tenant_id }
+        { tenant_id: tenant_id, user_id: user?.id }
       );
       setEditId(null);
       setEditNode(null);
@@ -210,7 +210,7 @@ export default function TasksPage() {
   const markComplete = useCallback(
     async (id: string) => {
       try {
-        await apiClient.updateNodeV1(id, { status: "completed" }, { tenant_id: tenant_id });
+        await apiClient.updateNodeV1(id, { status: "completed" }, { tenant_id: tenant_id, user_id: user?.id });
         await load();
       } catch (e) {
         setError(e instanceof Error ? e.message : "Failed to update");
@@ -224,7 +224,7 @@ export default function TasksPage() {
       const t = tasks.find((x) => x.id === id);
       const next = snoozeDueDate(t?.due_date ?? null);
       try {
-        await apiClient.updateNodeV1(id, { due_date: next }, { tenant_id: tenant_id });
+        await apiClient.updateNodeV1(id, { due_date: next }, { tenant_id: tenant_id, user_id: user?.id });
         await load();
       } catch (e) {
         setError(e instanceof Error ? e.message : "Failed to snooze");
@@ -240,11 +240,11 @@ export default function TasksPage() {
       try {
         const createRes = await apiClient.createNodeV1(
           { entity: "project", title: t.title ?? "New project" },
-          { tenant_id: tenant_id, space_id: spaceId ?? "all" }
+          { tenant_id: tenant_id, space_id: spaceId ?? "all", user_id: user?.id }
         );
         const projectId = createRes.node?.id;
         if (projectId) {
-          await apiClient.updateNodeV1(taskId, { parent_id: projectId }, { tenant_id: tenant_id });
+          await apiClient.updateNodeV1(taskId, { parent_id: projectId }, { tenant_id: tenant_id, user_id: user?.id });
         }
         await load();
       } catch (e) {
@@ -266,9 +266,9 @@ export default function TasksPage() {
             due_date: t.due_date ?? undefined,
             status: t.status ?? undefined,
           },
-          { tenant_id: tenant_id, space_id: spaceId ?? "all" }
+          { tenant_id: tenant_id, space_id: spaceId ?? "all", user_id: user?.id }
         );
-        await apiClient.updateNodeV1(taskId, { status: "completed" }, { tenant_id: tenant_id });
+        await apiClient.updateNodeV1(taskId, { status: "completed" }, { tenant_id: tenant_id, user_id: user?.id });
         await load();
       } catch (e) {
         setError(e instanceof Error ? e.message : "Convert failed");

@@ -7,7 +7,7 @@ import { ErrorState } from "@/components/feedback/ErrorState";
 import { apiClient, type SchemaNodeV1 } from "@/lib/apiClient";
 import { DEFAULT_TENANT_ID } from "@/lib/constants";
 import { useTenantContextStore } from "@/lib/stores/tenantContextStore";
-import { LayoutGrid, Briefcase, Heart, Users, BookOpen } from "lucide-react";
+import { LayoutGrid, Briefcase, Heart, Users, BookOpen, Folder } from "lucide-react";
 
 const LIFE_AREAS = [
   { name: "Work", icon: Briefcase, color: "text-amber-500" },
@@ -15,6 +15,7 @@ const LIFE_AREAS = [
   { name: "Health", icon: Heart, color: "text-rose-500" },
   { name: "Learning", icon: BookOpen, color: "text-violet-500" },
 ];
+const UNCATEGORIZED = { name: "Uncategorized", icon: Folder, color: "text-neutral-400" };
 
 function formatDate(s: string | null | undefined): string {
   if (!s) return "";
@@ -108,6 +109,16 @@ function LifeAreasContent() {
     };
   });
 
+  const assignedCIds = new Set(byLifeArea.flatMap((a) => a.commitments.map((c) => c.id)));
+  const assignedTIds = new Set(byLifeArea.flatMap((a) => a.tasks.map((t) => t.id)));
+  const uncategorizedCard = {
+    ...UNCATEGORIZED,
+    commitments: commitments.filter((c) => !assignedCIds.has(c.id)),
+    tasks: tasks.filter((t) => !assignedTIds.has(t.id)),
+    node: null as SchemaNodeV1 | null,
+  };
+  const allCards = [...byLifeArea, uncategorizedCard];
+
   return (
     <div className="space-y-6" suppressHydrationWarning>
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between" suppressHydrationWarning>
@@ -130,7 +141,7 @@ function LifeAreasContent() {
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {byLifeArea.map(({ name, icon: Icon, color, commitments: comms, tasks: tsks }) => (
+        {allCards.map(({ name, icon: Icon, color, commitments: comms, tasks: tsks }) => (
           <Card
             key={name}
             className="rounded-2xl border border-[color:var(--color-border-subtle)] bg-surface1/90 shadow-soft"

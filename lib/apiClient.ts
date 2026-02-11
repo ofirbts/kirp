@@ -27,9 +27,11 @@ const DEV_TOKEN =
 function getRuntimeToken(): string | null {
   if (typeof window === "undefined") return DEV_TOKEN || null;
   const fromLocal =
+    window.localStorage.getItem("access_token") ??
     window.localStorage.getItem("kirp_auth_token") ??
     window.localStorage.getItem("kirp_token");
   const fromSession =
+    window.sessionStorage.getItem("access_token") ??
     window.sessionStorage.getItem("kirp_auth_token") ??
     window.sessionStorage.getItem("kirp_token");
   return fromLocal || fromSession || DEV_TOKEN || null;
@@ -76,6 +78,24 @@ async function get<T>(
         ? `Backend unreachable: ${url}`
         : `${res.status}: ${text || res.statusText}`,
     );
+  }
+  return res.json() as Promise<T>;
+}
+
+async function patch<T>(path: string, body?: unknown): Promise<T> {
+  const url = buildUrl(path);
+  const res = await fetch(url, {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+      ...authHeaders(),
+    },
+    body: body !== undefined ? JSON.stringify(body) : undefined,
+    credentials: "include",
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`${res.status}: ${text || res.statusText}`);
   }
   return res.json() as Promise<T>;
 }
@@ -564,12 +584,13 @@ export async function listTasksV1(params?: {
 export async function updateNodeV1(
   nodeId: string,
   body: { title?: string; description?: string; status?: string; priority?: string; due_date?: string; parent_id?: string },
-  params?: { tenant_id?: string }
+  params?: { tenant_id?: string; user_id?: string }
 ): Promise<{ ok: boolean; node: SchemaNodeV1 }> {
   const q: Record<string, string> = {};
   if (params?.tenant_id) q.tenant_id = params.tenant_id;
+  if (params?.user_id) q.user_id = params.user_id;
   const url = `/api/v1/nodes/${encodeURIComponent(nodeId)}?${new URLSearchParams(q).toString()}`;
-  return post(url, body);
+  return patch(url, body);
 }
 
 export async function createTaskV1(

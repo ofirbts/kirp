@@ -10,15 +10,22 @@ import logging
 import os
 from typing import Any
 
-from fastapi import APIRouter, HTTPException, Query, Body
+from fastapi import APIRouter, HTTPException, Query, Body, Request
 from fastapi.responses import RedirectResponse
 
+from src.auth.tenant_context import get_tenant_context
 from src.core.connector_tokens import ConnectorTokenStore, INTEGRATIONS
 from src.core.connector_sync_log import ConnectorSyncLogStore
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/v1", tags=["connections"])
+
+
+def _ctx_ids(request: Request) -> tuple[str, str]:
+    """Derive tenant_id and user_id from JWT context."""
+    ctx = get_tenant_context(request)
+    return ctx.tenant_id, ctx.user_id
 
 CONNECTOR_LABELS = {
     "gmail": "Gmail",
@@ -50,13 +57,11 @@ async def _ensure_stores():
 
 
 @router.get("/connections")
-async def list_connections(
-    tenant_id: str = Query("default"),
-    user_id: str = Query("system"),
-) -> dict[str, Any]:
+async def list_connections(request: Request) -> dict[str, Any]:
     """
-    List all integrations with status: connected, last_sync_at, last_sync_status, error_count.
+    List all integrations with status. Tenant/user from JWT.
     """
+    tenant_id, user_id = _ctx_ids(request)
     ts, sl = await _ensure_stores()
     connected = await ts.list_connected(tenant_id, user_id)
     connectors = []
@@ -85,16 +90,14 @@ async def list_connections(
 
 @router.post("/connections/{integration}/connect")
 async def connect_integration(
+    request: Request,
     integration: str,
-    tenant_id: str = Query("default"),
-    user_id: str = Query("system"),
     body: dict[str, Any] | None = Body(None),
 ) -> dict[str, Any]:
     """
-    Store token for integration (token-based connect).
-    Body: { "access_token": "...", "refresh_token": "... (optional)", "extra": {} }.
-    For OAuth, use GET /connections/oauth/{integration}/start then callback stores the token.
+    Store token for integration. Tenant/user from JWT.
     """
+    tenant_id, user_id = _ctx_ids(request)
     if integration not in INTEGRATIONS:
         raise HTTPException(status_code=400, detail=f"Unknown integration: {integration}")
     body = body or {}
@@ -114,12 +117,9 @@ async def connect_integration(
 
 
 @router.post("/connections/{integration}/disconnect")
-async def disconnect_integration(
-    integration: str,
-    tenant_id: str = Query("default"),
-    user_id: str = Query("system"),
-) -> dict[str, Any]:
-    """Remove stored token for this integration."""
+async def disconnect_integration(request: Request, integration: str) -> dict[str, Any]:
+    """Remove stored token for this integration. Tenant/user from JWT."""
+    tenant_id, user_id = _ctx_ids(request)
     if integration not in INTEGRATIONS:
         raise HTTPException(status_code=400, detail=f"Unknown integration: {integration}")
     ts, _ = await _ensure_stores()
@@ -128,13 +128,9 @@ async def disconnect_integration(
 
 
 @router.post("/connections/{integration}/sync")
-async def sync_now(
-    integration: str,
-    tenant_id: str = Query("default"),
-    space_id: str = Query("all"),
-    user_id: str = Query("system"),
-) -> dict[str, Any]:
-    """Trigger a manual sync for this integration. Records result in sync log."""
+async def sync_now(request: Request, integration: str, space_id: str = Query("all")) -> dict[str, Any]:
+    """Trigger a manual sync for this integration. Tenant/user from JWT."""
+    tenant_id, user_id = _ctx_ids(request)
     if integration not in INTEGRATIONS:
         raise HTTPException(status_code=400, detail=f"Unknown integration: {integration}")
     ts, sl = await _ensure_stores()

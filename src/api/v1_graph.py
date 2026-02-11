@@ -10,7 +10,7 @@ from typing import Any
 
 from fastapi import APIRouter, Query, Request
 
-from src.auth.tenant_context import get_tenant_context, is_local_or_skip_auth
+from src.auth.tenant_context import get_tenant_context
 from src.core.graph_engine import GraphBuilder
 from src.core.schema_engine import get_schema_engine
 from src.main import get_event_store
@@ -34,11 +34,11 @@ async def get_graph_v1(
 ) -> dict[str, Any]:
     """
     Get unified graph (nodes + edges) from schema nodes and events.
-    Optional filters: life_area, project_id, date range, entity_types, source.
+    Tenant/space from JWT. Optional filters: life_area, project_id, date range, entity_types, source.
     """
     ctx = get_tenant_context(request)
-    tid = ctx.tenant_id if is_local_or_skip_auth() else (tenant_id or ctx.tenant_id)
-    sid = space_id or ctx.space_id
+    tid = ctx.tenant_id
+    sid = space_id or ctx.space_id or "all"
     schema = await get_schema_engine()
     store = await get_event_store()
     builder = GraphBuilder(schema, store)

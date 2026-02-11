@@ -29,6 +29,18 @@ export default function LLMUsageToolbar() {
     let cancelled = false;
 
     const load = async () => {
+      if (typeof window === "undefined") {
+        return;
+      }
+      const token = window.localStorage.getItem("access_token");
+      if (!token) {
+        if (!cancelled) {
+          setUsage(null);
+          setError(null);
+        }
+        return;
+      }
+
       try {
         const data = await apiClient.getLlmUsage();
         if (!cancelled) {
@@ -118,4 +130,5 @@ export default function LLMUsageToolbar() {
     </div>
   );
 }
+
 

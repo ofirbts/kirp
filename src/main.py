@@ -520,6 +520,19 @@ async def run_agent_v1(
                 await record_history(tenant_id, space_id, user_id, "agent_insight" if insights_count else "agent_action", f"{agent_id} ran", f"{insights_count} insight(s), {actions_count} action(s).", source="agent", meta={"agent_id": agent_id})
     except Exception:
         pass
+    # So "Agent actions" UI shows something: push one agent_insight row when agent produced insights.
+    try:
+        if result.get("ok"):
+            insights_count = len(result.get("insights") or [])
+            if insights_count > 0:
+                from src.core.agent_actions import get_agent_actions_store, action_doc, ACTION_AGENT_INSIGHT
+                store = get_agent_actions_store()
+                await store.connect()
+                doc = action_doc(agent_id, ACTION_AGENT_INSIGHT, {"insights_count": insights_count, "summary": f"{insights_count} insight(s) from {agent_id}"}, tenant_id, space_id, user_id)
+                doc["status"] = "executed"  # informational, not pending execution
+                await store.create(doc)
+    except Exception as e:
+        logger.debug("run_agent_v1: could not push agent_insight to actions store: %s", e)
     return {"ok": result.get("ok", False), "agent_id": agent_id, "result": result}
 
 

@@ -27,9 +27,9 @@ export const useAuthStore = create<AuthState>((set) => ({
       const user = res.user;
       if (typeof window !== "undefined") {
         if (token) {
-          window.localStorage.setItem("kirp_auth_token", token);
+          window.localStorage.setItem("access_token", token);
         } else {
-          window.localStorage.removeItem("kirp_auth_token");
+          window.localStorage.removeItem("access_token");
         }
       }
       set({ user, token, loggingIn: false, loaded: true });
@@ -46,9 +46,9 @@ export const useAuthStore = create<AuthState>((set) => ({
       const user = res.user;
       if (typeof window !== "undefined") {
         if (token) {
-          window.localStorage.setItem("kirp_auth_token", token);
+          window.localStorage.setItem("access_token", token);
         } else {
-          window.localStorage.removeItem("kirp_auth_token");
+          window.localStorage.removeItem("access_token");
         }
       }
       set({ user, token, loggingIn: false, loaded: true });
@@ -59,7 +59,7 @@ export const useAuthStore = create<AuthState>((set) => ({
   },
   logout() {
     if (typeof window !== "undefined") {
-      window.localStorage.removeItem("kirp_auth_token");
+      window.localStorage.removeItem("access_token");
     }
     set({ user: null, token: null, loaded: true });
   },
@@ -69,7 +69,7 @@ export const useAuthStore = create<AuthState>((set) => ({
       return;
     }
   
-    const token = window.localStorage.getItem("kirp_auth_token");
+    const token = window.localStorage.getItem("access_token");
     const skipAuth = process.env.NEXT_PUBLIC_SKIP_AUTH === "1";
   
     // No token → SKIP_AUTH mode
@@ -92,7 +92,7 @@ export const useAuthStore = create<AuthState>((set) => ({
       const me = await apiClient.meV1();
       set({ user: me, token, loaded: true });
     } catch {
-      window.localStorage.removeItem("kirp_auth_token");
+      window.localStorage.removeItem("access_token");
       set({ user: null, token: null, loaded: true });
     }
   }

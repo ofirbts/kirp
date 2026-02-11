@@ -55,11 +55,59 @@ Return JSON:
     llm = get_llm_for_task("bulk")
     response = await llm.invoke(prompt, temperature=0.3)
     import json
+    import re
+
+    def _extract_json(text: str) -> str | None:
+        """Try to parse JSON; if failed, strip markdown code blocks and retry."""
+        text = (text or "").strip()
+        try:
+            json.loads(text)
+            return text
+        except json.JSONDecodeError:
+            pass
+        # Strip ```json ... ``` or ``` ... ```
+        m = re.search(r"```(?:json)?\s*([\s\S]*?)```", text)
+        if m:
+            return m.group(1).strip()
+        # First { ... } or [ ... ]
+        m = re.search(r"(\{[\s\S]*\}|\[[\s\S]*\])", text)
+        if m:
+            return m.group(1)
+        return None
+
+    raw_for_fallback = response
     try:
-        data = json.loads(response)
-        return {"ok": True, "patterns": data.get("patterns", []), "summary": data.get("summary"), "explanation": "pattern_analyzer_llm"}
-    except:
-        return {"ok": True, "patterns": [], "raw_response": response, "explanation": "pattern_analyzer_llm"}
+        json_str = _extract_json(response)
+        data = json.loads(json_str) if json_str else {}
+    except Exception:
+        data = {}
+
+    patterns = data.get("patterns", []) or []
+    summary = data.get("summary") or ""
+    # Standardized shape: always expose insights for history/notifications/result_count.
+    insights = [
+        {
+            "title": f"Pattern: {p.get('type', 'pattern')}",
+            "body": p.get("description") or summary or "Pattern detected.",
+            "data": p,
+        }
+        for p in patterns
+    ]
+    # Ensure at least one insight when we have a summary (so result_count > 0 and history is written).
+    if not insights and summary:
+        insights = [{"title": "Pattern summary", "body": summary, "data": {"summary": summary}}]
+    if not insights:
+        insights = [{"title": "Pattern analysis ran", "body": "No patterns detected in current context.", "data": {}}]
+
+    return {
+        "ok": True,
+        "patterns": patterns,
+        "summary": summary or None,
+        "insights": insights,
+        "actions": [],
+        "raw_response": raw_for_fallback,
+        "explanation": "pattern_analyzer_llm",
+    }
 
 
 class PatternAnalyzerAgent:
