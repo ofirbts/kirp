@@ -71,24 +71,57 @@ class WhatsAppIntegration:
     def parse_webhook_payload(self, body: dict[str, Any]) -> list[dict[str, Any]]:
         """Parse Meta/Twilio webhook body into unified event payloads (tenant_id etc. set by caller)."""
         events: list[dict[str, Any]] = []
-        # Meta format
+
+        # Meta format (Cloud API)
         for entry in body.get("entry", []):
             for change in entry.get("changes", []):
                 val = change.get("value", {})
                 for msg in val.get("messages", []):
                     msg_id = msg.get("id")
                     text = (msg.get("text") or {}).get("body", "")
-                    events.append({
+                    events.append(
+                        {
+                            "source": "whatsapp",
+                            "content": text,
+                            "metadata": {
+                                "external_id": msg_id or "",
+                                "from": msg.get("from"),
+                                "msg_id": msg_id,
+                            },
+                        }
+                    )
+
+        # Twilio simple form-encoded webhook: keys like 'From', 'Body'
+        if not events and ("From" in body or "from" in body):
+            frm = body.get("From") or body.get("from") or ""
+            text = body.get("Body") or body.get("body") or body.get("text") or ""
+            if text:
+                ext_id = (
+                    body.get("MessageSid")
+                    or body.get("SmsSid")
+                    or body.get("msg_id")
+                    or f"{frm}_{body.get('Timestamp') or body.get('timestamp') or ''}"
+                )
+                events.append(
+                    {
                         "source": "whatsapp",
                         "content": text,
-                        "metadata": {"external_id": msg_id or "", "from": msg.get("from"), "msg_id": msg_id},
-                    })
-        # Simple format
+                        "metadata": {
+                            "external_id": ext_id or "",
+                            "from": frm,
+                        },
+                    }
+                )
+
+        # Very simple JSON format: {"from": "...", "text": "..."}
         if not events and "from" in body and "text" in body:
-            ext_id = body.get("msg_id") or body.get("from", "") + "_" + str(body.get("timestamp", ""))
-            events.append({
-                "source": "whatsapp",
-                "content": body["text"],
-                "metadata": {"external_id": ext_id, "from": body["from"]},
-            })
+            ext_id = body.get("msg_id") or (body.get("from") or "") + "_" + str(body.get("timestamp", ""))
+            events.append(
+                {
+                    "source": "whatsapp",
+                    "content": body["text"],
+                    "metadata": {"external_id": ext_id, "from": body["from"]},
+                }
+            )
+
         return events

@@ -66,6 +66,12 @@ function InboxContent() {
 
   useEffect(() => { load(); }, [load]);
 
+  // Auto-refresh so new WhatsApp/Gmail events appear without manual refresh
+  useEffect(() => {
+    const interval = setInterval(load, 30000);
+    return () => clearInterval(interval);
+  }, [load]);
+
   if (loading) return <PageSkeleton title subtitle tableRows={10} />;
   if (error) {
     return (
@@ -87,7 +93,9 @@ function InboxContent() {
             <Inbox className="h-7 w-7 text-primary" />
             Inbox
           </h1>
-          <p className="mt-1 text-sm text-textSoft">Recent activity and ingested items.</p>
+          <p className="mt-1 text-sm text-textSoft">
+            הודעות WhatsApp ומיילים (Gmail) שמוכנסים למערכת מופיעות כאן. הרענון מתבצע אוטומטית כל 30 שניות.
+          </p>
         </div>
         <button type="button" onClick={() => load()} className="rounded-full border border-[color:var(--color-border-subtle)] bg-surface2 px-3 py-2 text-xs text-textMain hover:bg-surface3">
           Refresh

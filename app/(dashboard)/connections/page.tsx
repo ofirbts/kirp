@@ -119,7 +119,20 @@ function ConnectorCard({
       setSlackChannelId("");
       onRefresh();
     } catch (e) {
-      setConnectError(e instanceof Error ? e.message : "Connect failed");
+      const msg = e instanceof Error ? e.message : "Connect failed";
+      // Parse API error body (e.g. "400: {\"detail\":\"...\"}" or "500: {\"detail\":\"...\"}")
+      let display = msg;
+      try {
+        const match = msg.match(/^\d+\s*:\s*(\{.+\})$/s);
+        if (match) {
+          const obj = JSON.parse(match[1]);
+          const d = obj?.detail;
+          display = Array.isArray(d) ? d.map((x: { msg?: string }) => x?.msg).filter(Boolean).join("; ") || msg : (d ?? msg);
+        }
+      } catch {
+        // keep display as msg
+      }
+      setConnectError(display);
     }
   }, [conn.integration, tenantId, userId, tokenValue, slackChannelId, onRefresh]);
 
@@ -181,7 +194,7 @@ function ConnectorCard({
                 <Link2Off className="h-4 w-4 mr-1" />
                 Disconnect
               </Button>
-              {(conn.integration === "gmail" || conn.integration === "calendar" || conn.integration === "slack" || conn.integration === "notion") && (
+              {(conn.integration === "gmail" || conn.integration === "calendar" || conn.integration === "slack" || conn.integration === "notion" || conn.integration === "whatsapp") && (
                 <Button
                   size="sm"
                   className="rounded-full bg-primary text-bg"
@@ -222,7 +235,14 @@ function ConnectorCard({
           <div className="space-y-2 pt-2 border-t border-[color:var(--color-border-subtle)]">
             <input
               type="password"
-              placeholder={conn.integration === "webhook" ? "Webhook URL" : "Token or API key"}
+              autoComplete="off"
+              placeholder={
+                conn.integration === "webhook"
+                  ? "Webhook URL"
+                  : conn.integration === "whatsapp"
+                    ? "Twilio Auth Token (from Console → API keys)"
+                    : "Token or API key"
+              }
               value={tokenValue}
               onChange={(e) => setTokenValue(e.target.value)}
               className="min-w-[200px] w-full rounded-xl border border-[color:var(--color-border-subtle)] bg-surface2 px-3 py-2 text-sm text-textMain placeholder:text-textSoft"
@@ -236,13 +256,18 @@ function ConnectorCard({
                 className="min-w-[200px] w-full rounded-xl border border-[color:var(--color-border-subtle)] bg-surface2 px-3 py-2 text-sm text-textMain placeholder:text-textSoft"
               />
             )}
-            <div className="flex gap-2">
+            <div className="flex gap-2 items-center">
               <Button size="sm" className="rounded-xl" onClick={handleConnectToken} disabled={!tokenValue.trim()}>
                 Save
               </Button>
               <Button size="sm" variant="ghost" onClick={() => { setTokenForm(false); setTokenValue(""); setSlackChannelId(""); setConnectError(null); }}>
                 Cancel
               </Button>
+              {connectError && (
+                <span className="text-xs text-red-400" role="alert">
+                  {connectError}
+                </span>
+              )}
             </div>
           </div>
         )}

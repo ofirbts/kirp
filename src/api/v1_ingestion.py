@@ -157,16 +157,65 @@ async def webhook_notion(request: Request) -> dict[str, Any]:
     return {"ok": True, "processed": processed}
 
 
+async def _parse_webhook_body(request: Request) -> dict[str, Any]:
+    """Parse WhatsApp webhook body: Twilio sends form-urlencoded, Meta may send JSON."""
+    ct = (request.headers.get("content-type") or "").lower()
+    if "application/x-www-form-urlencoded" in ct or "multipart/form-data" in ct:
+        form = await request.form()
+        return dict(form)  # Twilio sends one value per key
+    try:
+        return await request.json()
+    except Exception:
+        return {}
+
+
 @router.post("/webhooks/whatsapp")
-async def webhook_whatsapp(body: dict[str, Any] = Body(...)) -> dict[str, Any]:
+async def webhook_whatsapp(request: Request) -> dict[str, Any]:
     """
     WhatsApp (Meta/Twilio) webhook. Parses payload and ingests as unified events.
-    Expects body.tenant_id, body.space_id, body.user_id or defaults.
+    Twilio sends application/x-www-form-urlencoded; we accept that and JSON.
+    tenant_id/space_id/user_id default to default/all/system.
+
+    For Twilio, validates X-Twilio-Signature when TWILIO_AUTH_TOKEN is set.
     """
     from src.integrations.whatsapp import WhatsAppIntegration
-    tenant_id = body.get("tenant_id", "default")
+
+    body = await _parse_webhook_body(request)
+
+    # Optional Twilio signature validation (best-effort; skips if misconfigured).
+    try:
+        import os
+        from twilio.request_validator import RequestValidator  # type: ignore[import]
+
+        if os.getenv("WHATSAPP_PROVIDER", "").lower() == "twilio":
+            auth_token = os.getenv("TWILIO_AUTH_TOKEN", "")
+            signature = request.headers.get("X-Twilio-Signature", "")
+            if auth_token and signature:
+                validator = RequestValidator(auth_token)
+                # Behind ngrok/proxy: Twilio signed the public URL; use X-Forwarded-* to reconstruct it.
+                forwarded_host = request.headers.get("X-Forwarded-Host")
+                forwarded_proto = request.headers.get("X-Forwarded-Proto", "https")
+                if forwarded_host:
+                    path = request.scope.get("path", "/")
+                    query = request.scope.get("query_string", b"").decode()
+                    url = f"{forwarded_proto}://{forwarded_host.split(',')[0].strip()}{path}"
+                    if query:
+                        url += "?" + query
+                else:
+                    url = str(request.url)
+                if not validator.validate(url, body, signature):
+                    logger.warning("WhatsApp webhook Twilio signature validation failed (url=%s)", url[:80])
+                    raise HTTPException(status_code=403, detail="Invalid Twilio signature")
+    except HTTPException:
+        raise
+    except Exception as e:  # pragma: no cover
+        logger.warning("WhatsApp webhook signature validation skipped: %s", e)
+
+    # Use env so webhook events appear in your tenant's Inbox (default: tenant_id=default)
+    tenant_id = body.get("tenant_id") or os.getenv("WHATSAPP_WEBHOOK_TENANT_ID", "default")
     space_id = body.get("space_id", "all")
-    user_id = body.get("user_id", "system")
+    user_id = body.get("user_id") or os.getenv("WHATSAPP_WEBHOOK_USER_ID", "system")
+
     wa = WhatsAppIntegration()
     events = wa.parse_webhook_payload(body)
     results = []
@@ -177,6 +226,22 @@ async def webhook_whatsapp(body: dict[str, Any] = Body(...)) -> dict[str, Any]:
         except Exception as e:
             logger.warning("WhatsApp webhook ingest failed: %s", e)
             results.append({"ok": False, "error": str(e)})
+    # Notify user in the bell so they see a new WhatsApp message
+    if events and user_id and user_id != "system":
+        try:
+            from src.core.notifications import notify_user
+            first_content = (events[0].get("content") or "")[:120].strip() or "New message"
+            await notify_user(
+                tenant_id=tenant_id,
+                user_id=user_id,
+                type="whatsapp_message",
+                title="WhatsApp",
+                body=first_content,
+                space_id=space_id,
+                meta={"source": "whatsapp", "count": len(events)},
+            )
+        except Exception as e:
+            logger.warning("WhatsApp notification failed: %s", e)
     return {"ok": True, "processed": len(results), "results": results}
 
 

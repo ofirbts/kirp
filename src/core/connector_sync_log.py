@@ -48,19 +48,21 @@ class ConnectorSyncLogStore:
         status: str,
         result: dict[str, Any] | None = None,
         error_message: str | None = None,
+        clear_errors: bool = False,
     ) -> None:
-        """Record a sync run. status: ok | error."""
+        """Record a sync run. status: ok | error. If clear_errors=True, clear past error_log."""
         now = datetime.now(timezone.utc)
-        upd: dict[str, Any] = {
-            "$set": {
-                "tenant_id": tenant_id,
-                "user_id": user_id,
-                "integration": integration,
-                "last_sync_at": now.isoformat(),
-                "last_sync_status": status,
-                "last_sync_result": result or {},
-            },
+        set_fields: dict[str, Any] = {
+            "tenant_id": tenant_id,
+            "user_id": user_id,
+            "integration": integration,
+            "last_sync_at": now.isoformat(),
+            "last_sync_status": status,
+            "last_sync_result": result or {},
         }
+        if clear_errors:
+            set_fields["error_log"] = []
+        upd: dict[str, Any] = {"$set": set_fields}
         if error_message:
             upd["$push"] = {
                 "error_log": {

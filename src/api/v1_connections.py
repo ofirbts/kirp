@@ -101,18 +101,23 @@ async def connect_integration(
     if integration not in INTEGRATIONS:
         raise HTTPException(status_code=400, detail=f"Unknown integration: {integration}")
     body = body or {}
-    access_token = body.get("access_token") or (body.get("extra") or {}).get("api_key") or (body.get("extra") or {}).get("webhook_url")
+    raw = body.get("access_token") or (body.get("extra") or {}).get("api_key") or (body.get("extra") or {}).get("webhook_url")
+    access_token = (raw or "").strip() if isinstance(raw, str) else raw
     if not access_token:
         raise HTTPException(status_code=400, detail="access_token or extra.api_key or extra.webhook_url required")
     ts, _ = await _ensure_stores()
-    await ts.set_token(
-        tenant_id=tenant_id,
-        user_id=user_id,
-        integration=integration,
-        access_token=access_token,
-        refresh_token=body.get("refresh_token"),
-        extra=body.get("extra"),
-    )
+    try:
+        await ts.set_token(
+            tenant_id=tenant_id,
+            user_id=user_id,
+            integration=integration,
+            access_token=access_token,
+            refresh_token=body.get("refresh_token"),
+            extra=body.get("extra"),
+        )
+    except Exception as e:
+        logger.exception("Connect %s failed: %s", integration, e)
+        raise HTTPException(status_code=500, detail=f"Failed to save token: {e!s}")
     return {"ok": True, "integration": integration, "message": "Connected"}
 
 
@@ -141,13 +146,13 @@ async def sync_now(request: Request, integration: str, space_id: str = Query("al
         if integration == "gmail":
             from src.integrations.gmail import GmailIntegration
             from src.workers.connector_sync import run_gmail_sync
-            gmail = GmailIntegration(access_token=token.get("access_token") if token else None)
+            gmail = GmailIntegration(token=token)
             gmail.connect()
             result = await run_gmail_sync(tenant_id=tenant_id, space_id=space_id, user_id=user_id, gmail=gmail)
         elif integration == "calendar":
             from src.integrations.calendar import CalendarIntegration
             from src.workers.connector_sync import run_calendar_sync
-            cal = CalendarIntegration(access_token=token.get("access_token") if token else None)
+            cal = CalendarIntegration(token=token)
             cal.connect()
             result = await run_calendar_sync(tenant_id=tenant_id, space_id=space_id, user_id=user_id, calendar=cal)
         elif integration == "slack":
@@ -167,6 +172,19 @@ async def sync_now(request: Request, integration: str, space_id: str = Query("al
                 notion = NotionIntegration(token=token["access_token"])
                 notion.connect()
             result = await run_notion_sync(tenant_id=tenant_id, space_id=space_id, user_id=user_id, notion=notion)
+        elif integration in ("whatsapp", "email", "webhook"):
+            # Webhook-based: no pull/sync; messages arrive via POST to /api/v1/webhooks/whatsapp etc.
+            result = {"message": "No sync for webhook-based integrations; messages arrive when sent to your webhook URL."}
+            await sl.record_sync(
+                tenant_id=tenant_id,
+                user_id=user_id,
+                integration=integration,
+                status="ok",
+                result=result,
+                error_message=None,
+                clear_errors=True,
+            )
+            return {"ok": True, "integration": integration, "result": result}
         else:
             raise HTTPException(status_code=400, detail=f"Sync not implemented for {integration}")
         errs = result.get("errors") or []
@@ -232,12 +250,12 @@ async def validate_connection(
     try:
         if integration == "gmail":
             from src.integrations.gmail import GmailIntegration
-            g = GmailIntegration(access_token=token.get("access_token"))
+            g = GmailIntegration(token=token)
             g.connect()
             valid = g._client is not None
         elif integration == "calendar":
             from src.integrations.calendar import CalendarIntegration
-            c = CalendarIntegration(access_token=token.get("access_token"))
+            c = CalendarIntegration(token=token)
             c.connect()
             valid = c._client is not None
         elif integration == "notion":

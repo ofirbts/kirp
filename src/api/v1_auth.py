@@ -26,13 +26,13 @@ class SignupBody(BaseModel):
 
 
 class LoginBody(BaseModel):
-  email: EmailStr
+  email: str  # allow dev@localhost for local dev (EmailStr rejects it)
   password: str
 
 
 class AuthUser(BaseModel):
   id: str
-  email: EmailStr
+  email: str  # allow dev@localhost for local dev
   name: str
   tenant_id: str
   roles: list[str]
@@ -106,7 +106,7 @@ async def signup(body: SignupBody) -> AuthResponse:
 
 
 DEV_EMAIL = "dev@localhost"
-DEV_PASSWORD = "dev"
+DEV_PASSWORD = "devdevdev"  # match verify_activation.sh and common dev usage
 
 
 @router.post("/login", response_model=AuthResponse)

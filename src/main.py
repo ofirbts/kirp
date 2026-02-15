@@ -132,7 +132,7 @@ async def get_pipeline() -> Any:
 
 
 async def _seed_dev_user_if_needed() -> None:
-    """Create dev@localhost with password 'dev' if no users exist (demo user for first run)."""
+    """Create dev@localhost with password 'devdevdev' if no users exist (demo user for first run)."""
     try:
         from src.core.auth import get_user_store
         from src.api.v1_auth import _make_password_hash, DEV_EMAIL, DEV_PASSWORD
