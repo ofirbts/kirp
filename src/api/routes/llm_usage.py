@@ -7,10 +7,12 @@ Endpoint:
 Notes:
 - This is observability/ops-only data; it does not call LLMs directly.
 - External calls are read‑only and scoped to provider dashboard/usage APIs.
+- Non-2xx responses are returned as stable JSON (no raise_for_status) to avoid 400/404 log noise.
 """
 
 from __future__ import annotations
 
+import logging
 import os
 from typing import Any, Dict
 
@@ -19,6 +21,8 @@ from fastapi import APIRouter, Depends
 
 from src.core.jwt_utils import require_auth
 
+# Reduce httpx log noise when provider APIs return 400/404
+logging.getLogger("httpx").setLevel(logging.WARNING)
 
 router = APIRouter(tags=["LLM Usage"])
 
@@ -28,12 +32,18 @@ async def _safe_get_json(
     headers: Dict[str, str],
     timeout: float = 10.0,
 ) -> Dict[str, Any]:
-    """Helper: perform a GET and return JSON or error without raising."""
+    """GET URL and return stable JSON; never raise. Non-2xx → status 'unavailable' with code."""
     try:
         async with httpx.AsyncClient(timeout=timeout) as client:
             r = await client.get(url, headers=headers)
-            r.raise_for_status()
-            return {"status": "ok", "raw": r.json()}
+            if r.status_code >= 200 and r.status_code < 300:
+                return {"status": "ok", "raw": r.json()}
+            return {
+                "status": "unavailable",
+                "http_code": r.status_code,
+                "error": f"HTTP {r.status_code}",
+                "raw": None,
+            }
     except Exception as e:  # pragma: no cover - network errors are environment‑specific
         return {"status": "error", "error": str(e)}
 
@@ -43,16 +53,16 @@ async def fetch_groq_usage() -> Dict[str, Any]:
     if not key:
         return {"status": "missing_key"}
 
-    # Groq dashboard usage API (shape may evolve; we keep it best‑effort).
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
             r = await client.get(
                 "https://api.groq.com/dashboard/api/usage",
                 headers={"Authorization": f"Bearer {key}"},
             )
-            r.raise_for_status()
+            if r.status_code < 200 or r.status_code >= 300:
+                return {"status": "unavailable", "http_code": r.status_code, "error": f"HTTP {r.status_code}"}
             data = r.json()
-    except Exception as e:  # pragma: no cover - network errors are environment‑specific
+    except Exception as e:  # pragma: no cover
         return {"status": "error", "error": str(e)}
 
     return {

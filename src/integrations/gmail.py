@@ -89,24 +89,25 @@ class GmailIntegration:
         user_id: str,
         max_results: int = 50,
         label_ids: list[str] | None = None,
-    ) -> list[dict[str, Any]]:
+        page_token: str | None = None,
+    ) -> tuple[list[dict[str, Any]], str | None]:
         """
-        Fetch recent messages and return unified event payloads for /api/v1/ingest.
+        Fetch messages and return (unified event payloads, next_page_token).
         Each payload has source=gmail, metadata.external_id=message_id (for idempotency).
+        Cursor per user: pass page_token from previous run; returns next_page_token for next run.
         """
         if self._client is None:
             self.connect()
         if self._client is None:
-            return []
+            return [], None
         import asyncio
         events: list[dict[str, Any]] = []
         try:
             def _list() -> dict:
-                return self._client.users().messages().list(
-                    userId="me",
-                    maxResults=max_results,
-                    labelIds=label_ids or ["INBOX"],
-                ).execute()
+                kwargs = {"userId": "me", "maxResults": max_results, "labelIds": label_ids or ["INBOX"]}
+                if page_token:
+                    kwargs["pageToken"] = page_token
+                return self._client.users().messages().list(**kwargs).execute()
 
             r = await asyncio.to_thread(_list)
             for msg_ref in r.get("messages", []):
@@ -136,4 +137,5 @@ class GmailIntegration:
                 })
         except Exception as e:
             logger.error("Gmail list failed: %s", e)
-        return events
+            return events, None
+        return events, r.get("nextPageToken")

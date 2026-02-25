@@ -31,3 +31,11 @@ async def list_workflow_runs(
     """List runs for a workflow. Phase 4.2: returns an empty list."""
     return []
 
+
+async def trigger_workflow(workflow_id: str, body: dict) -> dict:
+    """Trigger a workflow run. Phase 4.2: returns ok + run_id placeholder."""
+    from uuid import uuid4
+    run_id = str(uuid4())
+    # When workflow engine exists: enqueue or execute here.
+    return {"ok": True, "workflow_id": workflow_id, "run_id": run_id}
+

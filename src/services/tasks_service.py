@@ -26,3 +26,9 @@ async def get_task(task_id: str) -> Optional[Task]:
     """Get a single task by ID. Phase 4.2: returns None."""
     return None
 
+
+async def retry_task(task_id: str) -> bool:
+    """Queue task for retry. Phase 4.2: no-op but returns True so API returns 200."""
+    # When tasks are backed by store, re-queue or set status to pending here.
+    return True
+

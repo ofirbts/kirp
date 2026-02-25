@@ -75,8 +75,9 @@ async def run_gmail_sync(
     pipeline: Any = None,
     gmail: Any = None,
     max_results: int = 50,
+    page_token: str | None = None,
 ) -> dict[str, Any]:
-    """Pull Gmail messages and ingest new ones (idempotent). Returns {ingested, skipped, errors}."""
+    """Pull Gmail messages and ingest new ones (idempotent). Returns {ingested, skipped, errors, next_page_token}."""
     import os
     if event_store is None or pipeline is None:
         EStore, EPipeline, RAG, Schema, Gov, get_af = _get_store_and_pipeline()
@@ -97,11 +98,14 @@ async def run_gmail_sync(
         from src.integrations.gmail import GmailIntegration
         gmail = GmailIntegration()
         gmail.connect()
-    payloads = await gmail.list_messages(
-        tenant_id=tenant_id, space_id=space_id, user_id=user_id, max_results=max_results
+    payloads, next_page_token = await gmail.list_messages(
+        tenant_id=tenant_id, space_id=space_id, user_id=user_id, max_results=max_results, page_token=page_token
     )
     ingested, skipped, errors = await _ingest_payloads_idempotent(payloads, pipeline, event_store)
-    return {"ingested": ingested, "skipped": skipped, "errors": errors}
+    result = {"ingested": ingested, "skipped": skipped, "errors": errors}
+    if next_page_token is not None:
+        result["page_token"] = next_page_token
+    return result
 
 
 async def run_calendar_sync(
@@ -113,8 +117,9 @@ async def run_calendar_sync(
     pipeline: Any = None,
     calendar: Any = None,
     limit: int = 100,
+    sync_token: str | None = None,
 ) -> dict[str, Any]:
-    """Pull calendar events and ingest new ones (idempotent). Returns {ingested, skipped, errors}."""
+    """Pull calendar events (7d back + future) and ingest (idempotent). Returns {ingested, skipped, errors, sync_token}."""
     import os
     if event_store is None or pipeline is None:
         EStore, EPipeline, RAG, Schema, Gov, get_af = _get_store_and_pipeline()
@@ -135,9 +140,14 @@ async def run_calendar_sync(
         from src.integrations.calendar import CalendarIntegration
         calendar = CalendarIntegration()
         calendar.connect()
-    payloads = await calendar.list_events(tenant_id=tenant_id, space_id=space_id, user_id=user_id, limit=limit)
+    payloads, next_sync_token = await calendar.list_events(
+        tenant_id=tenant_id, space_id=space_id, user_id=user_id, limit=limit, sync_token=sync_token
+    )
     ingested, skipped, errors = await _ingest_payloads_idempotent(payloads, pipeline, event_store)
-    return {"ingested": ingested, "skipped": skipped, "errors": errors}
+    result = {"ingested": ingested, "skipped": skipped, "errors": errors}
+    if next_sync_token:
+        result["sync_token"] = next_sync_token
+    return result
 
 
 async def run_slack_sync(

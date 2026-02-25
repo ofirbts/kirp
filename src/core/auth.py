@@ -121,6 +121,15 @@ class UserStore:
             {"$set": {"last_login_at": datetime.now(timezone.utc)}},
         )
 
+    async def update_user_roles(self, user_id: str, tenant_id: str, roles: list[str]) -> bool:
+        """Update roles for a user in the same tenant. Returns True if updated."""
+        await self.connect()
+        r = await self._coll.update_one(
+            {"id": user_id, "tenant_id": tenant_id},
+            {"$set": {"roles": roles}},
+        )
+        return r.modified_count > 0
+
     async def list_users(self, tenant_id: str) -> list[User]:
         await self.connect()
         cursor = self._coll.find({"tenant_id": tenant_id}).sort("created_at", -1)

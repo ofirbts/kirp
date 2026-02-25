@@ -149,6 +149,26 @@ async def update_node_v1(
     if not updated:
         from fastapi import HTTPException
         raise HTTPException(status_code=404, detail="Node not found")
+    # Phase 7: PATCH back to Notion when node has notion_page_id
+    meta = updated.get("metadata") or updated.get("extra") or {}
+    notion_page_id = meta.get("notion_page_id")
+    if notion_page_id and (title is not None or status is not None or due_dt is not None):
+        try:
+            from src.core.execution_engine import execute_command
+            from src.core.event_store import EventStore
+            import os
+            store = EventStore(os.getenv("MONGO_URI", "mongodb://root:example@localhost:27017/kirp?authSource=admin"))
+            await store.connect()
+            await execute_command(
+                "update_notion_task",
+                {"node_id": node_id, "title": title, "status": status, "due_date": due_dt.isoformat() if due_dt else None},
+                tenant_id=tid,
+                user_id=ctx.user_id or user_id,
+                space_id=ctx.space_id or "all",
+                event_store=store,
+            )
+        except Exception:
+            pass
     if updated.get("entity") == "task":
         try:
             from src.core.notifications import notify_user

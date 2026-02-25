@@ -93,8 +93,8 @@ async def approve_event(event_id: str) -> dict[str, Any]:
     )
     await store.ingest(resolution)
 
-    # TODO: Trigger the tool/action that originally requested approval
-    # based on ev.payload
+    # Downstream agents (e.g. execution_agent) can subscribe to governance_approval
+    # and run the action from ev.metadata / ev.payload.
 
     return {"status": "approved", "event_id": event_id}
 
@@ -170,14 +170,22 @@ async def policy_simulate(
     change_set: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """
-    Simulate policy changes.
-    Placeholder — ready for connection to policy engine.
+    Simulate policy changes. Uses OPA when OPA_URL is set; else placeholder risk.
     """
+    import os
     store = await _get_event_store()
-    gov = GovernanceEngine()
+    gov = GovernanceEngine(opa_url=os.getenv("OPA_URL"))
 
-    # TODO: Call policy_engine to calculate real risk/impact
-    simulated_risk = 0.37  # placeholder
+    # Real risk from OPA when available
+    check = await gov.check(
+        tenant_id="*",
+        space_id="all",
+        user_id="system",
+        action="simulate",
+        resource=policy_id,
+        context=change_set or {},
+    )
+    simulated_risk = check.risk_score if check.risk_score else 0.37
     impacted_events = await store.list(tenant_id="*", limit=100, allow_all_tenants=True)
     approval_events = [e for e in impacted_events if e.event_type == "human_approval_required"]
 

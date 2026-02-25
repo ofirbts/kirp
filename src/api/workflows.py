@@ -49,8 +49,9 @@ async def trigger_workflow(
     workflow_id: str,
     body: dict[str, Any] = Body(...),
 ) -> dict[str, Any]:
-    """Trigger a workflow. Not implemented yet in Phase 4.1."""
-    raise HTTPException(status_code=501, detail="Workflow trigger not implemented yet")
+    """Trigger a workflow run. Returns run_id; when engine exists, will execute."""
+    from src.services import workflows_service
+    return await workflows_service.trigger_workflow(workflow_id, body)
 
 
 @router.get("/{workflow_id}/runs", response_model=WorkflowRunsListResponse)

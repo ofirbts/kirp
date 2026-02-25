@@ -56,11 +56,13 @@ class WhatsAppIntegration:
             logger.info("[MOCK WhatsApp] to=%s text=%s", to, text[:80])
             return {"ok": True, "provider": "mock", "to": to}
         try:
-            from twilio.rest import Client
-            # Twilio: use messaging service or from number
+            import os
+            from_ = os.getenv("TWILIO_NUMBER", "")
+            if not from_:
+                from_ = getattr(self._client, "from_", None) or "whatsapp:+14155238886"
             msg = self._client.messages.create(
                 body=text,
-                from_=str(self._client).split("'")[0],  # placeholder
+                from_=from_,
                 to=to,
             )
             return {"ok": True, "provider": "twilio", "sid": msg.sid}

@@ -114,11 +114,20 @@ async def assign_role(req: AssignRoleRequest) -> dict[str, Any]:
         )
         if not requester_check.allowed:
             raise HTTPException(status_code=403, detail="Only admins can assign roles")
-        
-        # TODO: Implement role assignment in database
-        # For now, return success
+
+        from src.core.auth import get_user_store
+        store = get_user_store()
+        target = await store.get_user_by_id(req.user_id)
+        if not target:
+            raise HTTPException(status_code=404, detail="User not found")
+        if target.tenant_id != req.tenant_id:
+            raise HTTPException(status_code=403, detail="User is in a different tenant")
+        # Merge new role with existing (dedupe, keep admin if present)
+        new_roles = list(dict.fromkeys([req.role] + [r for r in target.roles if r != req.role]))
+        updated = await store.update_user_roles(req.user_id, req.tenant_id, new_roles)
         return {
             "ok": True,
+            "updated": updated,
             "message": f"Role {req.role} assigned to {req.user_id}",
             "tenant_id": req.tenant_id,
             "space_id": req.space_id,

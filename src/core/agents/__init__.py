@@ -11,6 +11,7 @@ from src.core.agents.reminder_agent_v2 import ReminderAgentV2
 from src.core.agents.execution_agent import ExecutionAgent
 from src.core.agents.overload_agent import OverloadAgent
 from src.core.agents.conflict_agent import ConflictAgent
+from src.core.agents.suggest_filters_agent import SuggestFiltersAgent
 
 __all__ = [
     "BaseAgent",
@@ -20,4 +21,5 @@ __all__ = [
     "ExecutionAgent",
     "OverloadAgent",
     "ConflictAgent",
+    "SuggestFiltersAgent",
 ]

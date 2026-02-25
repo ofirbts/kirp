@@ -85,16 +85,16 @@ class CalendarIntegration:
         calendar_id: str = "primary",
         since: datetime | None = None,
         limit: int = 100,
-    ) -> list[dict[str, Any]]:
-        """Fetch calendar events as ingestion payloads."""
+        sync_token: str | None = None,
+    ) -> tuple[list[dict[str, Any]], str | None]:
+        """Fetch calendar events (7 days back + future). Returns (payloads, next_sync_token) for cursor per user."""
         import asyncio
         if not self._client:
             self.connect()
         if not self._client:
-            return []
+            return [], None
         events: list[dict[str, Any]] = []
         try:
-            # Include last 7 days so recent past events appear in Inbox; default was only "from now"
             now = datetime.now(timezone.utc)
             if since is not None:
                 tmin = since.isoformat().replace("+00:00", "Z")
@@ -103,13 +103,17 @@ class CalendarIntegration:
                 tmin = (now - timedelta(days=7)).isoformat().replace("+00:00", "Z")
 
             def _list() -> dict:
-                return self._client.events().list(
-                    calendarId=calendar_id,
-                    timeMin=tmin,
-                    maxResults=limit,
-                    singleEvents=True,
-                    orderBy="startTime",
-                ).execute()
+                kwargs = {
+                    "calendarId": calendar_id,
+                    "maxResults": limit,
+                    "singleEvents": True,
+                    "orderBy": "startTime",
+                }
+                if sync_token:
+                    kwargs["syncToken"] = sync_token
+                else:
+                    kwargs["timeMin"] = tmin
+                return self._client.events().list(**kwargs).execute()
 
             r = await asyncio.to_thread(_list)
             for ev in r.get("items", []):
@@ -123,9 +127,11 @@ class CalendarIntegration:
                     "content": ev.get("summary", "") + "\n" + (ev.get("description") or ""),
                     "metadata": {"external_id": ev_id, "id": ev_id, "start": start, "calendar": calendar_id},
                 })
+            next_token = r.get("nextSyncToken")
         except Exception as e:
             logger.error("Calendar list failed: %s", e)
-        return events
+            return events, None
+        return events, next_token
 
     async def create_event(
         self,

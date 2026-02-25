@@ -15,6 +15,7 @@ async def _run_base_agent(agent_name: str, tenant_id: str, space_id: str, user_i
     from src.core.agents.execution_agent import ExecutionAgent
     from src.core.agents.overload_agent import OverloadAgent
     from src.core.agents.conflict_agent import ConflictAgent
+    from src.core.agents.suggest_filters_agent import SuggestFiltersAgent
 
     agents = {
         "PlannerAgent": PlannerAgent(),
@@ -23,6 +24,7 @@ async def _run_base_agent(agent_name: str, tenant_id: str, space_id: str, user_i
         "ExecutionAgent": ExecutionAgent(),
         "OverloadAgent": OverloadAgent(),
         "ConflictAgent": ConflictAgent(),
+        "SuggestFiltersAgent": SuggestFiltersAgent(),
     }
     agent = agents.get(agent_name)
     if not agent:
@@ -115,6 +117,17 @@ conflict_agent_spec = AgentSpec(
     handler=_handler("ConflictAgent"),
 )
 
+suggest_filters_agent_spec = AgentSpec(
+    name="SuggestFiltersAgent",
+    type="filters",
+    triggers=["scheduled", "manual"],
+    tools=["schema"],
+    autonomy=AutonomyLevel.FULL,
+    tenant_scopes=[],
+    description="Detects noise and suggests grouping or filters for inbox and task views.",
+    handler=_handler("SuggestFiltersAgent"),
+)
+
 PHASE5_AGENT_SPECS = [
     planner_agent_spec,
     insight_agent_v2_spec,
@@ -122,4 +135,5 @@ PHASE5_AGENT_SPECS = [
     execution_agent_spec,
     overload_agent_spec,
     conflict_agent_spec,
+    suggest_filters_agent_spec,
 ]

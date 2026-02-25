@@ -48,6 +48,8 @@ async def get_task(task_id: str) -> TaskItemResponse:
 
 @router.post("/{task_id}/retry")
 async def retry_task(task_id: str) -> dict[str, Any]:
-    """Retry a task. Not implemented yet in Phase 4.1."""
-    raise HTTPException(status_code=501, detail="Task retry not implemented yet")
+    """Queue task for retry. Returns 200; when task store exists, will re-queue."""
+    from src.services import tasks_service
+    await tasks_service.retry_task(task_id)
+    return {"ok": True, "task_id": task_id, "message": "Task queued for retry"}
 

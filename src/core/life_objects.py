@@ -94,6 +94,35 @@ def parse_due_date(text: str, base_date: datetime | None = None) -> datetime | N
         base = base.replace(tzinfo=timezone.utc)
 
     # 1) Try relative / NLP patterns first (two-arg: need match)
+    # Hebrew: מחר בבוקר, מחר בערב, שבוע הבא, יום שלישי בערב (Sunday=6, Mon=0, Tue=1, ..., Sat=5)
+    _hebrew_weekdays_py = {"ראשון": 6, "שני": 0, "שלישי": 1, "רביעי": 2, "חמישי": 3, "שישי": 4, "שבת": 5}
+    _hebrew_phrases = [("מחר בבוקר", _rel_tomorrow_morning), ("מחר בערב", _rel_tomorrow_evening), ("מחר", _rel_tomorrow), ("שבוע הבא", _rel_next_week), ("בשבוע הבא", _rel_next_week)]
+    for phrase, fn in _hebrew_phrases:
+        if phrase in text:
+            try:
+                dt = fn(base)
+                if dt.tzinfo is None:
+                    dt = dt.replace(tzinfo=timezone.utc)
+                return dt
+            except Exception:
+                pass
+    for day_hebrew, wd in _hebrew_weekdays_py.items():
+        if f"יום {day_hebrew} בערב" in text:
+            try:
+                dt = _next_weekday(base, wd, hour=18)
+                if dt.tzinfo is None:
+                    dt = dt.replace(tzinfo=timezone.utc)
+                return dt
+            except Exception:
+                pass
+        if f"יום {day_hebrew}" in text:
+            try:
+                dt = _next_weekday(base, wd, hour=12)
+                if dt.tzinfo is None:
+                    dt = dt.replace(tzinfo=timezone.utc)
+                return dt
+            except Exception:
+                pass
     for pattern, fn in _RELATIVE_TWO_ARG:
         m = pattern.search(text)
         if m:

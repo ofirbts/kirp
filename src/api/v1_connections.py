@@ -148,13 +148,17 @@ async def sync_now(request: Request, integration: str, space_id: str = Query("al
             from src.workers.connector_sync import run_gmail_sync
             gmail = GmailIntegration(token=token)
             gmail.connect()
-            result = await run_gmail_sync(tenant_id=tenant_id, space_id=space_id, user_id=user_id, gmail=gmail)
+            status = await sl.get_status(tenant_id, user_id, "gmail")
+            page_token = (status.get("last_sync_result") or {}).get("page_token") if status else None
+            result = await run_gmail_sync(tenant_id=tenant_id, space_id=space_id, user_id=user_id, gmail=gmail, page_token=page_token)
         elif integration == "calendar":
             from src.integrations.calendar import CalendarIntegration
             from src.workers.connector_sync import run_calendar_sync
             cal = CalendarIntegration(token=token)
             cal.connect()
-            result = await run_calendar_sync(tenant_id=tenant_id, space_id=space_id, user_id=user_id, calendar=cal)
+            status = await sl.get_status(tenant_id, user_id, "calendar")
+            sync_token = (status.get("last_sync_result") or {}).get("sync_token") if status else None
+            result = await run_calendar_sync(tenant_id=tenant_id, space_id=space_id, user_id=user_id, calendar=cal, sync_token=sync_token)
         elif integration == "slack":
             ch = (token or {}).get("extra", {}).get("channel_id") or os.getenv("SLACK_SYNC_CHANNEL_ID", "")
             if not ch:
