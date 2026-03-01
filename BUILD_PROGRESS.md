@@ -204,3 +204,18 @@ Build log for the M3 governed module inside KIRP. Each entry: timestamp, what wa
   - **Next:** Optional: persist ReflectionClassifier result to reflection entry; more agents.
 
 ---
+
+- **2025-02-19 (Step 27)**  
+  - **What:** Persist ReflectionClassifier result to last reflection: M3MemoryStore.update_last_reflection_classification(tenant_id, user_id, pillar_scores, mood); MongoM3MemoryStore same; stages after classifier run call it when result.ok and pillar_scores/mood present.  
+  - **Why:** Classified pillar_scores and mood stored on reflection entry for KPIs and UI.  
+  - **Files touched:** `src/modules/m3/memory.py`, `src/modules/m3/memory_mongo.py`, `src/modules/m3/stages.py`.  
+
+---
+
+- **2025-02-19 (Step 28)**  
+  - **What:** GET /m3/reflections optional query params since and until (YYYY-MM-DD); list_reflections(since_date=..., before_date=...) in memory and memory_mongo.  
+  - **Why:** Filter reflections by date range for dashboard or export.  
+  - **Files touched:** `src/modules/m3/memory.py`, `src/modules/m3/memory_mongo.py`, `src/api/v1_m3.py`.  
+  - **Next:** Optional: dashboard date filter UI; more agents.
+
+---

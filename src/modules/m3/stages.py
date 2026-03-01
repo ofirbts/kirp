@@ -109,10 +109,20 @@ async def run_m3_stages(
 
     try:
         if event_type == EVENT_M3_DAILY_REFLECTION_SUBMITTED:
-            # Stage 2–3: classify reflection (pillar_scores, mood)
+            # Stage 2–3: classify reflection (pillar_scores, mood) and persist to last reflection
             spec = af.get("ReflectionClassifierAgent")
             if spec and spec.handler:
-                await spec.handler(tenant_id, space_id, user_id, {**ctx, "reflection_text": content or ctx.get("metadata", {}).get("reflection_text", "")})
+                result = await spec.handler(
+                    tenant_id, space_id, user_id,
+                    {**ctx, "reflection_text": content or ctx.get("metadata", {}).get("reflection_text", "")},
+                )
+                if result.get("ok") and (result.get("pillar_scores") is not None or result.get("mood")):
+                    store = get_m3_memory_store()
+                    await store.update_last_reflection_classification(
+                        tenant_id, user_id,
+                        result.get("pillar_scores") or {},
+                        result.get("mood") or "",
+                    )
             # Stage 3: gap analysis
             spec = af.get("GapAnalysisAgent")
             if spec and spec.handler:

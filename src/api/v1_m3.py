@@ -161,10 +161,13 @@ async def m3_list_reflections(
     ctx: TenantContext = Depends(get_effective_tenant_context),
     limit: int = Query(50, ge=1, le=200),
     q: str | None = Query(None, description="Semantic search query (Qdrant over M3 reflections)"),
+    since: str | None = Query(None, description="Filter reflections on or after this date (YYYY-MM-DD)"),
+    until: str | None = Query(None, description="Filter reflections on or before this date (YYYY-MM-DD)"),
 ) -> dict[str, Any]:
     """
     List reflection entries from M3 memory (tenant/user scoped).
     When q is set: semantic search over M3 reflections in Qdrant (module=m3); returns matches with score.
+    Optional since/until filter by reflection_date (ignored when q is set).
     """
     if q and q.strip():
         from src.modules.m3.vectors import search_m3_reflections
@@ -177,7 +180,10 @@ async def m3_list_reflections(
         )
         return {"data": data, "meta": {"count": len(data), "search": True, "query": q.strip()}}
     store = get_m3_memory_store()
-    entries = await store.list_reflections(ctx.tenant_id, ctx.user_id, limit=limit)
+    entries = await store.list_reflections(
+        ctx.tenant_id, ctx.user_id, limit=limit,
+        since_date=since, before_date=until,
+    )
     data = [
         {
             "id": e.id,

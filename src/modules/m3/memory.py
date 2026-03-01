@@ -174,11 +174,14 @@ class M3MemoryStore:
         user_id: str,
         limit: int = 50,
         before_date: str | None = None,
+        since_date: str | None = None,
     ) -> list[ReflectionEntry]:
         filtered = [
             r for r in self._reflections
             if r.get("tenant_id") == tenant_id and r.get("user_id") == user_id
         ]
+        if since_date:
+            filtered = [r for r in filtered if (r.get("reflection_date") or "") >= since_date]
         if before_date:
             filtered = [r for r in filtered if (r.get("reflection_date") or "") <= before_date]
         filtered.sort(key=lambda r: r.get("reflection_date") or "", reverse=True)
@@ -239,6 +242,27 @@ class M3MemoryStore:
             created_at=entry["created_at"],
             id=entry["id"],
         )
+
+    async def update_last_reflection_classification(
+        self,
+        tenant_id: str,
+        user_id: str,
+        pillar_scores: dict[str, float],
+        mood: str = "",
+    ) -> bool:
+        """Update the most recent reflection for this user with classifier output. Returns True if updated."""
+        filtered = [
+            r for r in self._reflections
+            if r.get("tenant_id") == tenant_id and r.get("user_id") == user_id
+        ]
+        if not filtered:
+            return False
+        _epoch = datetime(2000, 1, 1, tzinfo=timezone.utc)
+        filtered.sort(key=lambda r: r.get("created_at") or _epoch, reverse=True)
+        last = filtered[0]
+        last["pillar_scores"] = pillar_scores or last.get("pillar_scores", {})
+        last["mood"] = mood if mood else last.get("mood", "")
+        return True
 
     # Micro actions
     async def list_micro_actions(

@@ -123,11 +123,21 @@ class MongoM3MemoryStore(M3MemoryStore):
         user_id: str,
         limit: int = 50,
         before_date: str | None = None,
+        since_date: str | None = None,
     ) -> list[ReflectionEntry]:
         db = await self._ensure_db()
         q: dict[str, Any] = {"tenant_id": tenant_id, "user_id": user_id}
+        if since_date:
+            q["reflection_date"] = q.get("reflection_date", {})
+            if isinstance(q["reflection_date"], dict):
+                q["reflection_date"]["$gte"] = since_date
+            else:
+                q["reflection_date"] = {"$gte": since_date}
         if before_date:
-            q["reflection_date"] = {"$lte": before_date}
+            if "reflection_date" in q and isinstance(q["reflection_date"], dict):
+                q["reflection_date"]["$lte"] = before_date
+            else:
+                q["reflection_date"] = {"$lte": before_date}
         cursor = db.m3_reflections.find(q).sort("reflection_date", -1).limit(limit)
         out = []
         async for doc in cursor:
@@ -166,6 +176,27 @@ class MongoM3MemoryStore(M3MemoryStore):
         }
         await db.m3_reflections.insert_one(doc)
         return _doc_to_reflection(doc)
+
+    async def update_last_reflection_classification(
+        self,
+        tenant_id: str,
+        user_id: str,
+        pillar_scores: dict[str, float],
+        mood: str = "",
+    ) -> bool:
+        """Update the most recent reflection for this user with classifier output. Returns True if updated."""
+        db = await self._ensure_db()
+        doc = await db.m3_reflections.find_one(
+            {"tenant_id": tenant_id, "user_id": user_id},
+            sort=[("created_at", -1)],
+        )
+        if not doc:
+            return False
+        await db.m3_reflections.update_one(
+            {"_id": doc["_id"]},
+            {"$set": {"pillar_scores": pillar_scores or {}, "mood": mood or ""}},
+        )
+        return True
 
     async def list_micro_actions(
         self,
