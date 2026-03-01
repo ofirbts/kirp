@@ -479,13 +479,20 @@ class M3MemoryStore:
         return out
 
 
-# Singleton for use by agents and API (can be replaced with a store that uses Qdrant/Schema)
+# Singleton for use by agents and API (in-memory default; optional Mongo via M3_MEMORY_BACKEND=mongo)
 _m3_store: M3MemoryStore | None = None
 
 
 def get_m3_memory_store() -> M3MemoryStore:
-    """Return the shared M3 memory store (stub by default)."""
+    """Return the shared M3 memory store. Default: in-memory. Set M3_MEMORY_BACKEND=mongo + MONGO_URI for persistence."""
     global _m3_store
     if _m3_store is None:
-        _m3_store = M3MemoryStore()
+        import os
+        backend = (os.getenv("M3_MEMORY_BACKEND") or "").strip().lower()
+        if backend == "mongo":
+            from src.modules.m3.memory_mongo import MongoM3MemoryStore
+            mongo_uri = os.getenv("MONGO_URI", "mongodb://root:example@localhost:27017/kirp?authSource=admin")
+            _m3_store = MongoM3MemoryStore(mongo_uri)
+        else:
+            _m3_store = M3MemoryStore()
     return _m3_store

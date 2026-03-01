@@ -126,3 +126,11 @@ Build log for the M3 governed module inside KIRP. Each entry: timestamp, what wa
   - **Next:** Optional: persist M3 memory to Qdrant/Postgres; dashboard widgets.
 
 ---
+
+- **2025-02-19 (Step 17)**  
+  - **What:** Optional MongoDB persistence for M3 memory: MongoM3MemoryStore (memory_mongo.py); get_m3_memory_store() returns it when M3_MEMORY_BACKEND=mongo; lazy connect; collections m3_*. .env.example and docs/M3.md updated.  
+  - **Why:** Persist M3 data across restarts.  
+  - **Files touched:** `src/modules/m3/memory_mongo.py`, `src/modules/m3/memory.py`, `.env.example`, `docs/M3.md`.  
+  - **Next:** Optional: dashboard widgets; Qdrant vector search for M3.
+
+---
