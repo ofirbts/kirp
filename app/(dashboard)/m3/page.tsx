@@ -7,12 +7,15 @@ import {
   type M3Reflection,
   type M3ReflectionSearchHit,
   type M3ReflectionsResponse,
+  type M3MicroAction,
+  type M3Synthesis,
+  type M3Evolution,
 } from "@/lib/apiClient";
 import { PageSkeleton } from "@/components/dashboard/PageSkeleton";
 import { ErrorState } from "@/components/feedback/ErrorState";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Target, RefreshCw, Send, BarChart3, Calendar, CalendarDays, Search } from "lucide-react";
+import { Target, RefreshCw, Send, BarChart3, Calendar, CalendarDays, Search, CheckSquare, ListTodo } from "lucide-react";
 
 export default function M3Page() {
   const [reflections, setReflections] = useState<M3Reflection[]>([]);
@@ -29,18 +32,33 @@ export default function M3Page() {
   const [searchQuery, setSearchQuery] = useState("");
   const [searchLoading, setSearchLoading] = useState(false);
   const [reflectionsMeta, setReflectionsMeta] = useState<M3ReflectionsResponse["meta"] | null>(null);
+  const [actions, setActions] = useState<M3MicroAction[]>([]);
+  const [syntheses, setSyntheses] = useState<M3Synthesis[]>([]);
+  const [evolutions, setEvolutions] = useState<M3Evolution[]>([]);
 
   const load = useCallback(async (opts?: { q?: string }) => {
     setLoading(true);
     setError(null);
     try {
-      const [refRes, kpisRes] = await Promise.all([
-        apiClient.m3ListReflections({ limit: 20, q: opts?.q }),
-        opts?.q ? Promise.resolve(null as M3Kpis | null) : apiClient.m3GetKpis({ days: 7 }),
-      ]);
-      setReflections(refRes.data ?? []);
-      setReflectionsMeta(refRes.meta ?? null);
-      if (!opts?.q) setKpis(kpisRes ?? null);
+      if (opts?.q) {
+        const refRes = await apiClient.m3ListReflections({ limit: 20, q: opts.q });
+        setReflections(refRes.data ?? []);
+        setReflectionsMeta(refRes.meta ?? null);
+      } else {
+        const [refRes, kpisRes, actionsRes, synthRes, evoRes] = await Promise.all([
+          apiClient.m3ListReflections({ limit: 20 }),
+          apiClient.m3GetKpis({ days: 7 }),
+          apiClient.m3ListActions({ limit: 50 }),
+          apiClient.m3ListSynthesis({ limit: 10 }),
+          apiClient.m3ListEvolution({ limit: 6 }),
+        ]);
+        setReflections(refRes.data ?? []);
+        setReflectionsMeta(refRes.meta ?? null);
+        setKpis(kpisRes ?? null);
+        setActions(actionsRes.data ?? []);
+        setSyntheses(synthRes.data ?? []);
+        setEvolutions(evoRes.data ?? []);
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load M3 data");
     } finally {
@@ -208,6 +226,41 @@ export default function M3Page() {
         </CardContent>
       </Card>
 
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base flex items-center gap-2">
+            <CheckSquare className="h-4 w-4" />
+            Micro-actions
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {actions.length === 0 ? (
+            <p className="text-textSoft text-sm">No micro-actions yet. They are generated from reflections.</p>
+          ) : (
+            <ul className="space-y-2">
+              {actions.slice(0, 15).map((a) => (
+                <li key={a.action_id} className="flex items-start gap-2 text-sm border-b border-border pb-2 last:border-0">
+                  <span className="font-medium flex-1">{a.title}</span>
+                  {a.pillar && <span className="text-textSoft text-xs shrink-0">{a.pillar}</span>}
+                  <span
+                    className={`shrink-0 text-xs px-1.5 py-0.5 rounded ${
+                      a.status === "completed"
+                        ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300"
+                        : a.status === "snoozed"
+                          ? "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300"
+                          : "bg-muted text-muted-foreground"
+                    }`}
+                  >
+                    {a.status}
+                  </span>
+                  {a.due_by && <span className="text-textSoft text-xs shrink-0">{a.due_by.slice(0, 10)}</span>}
+                </li>
+              ))}
+            </ul>
+          )}
+        </CardContent>
+      </Card>
+
       {kpis && (
         <Card>
           <CardHeader>
@@ -250,6 +303,50 @@ export default function M3Page() {
           </CardContent>
         </Card>
       )}
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base flex items-center gap-2">
+            <ListTodo className="h-4 w-4" />
+            Recent syntheses & evolution
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {syntheses.length > 0 && (
+            <div>
+              <p className="text-textSoft text-xs font-medium mb-2">Weekly syntheses</p>
+              <ul className="space-y-2">
+                {syntheses.slice(0, 5).map((s) => (
+                  <li key={s.synthesis_id} className="text-sm border-b border-border pb-2 last:border-0">
+                    <p className="text-textSoft text-xs">{s.week_start} – {s.week_end}</p>
+                    <p className="mt-0.5">{s.summary ? (s.summary.slice(0, 120) + (s.summary.length > 120 ? "…" : "")) : "—"}</p>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+          {evolutions.length > 0 && (
+            <div>
+              <p className="text-textSoft text-xs font-medium mb-2">Monthly evolutions</p>
+              <ul className="space-y-2">
+                {evolutions.slice(0, 5).map((e) => (
+                  <li key={e.evolution_id} className="text-sm border-b border-border pb-2 last:border-0">
+                    <p className="text-textSoft text-xs">{e.month}</p>
+                    <p className="mt-0.5">
+                      {e.new_goals?.length ? e.new_goals.slice(0, 2).join("; ") : (Array.isArray(e.trajectory) && e.trajectory[0])
+                        ? String((e.trajectory[0] as { summary?: string }).summary ?? e.trajectory[0]).slice(0, 80) + "…"
+                        : "—"}
+                    </p>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+          {syntheses.length === 0 && evolutions.length === 0 && (
+            <p className="text-textSoft text-sm">No syntheses or evolutions yet. Use the buttons above to request them.</p>
+          )}
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>

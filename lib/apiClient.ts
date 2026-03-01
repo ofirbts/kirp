@@ -856,6 +856,66 @@ export async function m3ListReflections(params?: {
   return get<M3ReflectionsResponse>("/api/v1/m3/reflections", p);
 }
 
+export interface M3MicroAction {
+  action_id: string;
+  title: string;
+  pillar: string;
+  status: string;
+  due_by: string | null;
+  roi_score: number;
+  completed_at: string | null;
+  feedback: string;
+}
+
+export interface M3Synthesis {
+  synthesis_id: string;
+  week_start: string;
+  week_end: string;
+  summary: string;
+  pillar_trends: Record<string, unknown>;
+  insights: string[];
+  created_at: string | null;
+}
+
+export interface M3Evolution {
+  evolution_id: string;
+  month: string;
+  trajectory: unknown[];
+  new_goals: string[];
+  pillar_shifts: Record<string, unknown>;
+  created_at: string | null;
+}
+
+export async function m3ListActions(params?: {
+  status?: string;
+  limit?: number;
+}): Promise<{ data: M3MicroAction[]; meta: { count: number } }> {
+  const p: Record<string, string | number | undefined> = {};
+  if (params?.status != null) p.status = params.status;
+  if (params?.limit != null) p.limit = params.limit;
+  return get<{ data: M3MicroAction[]; meta: { count: number } }>("/api/v1/m3/actions", p);
+}
+
+export async function m3ListSynthesis(params?: { limit?: number }): Promise<{
+  data: M3Synthesis[];
+  meta: { count: number };
+}> {
+  return get<{ data: M3Synthesis[]; meta: { count: number } }>(
+    "/api/v1/m3/synthesis",
+    params ? { limit: params.limit } : undefined,
+  );
+}
+
+export async function m3ListEvolution(params?: { limit?: number }): Promise<{
+  data: M3Evolution[];
+  meta: { count: number };
+}> {
+  return get<{ data: M3Evolution[]; meta: { count: number } }>(
+    "/api/v1/m3/evolution",
+    params ? { limit: params.limit } : undefined,
+  );
+}
+
 export async function m3GetKpis(params?: { days?: number }): Promise<M3Kpis> {
   return get<M3Kpis>("/api/v1/m3/kpis", params as Record<string, number>);
 }
@@ -948,6 +1008,9 @@ export const apiClient = {
   meV1,
   m3Reflect,
   m3ListReflections,
+  m3ListActions,
+  m3ListSynthesis,
+  m3ListEvolution,
   m3GetKpis,
   m3Health,
   m3SynthesisRequest,

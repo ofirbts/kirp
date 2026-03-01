@@ -174,3 +174,18 @@ Build log for the M3 governed module inside KIRP. Each entry: timestamp, what wa
   - **Next:** Optional: further M3 UX or agents wiring.
 
 ---
+
+- **2025-02-19 (Step 23)**  
+  - **What:** M3 dashboard: Micro-actions card — apiClient M3MicroAction, m3ListActions(status?, limit?); load actions in load(); card lists title, pillar, status badge, due_by (first 15).  
+  - **Why:** Show generated micro-actions from reflections.  
+  - **Files touched:** `lib/apiClient.ts`, `app/(dashboard)/m3/page.tsx`.  
+
+---
+
+- **2025-02-19 (Step 24)**  
+  - **What:** M3 dashboard: Recent syntheses & evolution card — apiClient M3Synthesis, M3Evolution, m3ListSynthesis(limit?), m3ListEvolution(limit?); load in load(); card shows weekly syntheses (week range + summary) and monthly evolutions (month + new_goals/trajectory snippet).  
+  - **Why:** Surface weekly/monthly outputs next to request buttons.  
+  - **Files touched:** `lib/apiClient.ts`, `app/(dashboard)/m3/page.tsx`.  
+  - **Next:** Optional: agents wiring, more M3 UX.
+
+---
