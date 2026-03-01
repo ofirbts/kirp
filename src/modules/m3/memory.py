@@ -8,7 +8,7 @@ weekly_synthesis, monthly_evolution. All tenant_id + user_id scoped.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
 from uuid import uuid4
 
@@ -92,6 +92,19 @@ class MonthlyEvolution:
     created_at: datetime | None = None
 
 
+@dataclass
+class GapSnapshot:
+    """One gap_analysis_computed snapshot for trend/KPI (spec 10)."""
+    user_id: str
+    tenant_id: str
+    space_id: str
+    gap_heatmap: dict[str, Any]
+    pillar_deltas: dict[str, float]
+    top_gaps: list[Any]
+    source_event_id: str | None = None
+    created_at: datetime | None = None
+
+
 # --- Store interface (tenant/user scoped; audit via source_event_id) ---
 
 class M3MemoryStore:
@@ -107,6 +120,7 @@ class M3MemoryStore:
         self._syntheses: list[dict[str, Any]] = []
         self._evolutions: list[dict[str, Any]] = []
         self._profiles: dict[tuple[str, str], dict[str, Any]] = {}
+        self._gap_snapshots: list[dict[str, Any]] = []
 
     async def connect(self) -> None:
         """Optional: connect to backing store."""
@@ -415,6 +429,54 @@ class M3MemoryStore:
             "source_event_id": source_event_id,
             "created_at": datetime.now(timezone.utc),
         })
+
+    # Gap snapshots (spec 10: Gap Closure KPI trend from m3.gap_analysis_computed)
+    async def append_gap_snapshot(
+        self,
+        tenant_id: str,
+        user_id: str,
+        space_id: str,
+        gap_heatmap: dict[str, Any],
+        pillar_deltas: dict[str, float],
+        top_gaps: list[Any] | None = None,
+        source_event_id: str | None = None,
+    ) -> None:
+        from datetime import datetime, timezone
+        self._gap_snapshots.append({
+            "user_id": user_id,
+            "tenant_id": tenant_id,
+            "space_id": space_id,
+            "gap_heatmap": gap_heatmap,
+            "pillar_deltas": pillar_deltas,
+            "top_gaps": top_gaps or [],
+            "source_event_id": source_event_id,
+            "created_at": datetime.now(timezone.utc),
+        })
+
+    async def list_gap_snapshots(
+        self,
+        tenant_id: str,
+        user_id: str,
+        limit: int = 30,
+    ) -> list[GapSnapshot]:
+        filtered = [
+            s for s in self._gap_snapshots
+            if s.get("tenant_id") == tenant_id and s.get("user_id") == user_id
+        ]
+        filtered.sort(key=lambda s: s.get("created_at") or datetime(2000, 1, 1, tzinfo=timezone.utc), reverse=True)
+        out = []
+        for s in filtered[:limit]:
+            out.append(GapSnapshot(
+                user_id=s["user_id"],
+                tenant_id=s["tenant_id"],
+                space_id=s["space_id"],
+                gap_heatmap=s.get("gap_heatmap", {}),
+                pillar_deltas=s.get("pillar_deltas", {}),
+                top_gaps=s.get("top_gaps", []),
+                source_event_id=s.get("source_event_id"),
+                created_at=s.get("created_at"),
+            ))
+        return out
 
 
 # Singleton for use by agents and API (can be replaced with a store that uses Qdrant/Schema)

@@ -267,10 +267,25 @@ async def m3_kpis(
         "explanation": "From identity_profiles; alignment_score from m3.identity_vector_updated when stored",
     }
 
-    # Gap Closure: trend from gap_analysis events; we don't store snapshots yet
+    # Gap Closure: trend from gap_analysis snapshots (m3.gap_analysis_computed writeback)
+    snapshots = await store.list_gap_snapshots(ctx.tenant_id, ctx.user_id, limit=10)
+    gap_closure_value = None
+    gap_closure_detail = None
+    if len(snapshots) >= 2:
+        # Delta: compare latest vs previous pillar_deltas (e.g. mean gap decrease = improvement)
+        latest = snapshots[0].pillar_deltas
+        previous = snapshots[1].pillar_deltas
+        if latest and previous:
+            common = [k for k in latest if k in previous]
+            if common:
+                deltas = [latest[k] - previous[k] for k in common]
+                gap_closure_value = round(sum(deltas) / len(deltas), 4)
+                gap_closure_detail = {"pillar_delta_avg": gap_closure_value, "snapshots_used": 2}
     gap_closure = {
-        "value": None,
-        "explanation": "Delta in gap_heatmap over time; derive from m3.gap_analysis_computed event store snapshots for trend",
+        "value": gap_closure_value,
+        "detail": gap_closure_detail,
+        "snapshot_count": len(snapshots),
+        "explanation": "Delta in pillar_deltas between last two m3.gap_analysis_computed snapshots; negative = gap closing",
     }
 
     return {

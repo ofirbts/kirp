@@ -20,6 +20,7 @@ from src.modules.m3.events import (
     EVENT_M3_WEEKLY_SYNTHESIS_GENERATED,
     EVENT_M3_MONTHLY_EVOLUTION_UPDATED,
     EVENT_M3_IDENTITY_VECTOR_UPDATED,
+    EVENT_M3_GAP_ANALYSIS_COMPUTED,
 )
 from src.modules.m3.memory import get_m3_memory_store
 
@@ -160,5 +161,18 @@ async def m3_memory_writeback(
                     ideal_self_vector=meta.get("ideal_self_vector"),
                 )
                 logger.info("M3 writeback: identity_profile updated for user %s", user_id)
+
+        elif event_type == EVENT_M3_GAP_ANALYSIS_COMPUTED:
+            await store.append_gap_snapshot(
+                tenant_id=tenant_id,
+                user_id=user_id,
+                space_id=space_id,
+                gap_heatmap=meta.get("gap_heatmap") or {},
+                pillar_deltas=meta.get("pillar_deltas") or {},
+                top_gaps=meta.get("top_gaps") or [],
+                source_event_id=source_event_id,
+            )
+            logger.info("M3 writeback: gap_snapshot appended for event %s", event_id)
+
     except Exception as e:
         logger.warning("M3 writeback failed (event already stored): %s", e)

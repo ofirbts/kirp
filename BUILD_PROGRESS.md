@@ -95,3 +95,19 @@ Build log for the M3 governed module inside KIRP. Each entry: timestamp, what wa
   - **Next:** Optional: persist M3 memory to Qdrant/Postgres; dashboard widgets; gap_closure snapshots from events.
 
 ---
+
+- **2025-02-19 (Step 13)**  
+  - **What:** Gap snapshots for KPI trend (spec 10): GapSnapshot + append_gap_snapshot/list_gap_snapshots in M3MemoryStore; writeback for EVENT_M3_GAP_ANALYSIS_COMPUTED; GET /m3/kpis gap_closure now computed from last two snapshots (pillar_delta_avg).  
+  - **Why:** Spec 10 Gap Closure derived from m3.gap_analysis_computed; store snapshots for trend.  
+  - **Files touched:** `src/modules/m3/memory.py`, `src/modules/m3/writeback.py`, `src/api/v1_m3.py`.  
+  - **Next:** Optional: .env.example M3 vars; persist M3 memory to Qdrant/Postgres; dashboard widgets.
+
+---
+
+- **2025-02-19 (Step 14)**  
+  - **What:** .env.example M3 section: M3_ESCALATION_PHONE and per-tenant/user override for WhatsApp human governance.  
+  - **Why:** Spec 8: WhatsApp routing keyed by tenant_id + user_id; document env for operators.  
+  - **Files touched:** `.env.example`.  
+  - **Next:** Optional: persist M3 memory to Qdrant/Postgres; dashboard widgets.
+
+---
