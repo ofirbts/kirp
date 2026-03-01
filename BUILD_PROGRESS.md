@@ -166,3 +166,11 @@ Build log for the M3 governed module inside KIRP. Each entry: timestamp, what wa
   - **Next:** Optional: dashboard search box for M3 reflections.
 
 ---
+
+- **2025-02-19 (Step 22)**  
+  - **What:** Dashboard M3: search box "Search reflections by meaning…" calling GET /m3/reflections?q=...; display semantic search results with score; types M3ReflectionSearchHit, M3ReflectionsResponse in apiClient.  
+  - **Why:** UX for finding past reflections by topic (Step 21 backend).  
+  - **Files touched:** `lib/apiClient.ts`, `app/(dashboard)/m3/page.tsx`.  
+  - **Next:** Optional: further M3 UX or agents wiring.
+
+---

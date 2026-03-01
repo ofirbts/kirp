@@ -800,7 +800,20 @@ export interface M3Reflection {
   reflection_text: string;
   pillar_scores: Record<string, number>;
   mood: string;
-  created_at: string | null;
+}
+
+/** Semantic search hit from GET /m3/reflections?q=... */
+export interface M3ReflectionSearchHit {
+  event_id?: string;
+  content: string;
+  score?: number;
+  source?: string;
+  metadata?: Record<string, unknown>;
+}
+
+export interface M3ReflectionsResponse {
+  data: M3Reflection[] | M3ReflectionSearchHit[];
+  meta: { count: number; search?: boolean; query?: string };
 }
 
 export interface M3Kpis {
@@ -833,8 +846,14 @@ export async function m3Reflect(body: {
   return post<{ ok: boolean; event_id: string }>("/api/v1/m3/reflect", body);
 }
 
-export async function m3ListReflections(params?: { limit?: number }): Promise<{ data: M3Reflection[]; meta: { count: number } }> {
-  return get<{ data: M3Reflection[]; meta: { count: number } }>("/api/v1/m3/reflections", params as Record<string, number>);
+export async function m3ListReflections(params?: {
+  limit?: number;
+  q?: string;
+}): Promise<M3ReflectionsResponse> {
+  const p: Record<string, string | number | undefined> = {};
+  if (params?.limit != null) p.limit = params.limit;
+  if (params?.q != null && params.q.trim() !== "") p.q = params.q.trim();
+  return get<M3ReflectionsResponse>("/api/v1/m3/reflections", p);
 }
 
 export async function m3GetKpis(params?: { days?: number }): Promise<M3Kpis> {

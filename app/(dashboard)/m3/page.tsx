@@ -1,12 +1,18 @@
 "use client";
 
 import React, { useCallback, useEffect, useState } from "react";
-import { apiClient, type M3Kpis, type M3Reflection } from "@/lib/apiClient";
+import {
+  apiClient,
+  type M3Kpis,
+  type M3Reflection,
+  type M3ReflectionSearchHit,
+  type M3ReflectionsResponse,
+} from "@/lib/apiClient";
 import { PageSkeleton } from "@/components/dashboard/PageSkeleton";
 import { ErrorState } from "@/components/feedback/ErrorState";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Target, RefreshCw, Send, BarChart3, Calendar, CalendarDays } from "lucide-react";
+import { Target, RefreshCw, Send, BarChart3, Calendar, CalendarDays, Search } from "lucide-react";
 
 export default function M3Page() {
   const [reflections, setReflections] = useState<M3Reflection[]>([]);
@@ -20,17 +26,21 @@ export default function M3Page() {
   const [synthesisLoading, setSynthesisLoading] = useState(false);
   const [evolutionLoading, setEvolutionLoading] = useState(false);
   const [triggerSuccess, setTriggerSuccess] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [reflectionsMeta, setReflectionsMeta] = useState<M3ReflectionsResponse["meta"] | null>(null);
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (opts?: { q?: string }) => {
     setLoading(true);
     setError(null);
     try {
       const [refRes, kpisRes] = await Promise.all([
-        apiClient.m3ListReflections({ limit: 20 }),
-        apiClient.m3GetKpis({ days: 7 }),
+        apiClient.m3ListReflections({ limit: 20, q: opts?.q }),
+        opts?.q ? Promise.resolve(null as M3Kpis | null) : apiClient.m3GetKpis({ days: 7 }),
       ]);
       setReflections(refRes.data ?? []);
-      setKpis(kpisRes ?? null);
+      setReflectionsMeta(refRes.meta ?? null);
+      if (!opts?.q) setKpis(kpisRes ?? null);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load M3 data");
     } finally {
@@ -90,6 +100,26 @@ export default function M3Page() {
       setEvolutionLoading(false);
     }
   }
+
+  async function handleSearch(e: React.FormEvent) {
+    e.preventDefault();
+    const q = searchQuery.trim();
+    if (!q) return;
+    setSearchLoading(true);
+    setError(null);
+    try {
+      const refRes = await apiClient.m3ListReflections({ limit: 20, q });
+      setReflections(refRes.data ?? []);
+      setReflectionsMeta(refRes.meta ?? null);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Search failed");
+    } finally {
+      setSearchLoading(false);
+    }
+  }
+
+  const isSearchResults = reflectionsMeta?.search === true;
+  const searchHits = isSearchResults ? (reflections as M3ReflectionSearchHit[]) : [];
 
   if (loading && reflections.length === 0 && !kpis) {
     return <PageSkeleton title subtitle tableRows={5} />;
@@ -223,14 +253,46 @@ export default function M3Page() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Recent reflections</CardTitle>
+          <CardTitle className="text-base">
+            {isSearchResults
+              ? `Search: "${reflectionsMeta?.query ?? ""}"`
+              : "Recent reflections"}
+          </CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-4">
+          <form onSubmit={handleSearch} className="flex gap-2">
+            <input
+              className="flex-1 max-w-sm rounded-lg border border-border bg-surface px-3 py-2 text-sm"
+              placeholder="Search reflections by meaning…"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+            <Button type="submit" variant="secondary" size="sm" disabled={searchLoading || !searchQuery.trim()}>
+              <Search className="h-4 w-4 mr-1" />
+              {searchLoading ? "Searching…" : "Search"}
+            </Button>
+          </form>
           {reflections.length === 0 ? (
-            <p className="text-textSoft text-sm">No reflections yet. Submit one above.</p>
+            <p className="text-textSoft text-sm">
+              {isSearchResults ? "No matching reflections." : "No reflections yet. Submit one above."}
+            </p>
+          ) : isSearchResults ? (
+            <ul className="space-y-3">
+              {searchHits.map((r, i) => (
+                <li
+                  key={r.event_id ?? `hit-${i}`}
+                  className="border-b border-border pb-3 last:border-0 last:pb-0 text-sm"
+                >
+                  {r.score != null && (
+                    <p className="text-textSoft text-xs">Score: {(r.score * 100).toFixed(0)}%</p>
+                  )}
+                  <p className="mt-1">{r.content}</p>
+                </li>
+              ))}
+            </ul>
           ) : (
             <ul className="space-y-3">
-              {reflections.slice(0, 10).map((r) => (
+              {(reflections as M3Reflection[]).slice(0, 10).map((r) => (
                 <li
                   key={r.id}
                   className="border-b border-border pb-3 last:border-0 last:pb-0 text-sm"
