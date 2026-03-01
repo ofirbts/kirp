@@ -1,0 +1,89 @@
+# M3 IdentityOS — Build Progress
+
+Build log for the M3 governed module inside KIRP. Each entry: timestamp, what was built, why, files touched, next step.
+
+---
+
+- **2025-02-19 (Step 1)**  
+  - **What:** M3 module skeleton and event type constants under `src/modules/m3/`. Added `BUILD_PROGRESS.md`.  
+  - **Why:** Spec requires M3 isolated under `/modules/m3`; all events must use `metadata.module = "m3"` and auditable event types.  
+  - **Files touched:** `BUILD_PROGRESS.md` (created), `src/modules/__init__.py`, `src/modules/m3/__init__.py`, `src/modules/m3/events.py`.  
+  - **Next:** Register M3 event handlers in Event Registry and add handler implementations that run M3 flows through the pipeline.
+
+---
+
+- **2025-02-19 (Step 2)**  
+  - **What:** M3 event handlers and Event Registry registration; pipeline extended with optional `event_type` (default `"ingest"`) so M3 events are stored with correct type.  
+  - **Why:** Spec requires M3 handlers registered for `m3.*` types invoking the same pipeline; events must be auditable with `event_type` and `metadata.module = "m3"`.  
+  - **Files touched:** `src/core/pipeline.py`, `src/modules/m3/handlers.py`, `src/modules/m3/registry.py`, `src/core/event_registry.py`.  
+  - **Next:** Add M3 agent stubs and register them in the agent framework; wire agents to pipeline stages where specified.
+
+---
+
+- **2025-02-19 (Step 3)**  
+  - **What:** M3 agent specs (8 agents) and stub handlers; registered in agent_registry via M3_AGENT_SPECS.  
+  - **Why:** Spec requires all M3 agents registered in KIRP's Agent Framework and invokable from pipeline stages.  
+  - **Files touched:** `src/modules/m3/agents.py`, `src/core/agent_registry.py`.  
+  - **Next:** Implement IdentityEntropyScore and EGE extension; extend OPA context with M3 resource_type and identity_entropy_score.
+
+---
+
+- **2025-02-19 (Step 4)**  
+  - **What:** IdentityEntropyScore in `src/modules/m3/ege.py`; pipeline enriches governance context for M3 events; OPA payload extended with `identity_entropy_score`, `module`, `event_type`; requires_approval when score ≥ 0.6.  
+  - **Why:** Spec 5.1–5.3: EGE extension for identity, thresholds, OPA context for M3.  
+  - **Files touched:** `src/modules/m3/ege.py`, `src/core/pipeline.py`, `src/core/governance.py`.  
+  - **Next:** Add M3 memory store interfaces and schema definitions (identity_profiles, reflection_entries, micro_actions, weekly_synthesis, monthly_evolution).
+
+---
+
+- **2025-02-19 (Step 5)**  
+  - **What:** M3 memory schemas (IdentityProfile, ReflectionEntry, MicroAction, WeeklySynthesis, MonthlyEvolution) and M3MemoryStore with tenant/user-scoped accessors; stub implementation (in-memory) and get_m3_memory_store() singleton.  
+  - **Why:** Spec 6.1–6.3: typed collections and retrieval patterns for daily, weekly, long-term.  
+  - **Files touched:** `src/modules/m3/memory.py`.  
+  - **Next:** Add M3 API routes: /api/v1/m3/reflect, /api/v1/m3/synthesis, /api/v1/m3/evolution that create M3 events and return data from M3 memory.
+
+---
+
+- **2025-02-19 (Step 6)**  
+  - **What:** M3 API routes in `src/api/v1_m3.py`: POST /api/v1/m3/reflect, /m3/synthesis, /m3/evolution (create M3 events and dispatch); GET /m3/reflections, /m3/synthesis, /m3/evolution (read from M3 memory). Router mounted in main.py.  
+  - **Why:** Spec 11: M3 routes that create events and return results from Memory.  
+  - **Files touched:** `src/api/v1_m3.py`, `src/main.py`.  
+  - **Next:** Run full self-check (imports, types, pipeline, event schemas, agent registry, memory, invariants) and document.
+
+---
+
+- **2025-02-19 (Step 7 — Self-check)**  
+  - **What:** Full self-check run: imports, types, pipeline event_type param, event schemas (M3 module tag), Event Registry (M3 handlers), agent registry (8 M3 agents), memory store (append/list), invariants (metadata.module = m3). All passed.  
+  - **Why:** Build Protocol requires validation after build steps; no KIRP core invariants or 9-stage pipeline changed.  
+  - **Files touched:** None (validation only).  
+  - **Next:** Continue with M3 as needed: wire agents into pipeline stages from handlers, persist M3 memory to Qdrant/Postgres, add OPA policy bundle for M3 resource types, WhatsApp escalation for human governance.
+
+---
+
+- **2025-02-19 (Step 8)**  
+  - **What:** M3 memory writeback (writeback.py): after pipeline run, update reflection_entries, micro_actions, weekly_synthesis, monthly_evolution, identity_profiles by event_type. Handler calls writeback then run_m3_stages.  
+  - **Why:** Spec 4 stage 9 (Reflection & Memory Writeback).  
+  - **Files touched:** `src/modules/m3/writeback.py`, `src/modules/m3/handlers.py`.  
+
+---
+
+- **2025-02-19 (Step 9)**  
+  - **What:** M3 pipeline stages (stages.py): context retrieval from M3 memory, then invoke ReflectionClassifier, GapAnalysis, MicroActionGenerator, IdentityDiscriminator, WeeklySynthesis, MonthlyEvolution agents from handler.  
+  - **Why:** Spec 4 stages 2–5 (Context Retrieval, Pattern Analysis, Plan Generation, Plan Critique).  
+  - **Files touched:** `src/modules/m3/stages.py`, `src/modules/m3/handlers.py`.  
+
+---
+
+- **2025-02-19 (Step 10)**  
+  - **What:** M3 OPA policy: extend deploy/opa/policies/kirp.rego with m3_risk (by resource_type), requires_approval when module=m3 and identity_entropy_score>=0.6 or resource_type m3.monthly_evolution / m3.identity_trajectory.  
+  - **Why:** Spec 5.3 OPA context and policies for M3.  
+  - **Files touched:** `deploy/opa/policies/kirp.rego`.  
+
+---
+
+- **2025-02-19 (Step 11)**  
+  - **What:** M3 WhatsApp escalation: send_m3_whatsapp_escalation in governance.py; pipeline calls it when check.requires_approval and event_type starts with m3. Phone from M3_ESCALATION_PHONE or M3_ESCALATION_PHONE_<tenant>_<user>.  
+  - **Why:** Spec 8 human governance (WhatsApp Control Plane).  
+  - **Files touched:** `src/modules/m3/governance.py`, `src/core/pipeline.py`.  
+
+---

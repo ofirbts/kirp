@@ -673,7 +673,7 @@ app.include_router(audit_api.router)
 app.include_router(v1_domain.router)
 app.include_router(v1_rag.router)
 
-from src.api import v1_tasks, v1_ingestion, v1_reminders, v1_execute, v1_context, v1_connections, v1_graph, v1_history, v1_tenants_spaces, v1_events, v1_users, v1_scenarios
+from src.api import v1_tasks, v1_ingestion, v1_reminders, v1_execute, v1_context, v1_connections, v1_graph, v1_history, v1_tenants_spaces, v1_events, v1_users, v1_scenarios, v1_m3
 app.include_router(v1_history.router)
 app.include_router(v1_tasks.router)
 app.include_router(v1_ingestion.router)
@@ -686,6 +686,7 @@ app.include_router(v1_tenants_spaces.router)
 app.include_router(v1_events.router)
 app.include_router(v1_users.router)
 app.include_router(v1_scenarios.router)
+app.include_router(v1_m3.router)
 app.include_router(v1_notifications.router)
 app.include_router(llm_usage_router, prefix="/api/v1")
 

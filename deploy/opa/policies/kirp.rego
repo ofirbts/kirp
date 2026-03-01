@@ -88,6 +88,14 @@ delete_risk := 0 if { input.action != "delete" }
 governance_risk := 0.2 if { input.resource_type == "governance" }
 governance_risk := 0 if { input.resource_type != "governance" }
 
+# M3 resource types (spec 5.3): reflection/micro_action low, monthly_evolution higher
+m3_risk := 0.4 if { input.module == "m3"; input.resource_type == "m3.monthly_evolution" }
+m3_risk := 0.3 if { input.module == "m3"; input.resource_type == "m3.identity_trajectory" }
+m3_risk := 0.1 if { input.module == "m3"; input.resource_type in ["m3.reflection", "m3.micro_action", "m3.weekly_synthesis", "m3.event"] }
+m3_risk := 0.1 if { input.module == "m3" }
+m3_risk := 0 if { input.module != "m3" }
+m3_risk := 0 if { not input.module }
+
 autonomy_risk := 0.1 if { input.agent_autonomy == "full" }
 autonomy_risk := 0 if { input.agent_autonomy != "full" }
 
@@ -98,7 +106,7 @@ high_privilege_risk := 0.3 if { input.action in ["write", "delete", "execute"] }
 high_privilege_risk := 0 if { not input.action in ["write", "delete", "execute"] }
 
 risk_score := s if {
-	s := confidential_risk + delete_risk + governance_risk + autonomy_risk + cross_tenant_risk + high_privilege_risk
+	s := confidential_risk + delete_risk + governance_risk + autonomy_risk + cross_tenant_risk + high_privilege_risk + m3_risk
 }
 
 # ---------------------------------------------------------------------------
@@ -113,6 +121,20 @@ requires_approval if {
 requires_approval if {
 	input.resource_type == "governance"
 	input.action != "read"
+}
+# M3 IdentityOS (spec 5.3): require human approval when identity entropy high or monthly evolution
+requires_approval if {
+	input.module == "m3"
+	input.identity_entropy_score >= 0.6
+}
+requires_approval if {
+	input.resource_type == "m3.monthly_evolution"
+	input.action == "write"
+}
+requires_approval if {
+	input.resource_type == "m3.identity_trajectory"
+	input.action == "write"
+	input.identity_entropy_score >= 0.6
 }
 
 # ---------------------------------------------------------------------------

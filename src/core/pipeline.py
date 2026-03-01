@@ -48,10 +48,12 @@ class EventPipeline:
         metadata: dict | None = None,
         sensitivity: Sensitivity | None = None,
         event_id: UUID | None = None,
+        event_type: str = "ingest",
     ) -> UUID:
         """
         Run full pipeline: governance → store → embed → Qdrant → (optional) trigger agents.
         Returns event ID. Pass event_id when re-ingesting from Kafka to preserve id.
+        event_type: stored on the event (e.g. "ingest" or "m3.daily_reflection_submitted").
         """
         if not tenant_id or tenant_id == "*":
             raise ValueError("tenant_id is required (multi-tenant isolation)")
@@ -59,17 +61,54 @@ class EventPipeline:
         meta = metadata or {}
         sens = sensitivity or Sensitivity.PRIVATE
 
-        # Governance check
+        # Build context for governance; M3 events get identity_entropy_score and resource_type
+        gov_context: dict[str, Any] = {
+            "sensitivity": sens.value,
+            "resource_type": "event",
+            "event_type": event_type,
+        }
+        if event_type.startswith("m3."):
+            from src.modules.m3.ege import compute_identity_entropy_score
+            gov_context["module"] = "m3"
+            gov_context["identity_entropy_score"] = compute_identity_entropy_score(meta, event_type)
+            if "monthly_evolution" in event_type:
+                gov_context["resource_type"] = "m3.monthly_evolution"
+            elif "weekly_synthesis" in event_type:
+                gov_context["resource_type"] = "m3.weekly_synthesis"
+            elif "reflection" in event_type:
+                gov_context["resource_type"] = "m3.reflection"
+            elif "micro_action" in event_type:
+                gov_context["resource_type"] = "m3.micro_action"
+            elif "identity_vector" in event_type or "gap_analysis" in event_type:
+                gov_context["resource_type"] = "m3.identity_trajectory"
+            else:
+                gov_context["resource_type"] = "m3.event"
+
         check = await self._gov.check(
             tenant_id=tenant_id,
             space_id=space_id,
             user_id=user_id,
             action="write",
             resource="event",
-            context={"sensitivity": sens.value, "resource_type": "event"},
+            context=gov_context,
         )
         if not check.allowed:
             raise PermissionError(f"Governance denied: {check.reason}")
+        # M3 human governance (spec 8): when requires_approval, send WhatsApp escalation
+        if check.requires_approval and event_type.startswith("m3."):
+            try:
+                from src.modules.m3.governance import send_m3_whatsapp_escalation
+                await send_m3_whatsapp_escalation(
+                    tenant_id=tenant_id,
+                    space_id=space_id,
+                    user_id=user_id,
+                    event_type=event_type,
+                    reason=check.reason,
+                    identity_entropy_score=gov_context.get("identity_entropy_score"),
+                    resource_type=gov_context.get("resource_type"),
+                )
+            except Exception as e:
+                logger.warning("M3 WhatsApp escalation failed: %s", e)
 
         event_id = event_id or uuid4()
         trace_id = meta.get("trace_id") or f"tr_{event_id.hex[:8]}"
@@ -86,7 +125,7 @@ class EventPipeline:
             embedding=[],
             timestamp=datetime.now(timezone.utc),
             sensitivity=sens,
-            event_type="ingest",
+            event_type=event_type,
             trace_id=trace_id,
         )
 

@@ -202,3 +202,20 @@ archive_analysis:
     - "You MUST NOT modify, move, or delete any file under archive/**."
     - "You MAY propose improvements for the core system (src/, app/, components/, services/) based on patterns found in archive/**."
     - "All implementation MUST stay within the current architecture and allowed folders."
+
+
+## Technical Stack
+- Backend: Python (FastAPI), Celery, Kafka.
+- Frontend: Next.js (TypeScript), Tailwind CSS.
+- Infrastructure: Docker, Docker Compose, Nginx.
+
+## Model Usage Playbook
+1. **Architectural Decisions (Plan Mode):** Use `Claude 3.5 Sonnet`. Always reference `UNIFIED_ARCHITECTURE.md`.
+2. **Backend/Logic (FastAPI/Celery):** Use `Claude 3.5 Sonnet` or `GPT-4o`. Follow PEP8.
+3. **Frontend/UI (Next.js):** Use `DeepSeek V3` (via OpenRouter) for standard components.
+4. **Documentation & Tests:** Use `Gemini 1.5 Flash` (via Google API) to save costs.
+
+## General Rules
+- Never modify Dockerfiles or `.env` files without explicit permission.
+- When adding new agents in `src/agents/`, ensure they are registered in the agent registry.
+- Always look for existing tools in the `tools/` directory before creating new ones.

@@ -68,11 +68,13 @@ def get_event_registry() -> EventRegistry:
 
 
 def _register_default_handlers(registry: EventRegistry) -> None:
-    """Register built-in handlers for ingest.v1 and agent_run.v1."""
+    """Register built-in handlers for ingest.v1, agent_run.v1, and M3 event types."""
     from src.core.event_registry_handlers import handle_ingest_v1, handle_agent_run_v1
+    from src.modules.m3.registry import register_m3_handlers
 
     registry.register(EVENT_TYPE_INGEST, handle_ingest_v1)
     registry.register(EVENT_TYPE_AGENT_RUN, handle_agent_run_v1)
     # Legacy type names
     registry.register("ingest", handle_ingest_v1)
     registry.register("agent_run", handle_agent_run_v1)
+    register_m3_handlers(registry)

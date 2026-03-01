@@ -27,3 +27,24 @@ docker compose up -d --build
 ```
 
 The reset script fixes ownership and permissions for `~/.docker` and recreates the default buildx builder.
+
+## Gemini CLI research agent (optional)
+
+For ad-hoc research using Gemini + web tools, you can use the standalone CLI agent:
+
+- Script: `agent.js`
+- Env:
+  - `GEMINI_API_KEY` (or `GOOGLE_API_KEY`) – Gemini API key.
+  - `GEMINI_MODEL` – model name, e.g. `gemini-1.5-flash` (see `node list_models.js`).
+
+Usage:
+
+```bash
+# 1. Copy .env.example to .env and set GEMINI_API_KEY / GEMINI_MODEL
+
+node list_models.js   # prints available models for your key
+npm run agent         # runs agent.js with the default question
+```
+
+The agent will fetch web context (if `TAVILY_API_KEY` is set), call Gemini with tools,
+and write a markdown summary to `research_results.md`.

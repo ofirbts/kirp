@@ -71,6 +71,7 @@ class GovernanceEngine:
 
         try:
             import httpx
+            ctx = context or {}
             payload = {
                 "input": {
                     "tenant_id": tenant_id,
@@ -79,17 +80,20 @@ class GovernanceEngine:
                     "user_tenant_id": tenant_id,  # TODO: Get from user lookup
                     "action": action,
                     "resource": resource,
-                    "resource_type": context.get("resource_type", "event") if context else "event",
-                    "sensitivity": context.get("sensitivity", "private") if context else "private",
-                    "agent_autonomy": context.get("agent_autonomy", "full") if context else "full",
-                    "approved": context.get("approved", False) if context else False,
-                    "cross_tenant_grant": context.get("cross_tenant_grant", False) if context else False,
-                    "user_role": context.get("user_role", "member") if context else "member",
-                    "space_owner_id": context.get("space_owner_id", user_id) if context else user_id,
-                    "space_members": context.get("space_members", [user_id]) if context else [user_id],
-                    "roles": context.get("roles", []) if context else [],
-                    "resource_owner_id": context.get("resource_owner_id", user_id) if context else user_id,
+                    "resource_type": ctx.get("resource_type", "event"),
+                    "sensitivity": ctx.get("sensitivity", "private"),
+                    "agent_autonomy": ctx.get("agent_autonomy", "full"),
+                    "approved": ctx.get("approved", False),
+                    "cross_tenant_grant": ctx.get("cross_tenant_grant", False),
+                    "user_role": ctx.get("user_role", "member"),
+                    "space_owner_id": ctx.get("space_owner_id", user_id),
+                    "space_members": ctx.get("space_members", [user_id]),
+                    "roles": ctx.get("roles", []),
+                    "resource_owner_id": ctx.get("resource_owner_id", user_id),
                     "risk_score": risk_score,
+                    "event_type": ctx.get("event_type"),
+                    "module": ctx.get("module"),
+                    "identity_entropy_score": ctx.get("identity_entropy_score"),
                 }
             }
             async with httpx.AsyncClient() as client:
@@ -108,12 +112,19 @@ class GovernanceEngine:
                 )
             data = r.json()
             result = data.get("result")
+            # M3: identity_entropy_score >= 0.6 → require human approval (WhatsApp)
+            m3_escalate = False
+            if ctx.get("identity_entropy_score") is not None:
+                try:
+                    m3_escalate = float(ctx["identity_entropy_score"]) >= 0.6
+                except (TypeError, ValueError):
+                    pass
             # OPA returns full document at kirp.governance; fallback if result is bool (single-rule query)
             if isinstance(result, bool):
                 return GovernanceCheck(
                     allowed=result,
                     reason="allowed" if result else "denied_by_policy",
-                    requires_approval=risk_score >= 0.7,
+                    requires_approval=m3_escalate or (risk_score >= 0.7),
                     risk_score=risk_score,
                 )
             if not isinstance(result, dict):
@@ -121,7 +132,7 @@ class GovernanceEngine:
             return GovernanceCheck(
                 allowed=result.get("allow", False),
                 reason=result.get("reason", "policy"),
-                requires_approval=result.get("requires_approval", risk_score >= 0.7),
+                requires_approval=result.get("requires_approval", risk_score >= 0.7) or m3_escalate,
                 policy_id=result.get("policy_id"),
                 risk_score=risk_score,
             )
