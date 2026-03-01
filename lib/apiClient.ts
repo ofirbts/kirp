@@ -936,6 +936,21 @@ export async function m3EvolutionRequest(body?: { month?: string }): Promise<{ o
   return post<{ ok: boolean; event_id: string }>("/api/v1/m3/evolution", body ?? {});
 }
 
+export interface M3ExportResponse {
+  reflections: unknown[];
+  micro_actions: unknown[];
+  weekly_syntheses: unknown[];
+  monthly_evolutions: unknown[];
+  meta: { tenant_id: string; user_id: string; since?: string; until?: string; exported_at: string };
+}
+
+export async function m3Export(params?: { since?: string; until?: string }): Promise<M3ExportResponse> {
+  const p: Record<string, string> = {};
+  if (params?.since) p.since = params.since;
+  if (params?.until) p.until = params.until;
+  return get<M3ExportResponse>("/api/v1/m3/export", Object.keys(p).length ? p : undefined);
+}
+
 export async function queryV1(body: {
   tenant_id: string;
   space_id: string;
@@ -1019,6 +1034,7 @@ export const apiClient = {
   m3Health,
   m3SynthesisRequest,
   m3EvolutionRequest,
+  m3Export,
 };
 
 // ---------- Connections Hub ----------

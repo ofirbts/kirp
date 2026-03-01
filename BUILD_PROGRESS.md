@@ -234,3 +234,32 @@ Build log for the M3 governed module inside KIRP. Each entry: timestamp, what wa
   - **Next:** Phase 2 (optional): more agents (GapAnalysis, MicroActionGenerator) with LLM; M3 export; dashboard pillar_scores display.
 
 ---
+
+- **2025-02-19 (Phase 2 — GapAnalysisAgent)**  
+  - **What:** GapAnalysisAgent: _gap_analysis_handler calls LLM for pillar_deltas, gap_heatmap, top_gaps; stages call append_gap_snapshot when result.ok.  
+  - **Why:** Gap Closure KPI and trend from real gap analysis.  
+  - **Files touched:** `src/modules/m3/agents.py`, `src/modules/m3/stages.py`.  
+
+---
+
+- **2025-02-19 (Phase 2 — MicroActionGeneratorAgent)**  
+  - **What:** MicroActionGeneratorAgent: _micro_action_generator_handler calls LLM for 1–3 actions (title, pillar, due_by, roi_score); stages pass top_gaps from gap result and upsert_micro_action for each.  
+  - **Why:** Generated micro-actions appear in dashboard after reflection.  
+  - **Files touched:** `src/modules/m3/agents.py`, `src/modules/m3/stages.py`.  
+
+---
+
+- **2025-02-19 (Phase 2 — Export + Dashboard)**  
+  - **What:** GET /m3/export?since=&until= returns JSON (reflections, micro_actions, weekly_syntheses, monthly_evolutions). apiClient m3Export; M3 page Export button (download JSON). Dashboard: show pillar_scores and mood per reflection in list.  
+  - **Why:** Export for backup/portability; pillar_scores visibility.  
+  - **Files touched:** `src/api/v1_m3.py`, `lib/apiClient.ts`, `app/(dashboard)/m3/page.tsx`.  
+
+---
+
+- **2025-02-19 (Phase 2 complete)**  
+  - **What:** docs/M3.md updated (GapAnalysis, MicroActionGenerator, Export, dashboard pillars). Full self-check: agents, stages, export route, memory.  
+  - **Why:** Close M3 Phase 2 per protocol.  
+  - **Files touched:** `docs/M3.md`, `BUILD_PROGRESS.md`.  
+  - **Next:** Optional: WeeklySynthesisAgent / MonthlyEvolutionAgent LLM; M3 analytics.
+
+---

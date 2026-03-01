@@ -347,3 +347,79 @@ async def m3_kpis(
         },
         "meta": {"tenant_id": ctx.tenant_id, "user_id": ctx.user_id, "window_days": days},
     }
+
+
+@router.get("/m3/export")
+async def m3_export(
+    ctx: TenantContext = Depends(get_effective_tenant_context),
+    since: str | None = Query(None, description="Reflections on or after (YYYY-MM-DD)"),
+    until: str | None = Query(None, description="Reflections on or before (YYYY-MM-DD)"),
+) -> dict[str, Any]:
+    """
+    Export M3 data for the current tenant/user as JSON: reflections, micro_actions,
+    weekly_syntheses, monthly_evolutions. Optional since/until filter for reflections.
+    """
+    store = get_m3_memory_store()
+    reflections = await store.list_reflections(
+        ctx.tenant_id, ctx.user_id, limit=500,
+        since_date=since, before_date=until,
+    )
+    actions = await store.list_micro_actions(ctx.tenant_id, ctx.user_id, limit=500)
+    syntheses = await store.list_weekly_syntheses(ctx.tenant_id, ctx.user_id, limit=100)
+    evolutions = await store.list_monthly_evolutions(ctx.tenant_id, ctx.user_id, limit=60)
+    return {
+        "reflections": [
+            {
+                "id": r.id,
+                "reflection_date": r.reflection_date,
+                "reflection_text": r.reflection_text,
+                "pillar_scores": r.pillar_scores,
+                "mood": r.mood,
+                "created_at": r.created_at.isoformat() if r.created_at else None,
+            }
+            for r in reflections
+        ],
+        "micro_actions": [
+            {
+                "action_id": a.action_id,
+                "title": a.title,
+                "pillar": a.pillar,
+                "status": a.status,
+                "due_by": a.due_by,
+                "roi_score": a.roi_score,
+                "completed_at": a.completed_at,
+                "feedback": a.feedback,
+            }
+            for a in actions
+        ],
+        "weekly_syntheses": [
+            {
+                "synthesis_id": s.synthesis_id,
+                "week_start": s.week_start,
+                "week_end": s.week_end,
+                "summary": s.summary,
+                "pillar_trends": s.pillar_trends,
+                "insights": s.insights,
+                "created_at": s.created_at.isoformat() if s.created_at else None,
+            }
+            for s in syntheses
+        ],
+        "monthly_evolutions": [
+            {
+                "evolution_id": e.evolution_id,
+                "month": e.month,
+                "trajectory": e.trajectory,
+                "new_goals": e.new_goals,
+                "pillar_shifts": e.pillar_shifts,
+                "created_at": e.created_at.isoformat() if e.created_at else None,
+            }
+            for e in evolutions
+        ],
+        "meta": {
+            "tenant_id": ctx.tenant_id,
+            "user_id": ctx.user_id,
+            "since": since,
+            "until": until,
+            "exported_at": datetime.now(timezone.utc).isoformat(),
+        },
+    }

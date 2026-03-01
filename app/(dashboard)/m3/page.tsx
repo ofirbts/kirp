@@ -15,7 +15,7 @@ import { PageSkeleton } from "@/components/dashboard/PageSkeleton";
 import { ErrorState } from "@/components/feedback/ErrorState";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Target, RefreshCw, Send, BarChart3, Calendar, CalendarDays, Search, CheckSquare, ListTodo, List } from "lucide-react";
+import { Target, RefreshCw, Send, BarChart3, Calendar, CalendarDays, Search, CheckSquare, ListTodo, List, Download } from "lucide-react";
 
 export default function M3Page() {
   const [reflections, setReflections] = useState<M3Reflection[]>([]);
@@ -38,6 +38,7 @@ export default function M3Page() {
   const [dateSince, setDateSince] = useState<string>("");
   const [dateUntil, setDateUntil] = useState<string>("");
   const [filterPreset, setFilterPreset] = useState<"all" | "7" | "30">("all");
+  const [exportLoading, setExportLoading] = useState(false);
 
   const load = useCallback(async (opts?: { q?: string; since?: string; until?: string }) => {
     setLoading(true);
@@ -193,10 +194,40 @@ export default function M3Page() {
           <Target className="h-6 w-4" />
           M3 Identity
         </h1>
-        <Button variant="outline" size="sm" onClick={load} disabled={loading}>
-          <RefreshCw className={`h-4 w-4 mr-1 ${loading ? "animate-spin" : ""}`} />
-          Refresh
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" onClick={load} disabled={loading}>
+            <RefreshCw className={`h-4 w-4 mr-1 ${loading ? "animate-spin" : ""}`} />
+            Refresh
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={async () => {
+              setExportLoading(true);
+              try {
+                const data = await apiClient.m3Export({
+                  since: dateSince || undefined,
+                  until: dateUntil || undefined,
+                });
+                const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement("a");
+                a.href = url;
+                a.download = `m3-export-${new Date().toISOString().slice(0, 10)}.json`;
+                a.click();
+                URL.revokeObjectURL(url);
+              } catch (e) {
+                setError(e instanceof Error ? e.message : "Export failed");
+              } finally {
+                setExportLoading(false);
+              }
+            }}
+            disabled={exportLoading}
+          >
+            <Download className={`h-4 w-4 mr-1 ${exportLoading ? "animate-pulse" : ""}`} />
+            Export
+          </Button>
+        </div>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-3">
@@ -503,8 +534,18 @@ export default function M3Page() {
                 >
                   <p className="text-textSoft text-xs">{r.reflection_date}</p>
                   <p className="mt-1">{r.reflection_text}</p>
-                  {r.mood && (
-                    <p className="text-textSoft text-xs mt-1">Mood: {r.mood}</p>
+                  {(r.mood || (r.pillar_scores && Object.keys(r.pillar_scores).length > 0)) && (
+                    <div className="text-textSoft text-xs mt-1 flex flex-wrap gap-x-3 gap-y-0.5">
+                      {r.mood && <span>Mood: {r.mood}</span>}
+                      {r.pillar_scores && Object.keys(r.pillar_scores).length > 0 && (
+                        <span>
+                          Pillars:{" "}
+                          {Object.entries(r.pillar_scores)
+                            .map(([k, v]) => `${k} ${typeof v === "number" ? (v * 100).toFixed(0) + "%" : v}`)
+                            .join(", ")}
+                        </span>
+                      )}
+                    </div>
                   )}
                 </li>
               ))}

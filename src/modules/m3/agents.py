@@ -115,6 +115,133 @@ Reply with only the JSON, no markdown."""
         }
 
 
+async def _gap_analysis_handler(
+    tenant_id: str,
+    space_id: str,
+    user_id: str,
+    context: dict[str, Any],
+) -> dict[str, Any]:
+    """Compute gap heatmap and pillar deltas from reflections and identity profile via LLM."""
+    reflections = context.get("reflections") or []
+    profile = context.get("identity_profile") or {}
+    pillar_scores = profile.get("pillar_scores") or {}
+    try:
+        from src.core.llm_router import get_llm_for_task
+        llm = get_llm_for_task("bulk")
+        recent = "\n".join(
+            (r.get("reflection_text") or r.get("reflection_date", ""))[:200]
+            for r in reflections[:5]
+        )
+        prompt = f"""Given recent reflections and current pillar scores, output one JSON object with:
+- "pillar_deltas": object with keys health, work, family, learning; each value a number -1 to 1 (gap: negative = need more, positive = surplus).
+- "gap_heatmap": optional object (e.g. pillar -> short label).
+- "top_gaps": optional array of 1-3 short strings (biggest gaps).
+
+Current pillar_scores: {pillar_scores}
+Recent reflections (excerpts):
+{recent[:800]}
+
+Reply with only the JSON, no markdown."""
+        response = await llm.invoke(prompt, temperature=0.2, max_tokens=400)
+        text = (response or "").strip()
+        if "```" in text:
+            m = re.search(r"```(?:json)?\s*([\s\S]*?)```", text)
+            if m:
+                text = m.group(1).strip()
+        data = json.loads(text)
+        pillar_deltas = data.get("pillar_deltas") or {}
+        if isinstance(pillar_deltas, dict):
+            pillar_deltas = {k: float(v) for k, v in pillar_deltas.items() if isinstance(v, (int, float))}
+        gap_heatmap = data.get("gap_heatmap") or {}
+        top_gaps = data.get("top_gaps") or []
+        if isinstance(top_gaps, list):
+            top_gaps = [str(x)[:200] for x in top_gaps[:5]]
+        return {
+            "ok": True,
+            "module": "m3",
+            "agent": "GapAnalysisAgent",
+            "tenant_id": tenant_id,
+            "user_id": user_id,
+            "gap_heatmap": gap_heatmap,
+            "pillar_deltas": pillar_deltas,
+            "top_gaps": top_gaps,
+        }
+    except (json.JSONDecodeError, Exception) as e:
+        logger.warning("GapAnalysisAgent failed: %s", e)
+        return {
+            "ok": False,
+            "module": "m3",
+            "agent": "GapAnalysisAgent",
+            "tenant_id": tenant_id,
+            "user_id": user_id,
+            "error": str(e),
+            "gap_heatmap": {},
+            "pillar_deltas": {},
+            "top_gaps": [],
+        }
+
+
+async def _micro_action_generator_handler(
+    tenant_id: str,
+    space_id: str,
+    user_id: str,
+    context: dict[str, Any],
+) -> dict[str, Any]:
+    """Generate 1–3 micro-actions from context via LLM. Stages will persist to memory."""
+    reflections = context.get("reflections") or []
+    top_gaps = context.get("top_gaps") or []
+    try:
+        from src.core.llm_router import get_llm_for_task
+        llm = get_llm_for_task("bulk")
+        recent = "\n".join((r.get("reflection_text") or "")[:150] for r in reflections[:3])
+        prompt = f"""Based on recent reflections and gaps, suggest 1-3 small, concrete micro-actions.
+Output one JSON: "actions": [ {{ "title": "short action", "pillar": "health|work|family|learning", "due_by": "YYYY-MM-DD or empty", "roi_score": 0.0-1.0 }} ]
+
+Recent reflections:
+{recent[:500]}
+Gaps (if any): {top_gaps[:3]}
+
+Reply with only the JSON, no markdown."""
+        response = await llm.invoke(prompt, temperature=0.3, max_tokens=350)
+        text = (response or "").strip()
+        if "```" in text:
+            m = re.search(r"```(?:json)?\s*([\s\S]*?)```", text)
+            if m:
+                text = m.group(1).strip()
+        data = json.loads(text)
+        actions = data.get("actions") or []
+        if not isinstance(actions, list):
+            actions = []
+        out = []
+        for a in actions[:5]:
+            if isinstance(a, dict) and a.get("title"):
+                out.append({
+                    "title": str(a.get("title", ""))[:200],
+                    "pillar": str(a.get("pillar", ""))[:50],
+                    "due_by": str(a.get("due_by", ""))[:20] or None,
+                    "roi_score": float(a.get("roi_score", 0.5)) if isinstance(a.get("roi_score"), (int, float)) else 0.5,
+                })
+        return {
+            "ok": True,
+            "module": "m3",
+            "agent": "MicroActionGeneratorAgent",
+            "tenant_id": tenant_id,
+            "user_id": user_id,
+            "actions": out,
+        }
+    except (json.JSONDecodeError, Exception) as e:
+        logger.warning("MicroActionGeneratorAgent failed: %s", e)
+        return {
+            "ok": False,
+            "module": "m3",
+            "agent": "MicroActionGeneratorAgent",
+            "tenant_id": tenant_id,
+            "user_id": user_id,
+            "error": str(e),
+            "actions": [],
+        }
+
+
 def _m3_handler(name: str):
     async def h(tenant_id: str, space_id: str, user_id: str, context: dict[str, Any]) -> dict[str, Any]:
         return await _stub_m3_agent(name, tenant_id, space_id, user_id, context)
@@ -165,7 +292,7 @@ gap_analysis_agent_spec = AgentSpec(
     autonomy=AutonomyLevel.FULL,
     tenant_scopes=[],
     description="Computes gap heatmap, pillar deltas, top_gaps from identity_profiles and ideal_self.",
-    handler=_m3_handler("GapAnalysisAgent"),
+    handler=_gap_analysis_handler,
 )
 
 micro_action_generator_agent_spec = AgentSpec(
@@ -176,7 +303,7 @@ micro_action_generator_agent_spec = AgentSpec(
     autonomy=AutonomyLevel.SEMI,
     tenant_scopes=[],
     description="Generates micro_actions with roi_score and due_by from gap output and context.",
-    handler=_m3_handler("MicroActionGeneratorAgent"),
+    handler=_micro_action_generator_handler,
 )
 
 weekly_synthesis_agent_spec = AgentSpec(

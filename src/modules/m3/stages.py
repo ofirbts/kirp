@@ -123,14 +123,40 @@ async def run_m3_stages(
                         result.get("pillar_scores") or {},
                         result.get("mood") or "",
                     )
-            # Stage 3: gap analysis
+            # Stage 3: gap analysis and persist snapshot
+            gap_result: dict[str, Any] = {}
             spec = af.get("GapAnalysisAgent")
             if spec and spec.handler:
-                await spec.handler(tenant_id, space_id, user_id, ctx)
-            # Stage 4: optional micro-actions (Discriminator may gate)
+                gap_result = await spec.handler(tenant_id, space_id, user_id, ctx)
+                if gap_result.get("ok") and (gap_result.get("pillar_deltas") is not None or gap_result.get("gap_heatmap")):
+                    store = get_m3_memory_store()
+                    await store.append_gap_snapshot(
+                        tenant_id, user_id, space_id,
+                        gap_result.get("gap_heatmap") or {},
+                        gap_result.get("pillar_deltas") or {},
+                        gap_result.get("top_gaps"),
+                    )
+            # Stage 4: micro-actions (pass top_gaps from gap result) and persist
+            ctx_with_gaps = {**ctx, "top_gaps": gap_result.get("top_gaps") or []}
             spec = af.get("MicroActionGeneratorAgent")
             if spec and spec.handler:
-                await spec.handler(tenant_id, space_id, user_id, ctx)
+                micro_result = await spec.handler(tenant_id, space_id, user_id, ctx_with_gaps)
+                if micro_result.get("ok") and micro_result.get("actions"):
+                    store = get_m3_memory_store()
+                    from uuid import uuid4
+                    for action in micro_result["actions"]:
+                        action_id = str(uuid4())
+                        await store.upsert_micro_action(
+                            tenant_id=tenant_id,
+                            user_id=user_id,
+                            space_id=space_id,
+                            action_id=action_id,
+                            title=action.get("title", ""),
+                            pillar=action.get("pillar", ""),
+                            status="pending",
+                            due_by=action.get("due_by"),
+                            roi_score=float(action.get("roi_score", 0.5)),
+                        )
             # Stage 5: critique (stub)
             spec = af.get("IdentityDiscriminatorAgent")
             if spec and spec.handler:
