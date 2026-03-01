@@ -22,9 +22,24 @@ from src.modules.m3.events import (
     EVENT_M3_MONTHLY_EVOLUTION_REQUESTED,
 )
 from src.modules.m3.memory import get_m3_memory_store
+from src.modules.m3.events import M3_EVENT_TYPES
+from src.modules.m3.agents import M3_AGENT_SPECS
 
 
 router = APIRouter(prefix="/api/v1", tags=["M3"])
+
+
+@router.get("/m3/health")
+async def m3_health() -> dict[str, Any]:
+    """M3 module status: event types and agents registered (no secrets)."""
+    registry = get_event_registry()
+    m3_registered = sum(1 for et in M3_EVENT_TYPES if registry.get(et) is not None)
+    return {
+        "module": "m3",
+        "event_types_registered": m3_registered,
+        "event_types_total": len(M3_EVENT_TYPES),
+        "agents_registered": len(M3_AGENT_SPECS),
+    }
 
 
 def _canonical_m3_event(

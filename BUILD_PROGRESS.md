@@ -111,3 +111,18 @@ Build log for the M3 governed module inside KIRP. Each entry: timestamp, what wa
   - **Next:** Optional: persist M3 memory to Qdrant/Postgres; dashboard widgets.
 
 ---
+
+- **2025-02-19 (Step 15)**  
+  - **What:** docs/M3.md — M3 module overview: architecture, API routes, env, event types, pipeline flow, code location.  
+  - **Why:** Onboarding and ops reference for M3.  
+  - **Files touched:** `docs/M3.md`.  
+
+---
+
+- **2025-02-19 (Step 16)**  
+  - **What:** GET /api/v1/m3/health — returns module status (event_types_registered, agents_registered), no secrets.  
+  - **Why:** Ops/health check and interview clarity.  
+  - **Files touched:** `src/api/v1_m3.py`.  
+  - **Next:** Optional: persist M3 memory to Qdrant/Postgres; dashboard widgets.
+
+---
