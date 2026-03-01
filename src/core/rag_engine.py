@@ -366,14 +366,17 @@ class RAGEngine:
         limit: int = 10,
         max_hops: int = 2,
         allowed_space_ids: list[str] | None = None,
+        payload_filter: dict[str, Any] | None = None,
     ) -> RAGResponse:
         """
         Multi-hop retrieval: query rewriting, context expansion, iterative retrieval.
-        Respects allowed_space_ids for membership.
+        Respects allowed_space_ids and payload_filter.
         """
         if not self._enable_multihop or max_hops <= 1:
             return await self._single_hop_search(
-                query, tenant_id, space_id, user_id, limit, allowed_space_ids=allowed_space_ids
+                query, tenant_id, space_id, user_id, limit,
+                allowed_space_ids=allowed_space_ids,
+                payload_filter=payload_filter,
             )
         
         from src.core.llm_router import get_llm_for_task
@@ -382,7 +385,9 @@ class RAGEngine:
         
         # Initial retrieval
         initial_results = await self._single_hop_search(
-            query, tenant_id, space_id, user_id, limit * 2, allowed_space_ids=allowed_space_ids
+            query, tenant_id, space_id, user_id, limit * 2,
+            allowed_space_ids=allowed_space_ids,
+            payload_filter=payload_filter,
         )
         all_results = {r.text: r for r in initial_results.results}  # Deduplicate by text
         
@@ -424,6 +429,7 @@ Return JSON:
                     exp_results = await self._single_hop_search(
                         exp_query, tenant_id, space_id, user_id, limit // 2,
                         allowed_space_ids=allowed_space_ids,
+                        payload_filter=payload_filter,
                     )
                     for r in exp_results.results:
                         if r.text not in all_results:
@@ -466,8 +472,9 @@ Return JSON:
         since: datetime | None = None,
         source: str | None = None,
         allowed_space_ids: list[str] | None = None,
+        payload_filter: dict[str, Any] | None = None,
     ) -> RAGResponse:
-        """Single-hop hybrid search (semantic + BM25). Respects allowed_space_ids for membership."""
+        """Single-hop hybrid search (semantic + BM25). Respects allowed_space_ids and payload_filter."""
         if self._client is None:
             await self.connect()
         from qdrant_client.http import models
@@ -483,6 +490,8 @@ Return JSON:
             must.append(models.FieldCondition(key="user_id", match=models.MatchValue(value=user_id)))
         if source:
             must.append(models.FieldCondition(key="source", match=models.MatchValue(value=source)))
+        for key, val in (payload_filter or {}).items():
+            must.append(models.FieldCondition(key=key, match=models.MatchValue(value=val)))
 
         q_filter = models.Filter(must=must) if must else None
         resp = self._client.query_points(
@@ -590,11 +599,12 @@ Return JSON:
         source: str | None = None,
         use_multihop: bool | None = None,
         allowed_space_ids: list[str] | None = None,
+        payload_filter: dict[str, Any] | None = None,
     ) -> RAGResponse:
         """
         Hybrid search with tenant/space/time/source scoping.
         When allowed_space_ids is set, results are restricted to those spaces (membership-aware).
-        Supports multi-hop reasoning if enabled.
+        payload_filter: optional exact-match filters on payload (e.g. {"module": "m3"}).
         Returns context + explainability + confidence.
         """
         # Enforce multi-tenant isolation
@@ -611,12 +621,15 @@ Return JSON:
 
         if use_multihop:
             resp = await self._multi_hop_retrieval(
-                query, tenant_id, space_id, user_id, limit, allowed_space_ids=allowed_space_ids
+                query, tenant_id, space_id, user_id, limit,
+                allowed_space_ids=allowed_space_ids,
+                payload_filter=payload_filter,
             )
         else:
             resp = await self._single_hop_search(
                 query, tenant_id, space_id, user_id, limit, since, source,
                 allowed_space_ids=allowed_space_ids,
+                payload_filter=payload_filter,
             )
 
         results_count = len(resp.results)

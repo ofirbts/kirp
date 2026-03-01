@@ -158,3 +158,11 @@ Build log for the M3 governed module inside KIRP. Each entry: timestamp, what wa
   - **Next:** Optional: Qdrant vector search for M3.
 
 ---
+
+- **2025-02-19 (Step 21)**  
+  - **What:** Qdrant vector search for M3: pipeline upserts event_type + module=m3 + event_id in payload; RAGEngine.search accepts payload_filter; M3 vectors.search_m3_reflections(tenant, user, query) uses payload_filter={"module": "m3"}; GET /m3/reflections?q=... runs semantic search and returns event_id, content, score.  
+  - **Why:** Optional semantic search over reflections (spec / BUILD_PROGRESS).  
+  - **Files touched:** `src/core/pipeline.py`, `src/core/rag_engine.py`, `src/modules/m3/vectors.py`, `src/api/v1_m3.py`.  
+  - **Next:** Optional: dashboard search box for M3 reflections.
+
+---

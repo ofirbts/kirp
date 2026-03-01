@@ -133,17 +133,24 @@ class EventPipeline:
         try:
             emb = await self._rag.embed(content)
             event.embedding = emb
+            point_payload: dict[str, Any] = {
+                "event_id": str(event_id),
+                "content": content,
+                "source": source,
+                "tenant_id": tenant_id,
+                "space_id": space_id,
+                "user_id": user_id,
+                "timestamp": event.timestamp.isoformat(),
+                "trace_id": trace_id,
+                "event_type": event_type,
+            }
+            if event_type.startswith("m3."):
+                point_payload["module"] = "m3"
             await self._rag.upsert(
                 points=[{
                     "id": str(event_id),
                     "embedding": emb,
-                    "content": content,
-                    "source": source,
-                    "tenant_id": tenant_id,
-                    "space_id": space_id,
-                    "user_id": user_id,
-                    "timestamp": event.timestamp.isoformat(),
-                    "trace_id": trace_id,
+                    **point_payload,
                 }],
                 tenant_id=tenant_id,
                 space_id=space_id,

@@ -160,8 +160,22 @@ async def m3_evolution_request(
 async def m3_list_reflections(
     ctx: TenantContext = Depends(get_effective_tenant_context),
     limit: int = Query(50, ge=1, le=200),
+    q: str | None = Query(None, description="Semantic search query (Qdrant over M3 reflections)"),
 ) -> dict[str, Any]:
-    """List reflection entries from M3 memory (tenant/user scoped)."""
+    """
+    List reflection entries from M3 memory (tenant/user scoped).
+    When q is set: semantic search over M3 reflections in Qdrant (module=m3); returns matches with score.
+    """
+    if q and q.strip():
+        from src.modules.m3.vectors import search_m3_reflections
+        data = await search_m3_reflections(
+            ctx.tenant_id,
+            ctx.user_id,
+            q.strip(),
+            space_id=ctx.space_id,
+            limit=min(limit, 50),
+        )
+        return {"data": data, "meta": {"count": len(data), "search": True, "query": q.strip()}}
     store = get_m3_memory_store()
     entries = await store.list_reflections(ctx.tenant_id, ctx.user_id, limit=limit)
     data = [
