@@ -87,3 +87,11 @@ Build log for the M3 governed module inside KIRP. Each entry: timestamp, what wa
   - **Files touched:** `src/modules/m3/governance.py`, `src/core/pipeline.py`.  
 
 ---
+
+- **2025-02-19 (Step 12)**  
+  - **What:** M3 API: GET /m3/actions (list micro_actions with optional status filter) and GET /m3/kpis (spec 10: Daily Reflection Completion, Recall Retention, Identity Alignment, Gap Closure with explanation path).  
+  - **Why:** Spec 10 analytics & KPIs under KIRP; auditable metrics from M3 memory.  
+  - **Files touched:** `src/api/v1_m3.py`.  
+  - **Next:** Optional: persist M3 memory to Qdrant/Postgres; dashboard widgets; gap_closure snapshots from events.
+
+---
