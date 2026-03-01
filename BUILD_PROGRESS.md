@@ -142,3 +142,11 @@ Build log for the M3 governed module inside KIRP. Each entry: timestamp, what wa
   - **Next:** Optional: Qdrant vector search for M3; mobile nav M3 link.
 
 ---
+
+- **2025-02-19 (Step 19)**  
+  - **What:** MobileNav: "Identity" link to /m3. apiClient: m3SynthesisRequest, m3EvolutionRequest. M3 page: card "Synthesis & evolution" with buttons "Request weekly synthesis" and "Request monthly evolution".  
+  - **Why:** Complete M3 UX from dashboard; mobile access; trigger weekly/monthly from UI.  
+  - **Files touched:** `components/navigation/MobileNav.tsx`, `lib/apiClient.ts`, `app/(dashboard)/m3/page.tsx`.  
+  - **Next:** Optional: Qdrant vector search for M3; idempotency key for reflect.
+
+---

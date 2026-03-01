@@ -6,7 +6,7 @@ import { PageSkeleton } from "@/components/dashboard/PageSkeleton";
 import { ErrorState } from "@/components/feedback/ErrorState";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Target, RefreshCw, Send, BarChart3 } from "lucide-react";
+import { Target, RefreshCw, Send, BarChart3, Calendar, CalendarDays } from "lucide-react";
 
 export default function M3Page() {
   const [reflections, setReflections] = useState<M3Reflection[]>([]);
@@ -17,6 +17,9 @@ export default function M3Page() {
   const [mood, setMood] = useState("");
   const [submitLoading, setSubmitLoading] = useState(false);
   const [submitSuccess, setSubmitSuccess] = useState<string | null>(null);
+  const [synthesisLoading, setSynthesisLoading] = useState(false);
+  const [evolutionLoading, setEvolutionLoading] = useState(false);
+  const [triggerSuccess, setTriggerSuccess] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -57,6 +60,34 @@ export default function M3Page() {
       setError(e instanceof Error ? e.message : "Submit failed");
     } finally {
       setSubmitLoading(false);
+    }
+  }
+
+  async function handleSynthesis() {
+    setSynthesisLoading(true);
+    setTriggerSuccess(null);
+    try {
+      await apiClient.m3SynthesisRequest({});
+      setTriggerSuccess("Weekly synthesis requested.");
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Synthesis request failed");
+    } finally {
+      setSynthesisLoading(false);
+    }
+  }
+
+  async function handleEvolution() {
+    setEvolutionLoading(true);
+    setTriggerSuccess(null);
+    try {
+      await apiClient.m3EvolutionRequest({});
+      setTriggerSuccess("Monthly evolution requested.");
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Evolution request failed");
+    } finally {
+      setEvolutionLoading(false);
     }
   }
 
@@ -117,6 +148,35 @@ export default function M3Page() {
           </CardContent>
         </Card>
       </form>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Synthesis & evolution</CardTitle>
+        </CardHeader>
+        <CardContent className="flex flex-wrap gap-3">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleSynthesis}
+            disabled={synthesisLoading}
+          >
+            <Calendar className="h-4 w-4 mr-2" />
+            {synthesisLoading ? "Requesting…" : "Request weekly synthesis"}
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleEvolution}
+            disabled={evolutionLoading}
+          >
+            <CalendarDays className="h-4 w-4 mr-2" />
+            {evolutionLoading ? "Requesting…" : "Request monthly evolution"}
+          </Button>
+          {triggerSuccess && (
+            <p className="text-sm text-green-600 dark:text-green-400 w-full">{triggerSuccess}</p>
+          )}
+        </CardContent>
+      </Card>
 
       {kpis && (
         <Card>

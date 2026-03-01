@@ -3,12 +3,13 @@
 import React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, CheckCircle2, History, Bell } from "lucide-react";
+import { LayoutDashboard, CheckCircle2, History, Bell, Target } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const ITEMS = [
   { href: "/dashboard", label: "Home", icon: LayoutDashboard },
   { href: "/tasks", label: "Tasks", icon: CheckCircle2 },
+  { href: "/m3", label: "Identity", icon: Target },
   { href: "/history", label: "History", icon: History },
   { href: "/notifications", label: "Activity", icon: Bell },
 ];

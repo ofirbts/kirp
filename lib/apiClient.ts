@@ -845,6 +845,14 @@ export async function m3Health(): Promise<{ module: string; event_types_register
   return get("/api/v1/m3/health");
 }
 
+export async function m3SynthesisRequest(body?: { week_start?: string; week_end?: string }): Promise<{ ok: boolean; event_id: string }> {
+  return post<{ ok: boolean; event_id: string }>("/api/v1/m3/synthesis", body ?? {});
+}
+
+export async function m3EvolutionRequest(body?: { month?: string }): Promise<{ ok: boolean; event_id: string }> {
+  return post<{ ok: boolean; event_id: string }>("/api/v1/m3/evolution", body ?? {});
+}
+
 export async function queryV1(body: {
   tenant_id: string;
   space_id: string;
@@ -923,6 +931,8 @@ export const apiClient = {
   m3ListReflections,
   m3GetKpis,
   m3Health,
+  m3SynthesisRequest,
+  m3EvolutionRequest,
 };
 
 // ---------- Connections Hub ----------
