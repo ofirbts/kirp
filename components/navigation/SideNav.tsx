@@ -16,6 +16,7 @@ import {
   Lightbulb,
   Share2,
   Bell,
+  Target,
 } from "lucide-react";
 
 type NavItem = {
@@ -74,6 +75,11 @@ const NAV_ITEMS: NavItem[] = [
     label: "History",
     href: "/history",
     icon: <Clock3 className="h-4 w-4" />,
+  },
+  {
+    label: "Identity (M3)",
+    href: "/m3",
+    icon: <Target className="h-4 w-4" />,
   },
 ];
 

@@ -134,3 +134,11 @@ Build log for the M3 governed module inside KIRP. Each entry: timestamp, what wa
   - **Next:** Optional: dashboard widgets; Qdrant vector search for M3.
 
 ---
+
+- **2025-02-19 (Step 18)**  
+  - **What:** Dashboard M3: apiClient m3Reflect, m3ListReflections, m3GetKpis, m3Health; SideNav "Identity (M3)" → /m3; app/(dashboard)/m3/page.tsx with reflection form, KPIs card, recent reflections list. docs/M3.md updated.  
+  - **Why:** Spec: Dashboard + M3-specific routes; UX for daily reflection and KPIs.  
+  - **Files touched:** `lib/apiClient.ts`, `components/navigation/SideNav.tsx`, `app/(dashboard)/m3/page.tsx`, `docs/M3.md`.  
+  - **Next:** Optional: Qdrant vector search for M3; mobile nav M3 link.
+
+---

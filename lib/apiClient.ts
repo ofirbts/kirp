@@ -792,6 +792,59 @@ export async function ingestV1(body: {
   return post<Record<string, unknown>>("/api/v1/ingest", body);
 }
 
+// ---------- M3 IdentityOS ----------
+
+export interface M3Reflection {
+  id: string;
+  reflection_date: string;
+  reflection_text: string;
+  pillar_scores: Record<string, number>;
+  mood: string;
+  created_at: string | null;
+}
+
+export interface M3Kpis {
+  data: {
+    daily_reflection_completion: {
+      days_with_reflection: number;
+      total_reflections: number;
+      target_met_days: number;
+      window_days: number;
+      explanation: string;
+    };
+    recall_retention: {
+      completed_or_snoozed_count: number;
+      total_actions: number;
+      rate_pct: number;
+      explanation: string;
+    };
+    identity_alignment: { has_profile: boolean; pillar_scores: Record<string, number>; explanation: string };
+    gap_closure: { value: number | null; snapshot_count: number; explanation: string };
+  };
+  meta: { tenant_id: string; user_id: string; window_days: number };
+}
+
+export async function m3Reflect(body: {
+  reflection_text: string;
+  pillar_scores?: Record<string, number>;
+  mood?: string;
+  reflection_date?: string;
+}): Promise<{ ok: boolean; event_id: string }> {
+  return post<{ ok: boolean; event_id: string }>("/api/v1/m3/reflect", body);
+}
+
+export async function m3ListReflections(params?: { limit?: number }): Promise<{ data: M3Reflection[]; meta: { count: number } }> {
+  return get<{ data: M3Reflection[]; meta: { count: number } }>("/api/v1/m3/reflections", params as Record<string, number>);
+}
+
+export async function m3GetKpis(params?: { days?: number }): Promise<M3Kpis> {
+  return get<M3Kpis>("/api/v1/m3/kpis", params as Record<string, number>);
+}
+
+export async function m3Health(): Promise<{ module: string; event_types_registered: number; agents_registered: number }> {
+  return get("/api/v1/m3/health");
+}
+
 export async function queryV1(body: {
   tenant_id: string;
   space_id: string;
@@ -866,6 +919,10 @@ export const apiClient = {
   signupV1,
   loginV1,
   meV1,
+  m3Reflect,
+  m3ListReflections,
+  m3GetKpis,
+  m3Health,
 };
 
 // ---------- Connections Hub ----------
