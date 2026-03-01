@@ -150,3 +150,11 @@ Build log for the M3 governed module inside KIRP. Each entry: timestamp, what wa
   - **Next:** Optional: Qdrant vector search for M3; idempotency key for reflect.
 
 ---
+
+- **2025-02-19 (Step 20)**  
+  - **What:** Idempotency for POST /m3/reflect: optional header Idempotency-Key; lookup in M3 memory before dispatch; if duplicate return 200 with same event_id; after success record (tenant_id, user_id, key) → event_id. In-memory and Mongo (m3_idempotency) backends.  
+  - **Why:** Avoid double writeback on duplicate submit (e.g. double-click); Build Protocol optional item.  
+  - **Files touched:** `src/modules/m3/memory.py`, `src/modules/m3/memory_mongo.py`, `src/api/v1_m3.py`.  
+  - **Next:** Optional: Qdrant vector search for M3.
+
+---

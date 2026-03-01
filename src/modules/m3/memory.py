@@ -121,6 +121,7 @@ class M3MemoryStore:
         self._evolutions: list[dict[str, Any]] = []
         self._profiles: dict[tuple[str, str], dict[str, Any]] = {}
         self._gap_snapshots: list[dict[str, Any]] = []
+        self._idempotency: dict[tuple[str, str, str], str] = {}  # (tenant_id, user_id, key) -> event_id
 
     async def connect(self) -> None:
         """Optional: connect to backing store."""
@@ -477,6 +478,19 @@ class M3MemoryStore:
                 created_at=s.get("created_at"),
             ))
         return out
+
+    # Idempotency for POST /m3/reflect (duplicate submit → return same event_id, no double writeback)
+    async def get_idempotency_event_id(
+        self, tenant_id: str, user_id: str, idempotency_key: str
+    ) -> str | None:
+        key = (tenant_id, user_id, idempotency_key)
+        return self._idempotency.get(key)
+
+    async def record_idempotency(
+        self, tenant_id: str, user_id: str, idempotency_key: str, event_id: str
+    ) -> None:
+        key = (tenant_id, user_id, idempotency_key)
+        self._idempotency[key] = event_id
 
 
 # Singleton for use by agents and API (in-memory default; optional Mongo via M3_MEMORY_BACKEND=mongo)

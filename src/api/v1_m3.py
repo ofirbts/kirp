@@ -10,7 +10,8 @@ from __future__ import annotations
 from datetime import date, datetime, timezone
 from typing import Any
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Request
+from fastapi.responses import JSONResponse
 
 from src.auth.tenant_context import TenantContext, get_effective_tenant_context
 from src.models.event import CanonicalEvent
@@ -69,13 +70,22 @@ def _canonical_m3_event(
 
 @router.post("/m3/reflect", status_code=201)
 async def m3_reflect(
+    request: Request,
     body: dict[str, Any] | None = None,
     ctx: TenantContext = Depends(get_effective_tenant_context),
 ) -> dict[str, Any]:
     """
     Submit a daily reflection. Creates m3.daily_reflection_submitted and runs pipeline.
     Body: reflection_text, pillar_scores (optional), mood (optional), duration_sec (optional), reflection_date (optional).
+    Header: Idempotency-Key (optional) — if present and duplicate, returns 200 with same event_id (no double writeback).
     """
+    idempotency_key = (request.headers.get("Idempotency-Key") or request.headers.get("idempotency-key") or "").strip()
+    if idempotency_key:
+        store = get_m3_memory_store()
+        existing = await store.get_idempotency_event_id(ctx.tenant_id, ctx.user_id, idempotency_key)
+        if existing:
+            return JSONResponse(status_code=200, content={"ok": True, "event_id": existing})
+
     payload = body or {}
     reflection_text = payload.get("reflection_text", "")
     reflection_date = payload.get("reflection_date") or date.today().isoformat()
@@ -86,6 +96,8 @@ async def m3_reflect(
         "duration_sec": payload.get("duration_sec"),
         "reflection_date": reflection_date,
     }
+    if idempotency_key:
+        meta["idempotency_key"] = idempotency_key
     event = _canonical_m3_event(
         ctx,
         EVENT_M3_DAILY_REFLECTION_SUBMITTED,
@@ -95,6 +107,9 @@ async def m3_reflect(
     )
     registry = get_event_registry()
     event_id = await registry.dispatch(event)
+    if idempotency_key:
+        store = get_m3_memory_store()
+        await store.record_idempotency(ctx.tenant_id, ctx.user_id, idempotency_key, str(event_id))
     return {"ok": True, "event_id": str(event_id)}
 
 

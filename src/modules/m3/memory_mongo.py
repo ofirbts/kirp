@@ -387,3 +387,22 @@ class MongoM3MemoryStore(M3MemoryStore):
                 created_at=doc.get("created_at"),
             ))
         return out
+
+    async def get_idempotency_event_id(
+        self, tenant_id: str, user_id: str, idempotency_key: str
+    ) -> str | None:
+        db = await self._ensure_db()
+        doc = await db.m3_idempotency.find_one(
+            {"tenant_id": tenant_id, "user_id": user_id, "idempotency_key": idempotency_key}
+        )
+        return doc.get("event_id") if doc else None
+
+    async def record_idempotency(
+        self, tenant_id: str, user_id: str, idempotency_key: str, event_id: str
+    ) -> None:
+        db = await self._ensure_db()
+        await db.m3_idempotency.update_one(
+            {"tenant_id": tenant_id, "user_id": user_id, "idempotency_key": idempotency_key},
+            {"$set": {"event_id": event_id, "updated_at": datetime.now(timezone.utc)}},
+            upsert=True,
+        )
