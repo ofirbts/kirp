@@ -15,7 +15,7 @@ import { PageSkeleton } from "@/components/dashboard/PageSkeleton";
 import { ErrorState } from "@/components/feedback/ErrorState";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Target, RefreshCw, Send, BarChart3, Calendar, CalendarDays, Search, CheckSquare, ListTodo } from "lucide-react";
+import { Target, RefreshCw, Send, BarChart3, Calendar, CalendarDays, Search, CheckSquare, ListTodo, List } from "lucide-react";
 
 export default function M3Page() {
   const [reflections, setReflections] = useState<M3Reflection[]>([]);
@@ -136,6 +136,32 @@ export default function M3Page() {
     }
   }
 
+  async function handleBackToList() {
+    setSearchQuery("");
+    setReflectionsMeta(null);
+    setLoading(true);
+    setError(null);
+    try {
+      const [refRes, kpisRes, actionsRes, synthRes, evoRes] = await Promise.all([
+        apiClient.m3ListReflections({ limit: 20 }),
+        apiClient.m3GetKpis({ days: 7 }),
+        apiClient.m3ListActions({ limit: 50 }),
+        apiClient.m3ListSynthesis({ limit: 10 }),
+        apiClient.m3ListEvolution({ limit: 6 }),
+      ]);
+      setReflections(refRes.data ?? []);
+      setReflectionsMeta(refRes.meta ?? null);
+      setKpis(kpisRes ?? null);
+      setActions(actionsRes.data ?? []);
+      setSyntheses(synthRes.data ?? []);
+      setEvolutions(evoRes.data ?? []);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to load");
+    } finally {
+      setLoading(false);
+    }
+  }
+
   const isSearchResults = reflectionsMeta?.search === true;
   const searchHits = isSearchResults ? (reflections as M3ReflectionSearchHit[]) : [];
 
@@ -234,7 +260,9 @@ export default function M3Page() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          {actions.length === 0 ? (
+          {loading && !isSearchResults ? (
+            <p className="text-textSoft text-sm">Loading…</p>
+          ) : actions.length === 0 ? (
             <p className="text-textSoft text-sm">No micro-actions yet. They are generated from reflections.</p>
           ) : (
             <ul className="space-y-2">
@@ -312,38 +340,44 @@ export default function M3Page() {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          {syntheses.length > 0 && (
-            <div>
-              <p className="text-textSoft text-xs font-medium mb-2">Weekly syntheses</p>
-              <ul className="space-y-2">
-                {syntheses.slice(0, 5).map((s) => (
-                  <li key={s.synthesis_id} className="text-sm border-b border-border pb-2 last:border-0">
-                    <p className="text-textSoft text-xs">{s.week_start} – {s.week_end}</p>
-                    <p className="mt-0.5">{s.summary ? (s.summary.slice(0, 120) + (s.summary.length > 120 ? "…" : "")) : "—"}</p>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-          {evolutions.length > 0 && (
-            <div>
-              <p className="text-textSoft text-xs font-medium mb-2">Monthly evolutions</p>
-              <ul className="space-y-2">
-                {evolutions.slice(0, 5).map((e) => (
-                  <li key={e.evolution_id} className="text-sm border-b border-border pb-2 last:border-0">
-                    <p className="text-textSoft text-xs">{e.month}</p>
-                    <p className="mt-0.5">
-                      {e.new_goals?.length ? e.new_goals.slice(0, 2).join("; ") : (Array.isArray(e.trajectory) && e.trajectory[0])
-                        ? String((e.trajectory[0] as { summary?: string }).summary ?? e.trajectory[0]).slice(0, 80) + "…"
-                        : "—"}
-                    </p>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-          {syntheses.length === 0 && evolutions.length === 0 && (
-            <p className="text-textSoft text-sm">No syntheses or evolutions yet. Use the buttons above to request them.</p>
+          {loading && !isSearchResults ? (
+            <p className="text-textSoft text-sm">Loading…</p>
+          ) : (
+            <>
+              {syntheses.length > 0 && (
+                <div>
+                  <p className="text-textSoft text-xs font-medium mb-2">Weekly syntheses</p>
+                  <ul className="space-y-2">
+                    {syntheses.slice(0, 5).map((s) => (
+                      <li key={s.synthesis_id} className="text-sm border-b border-border pb-2 last:border-0">
+                        <p className="text-textSoft text-xs">{s.week_start} – {s.week_end}</p>
+                        <p className="mt-0.5">{s.summary ? (s.summary.slice(0, 120) + (s.summary.length > 120 ? "…" : "")) : "—"}</p>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              {evolutions.length > 0 && (
+                <div>
+                  <p className="text-textSoft text-xs font-medium mb-2">Monthly evolutions</p>
+                  <ul className="space-y-2">
+                    {evolutions.slice(0, 5).map((e) => (
+                      <li key={e.evolution_id} className="text-sm border-b border-border pb-2 last:border-0">
+                        <p className="text-textSoft text-xs">{e.month}</p>
+                        <p className="mt-0.5">
+                          {e.new_goals?.length ? e.new_goals.slice(0, 2).join("; ") : (Array.isArray(e.trajectory) && e.trajectory[0])
+                            ? String((e.trajectory[0] as { summary?: string }).summary ?? e.trajectory[0]).slice(0, 80) + "…"
+                            : "—"}
+                        </p>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              {syntheses.length === 0 && evolutions.length === 0 && (
+                <p className="text-textSoft text-sm">No syntheses or evolutions yet. Use the buttons above to request them.</p>
+              )}
+            </>
           )}
         </CardContent>
       </Card>
@@ -357,9 +391,9 @@ export default function M3Page() {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <form onSubmit={handleSearch} className="flex gap-2">
+          <form onSubmit={handleSearch} className="flex flex-wrap gap-2 items-center">
             <input
-              className="flex-1 max-w-sm rounded-lg border border-border bg-surface px-3 py-2 text-sm"
+              className="flex-1 min-w-[200px] rounded-lg border border-border bg-surface px-3 py-2 text-sm"
               placeholder="Search reflections by meaning…"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
@@ -368,7 +402,16 @@ export default function M3Page() {
               <Search className="h-4 w-4 mr-1" />
               {searchLoading ? "Searching…" : "Search"}
             </Button>
+            {isSearchResults && (
+              <Button type="button" variant="ghost" size="sm" onClick={handleBackToList} disabled={loading}>
+                <List className="h-4 w-4 mr-1" />
+                Back to list
+              </Button>
+            )}
           </form>
+          {searchLoading && (
+            <p className="text-textSoft text-sm">Searching…</p>
+          )}
           {reflections.length === 0 ? (
             <p className="text-textSoft text-sm">
               {isSearchResults ? "No matching reflections." : "No reflections yet. Submit one above."}

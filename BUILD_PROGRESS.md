@@ -189,3 +189,18 @@ Build log for the M3 governed module inside KIRP. Each entry: timestamp, what wa
   - **Next:** Optional: agents wiring, more M3 UX.
 
 ---
+
+- **2025-02-19 (Step 25)**  
+  - **What:** ReflectionClassifierAgent: real handler calls get_llm_for_task("bulk"), prompts for JSON pillar_scores (health, work, family, learning) and mood; parses response, returns structured result; on failure returns ok: false with error.  
+  - **Why:** Wire one M3 agent to LLM for classification (spec agents).  
+  - **Files touched:** `src/modules/m3/agents.py`.  
+
+---
+
+- **2025-02-19 (Step 26)**  
+  - **What:** M3 dashboard UX: "Back to list" button when showing search results (reloads full list and clears search); "Loading…" in Micro-actions and Recent syntheses & evolution cards during initial load; "Searching…" under search form when searchLoading.  
+  - **Why:** Clear exit from search and loading feedback for sections.  
+  - **Files touched:** `app/(dashboard)/m3/page.tsx`.  
+  - **Next:** Optional: persist ReflectionClassifier result to reflection entry; more agents.
+
+---

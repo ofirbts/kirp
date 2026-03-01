@@ -2,14 +2,22 @@
 M3 IdentityOS — Agent specs and stub handlers.
 
 All M3 agents are registered in KIRP's Agent Framework and invoked from pipeline stages.
-Stub handlers return a minimal result; full implementations will use Memory and EGE.
+ReflectionClassifierAgent calls LLM to classify reflection into pillar_scores and mood.
 """
 
 from __future__ import annotations
 
+import json
+import logging
+import re
 from typing import Any
 
 from src.core.agent_framework import AgentSpec, AutonomyLevel
+
+logger = logging.getLogger(__name__)
+
+# Default pillars for classification (spec 6.1 / identity)
+DEFAULT_PILLARS = ["health", "work", "family", "learning"]
 
 
 async def _stub_m3_agent(
@@ -27,6 +35,84 @@ async def _stub_m3_agent(
         "tenant_id": tenant_id,
         "user_id": user_id,
     }
+
+
+async def _reflection_classifier_handler(
+    tenant_id: str,
+    space_id: str,
+    user_id: str,
+    context: dict[str, Any],
+) -> dict[str, Any]:
+    """
+    Classify reflection text via LLM into pillar_scores and mood.
+    Returns structured result; writeback already persisted the reflection (stages run after writeback).
+    """
+    reflection_text = (context.get("reflection_text") or context.get("content") or "").strip()
+    if not reflection_text:
+        return {
+            "ok": True,
+            "module": "m3",
+            "agent": "ReflectionClassifierAgent",
+            "tenant_id": tenant_id,
+            "user_id": user_id,
+            "pillar_scores": {},
+            "mood": "",
+        }
+    try:
+        from src.core.llm_router import get_llm_for_task
+        llm = get_llm_for_task("bulk")
+        pillars_str = ", ".join(DEFAULT_PILLARS)
+        prompt = f"""Classify this daily reflection in one short JSON object only.
+Use keys: "pillar_scores" (object with exactly these keys, each 0.0-1.0: {pillars_str}) and "mood" (one word or short phrase).
+Reflection:
+{reflection_text[:2000]}
+
+Reply with only the JSON, no markdown."""
+        response = await llm.invoke(prompt, temperature=0.2, max_tokens=300)
+        text = (response or "").strip()
+        # Strip markdown code block if present
+        if "```" in text:
+            m = re.search(r"```(?:json)?\s*([\s\S]*?)```", text)
+            if m:
+                text = m.group(1).strip()
+        data = json.loads(text)
+        pillar_scores = data.get("pillar_scores") or {}
+        if isinstance(pillar_scores, dict):
+            pillar_scores = {k: float(v) for k, v in pillar_scores.items() if isinstance(v, (int, float))}
+        mood = str(data.get("mood", "") or "").strip()[:100]
+        return {
+            "ok": True,
+            "module": "m3",
+            "agent": "ReflectionClassifierAgent",
+            "tenant_id": tenant_id,
+            "user_id": user_id,
+            "pillar_scores": pillar_scores,
+            "mood": mood,
+        }
+    except json.JSONDecodeError as e:
+        logger.warning("ReflectionClassifierAgent JSON parse failed: %s", e)
+        return {
+            "ok": False,
+            "module": "m3",
+            "agent": "ReflectionClassifierAgent",
+            "tenant_id": tenant_id,
+            "user_id": user_id,
+            "error": "classification_parse_failed",
+            "pillar_scores": {},
+            "mood": "",
+        }
+    except Exception as e:
+        logger.warning("ReflectionClassifierAgent failed: %s", e)
+        return {
+            "ok": False,
+            "module": "m3",
+            "agent": "ReflectionClassifierAgent",
+            "tenant_id": tenant_id,
+            "user_id": user_id,
+            "error": str(e),
+            "pillar_scores": {},
+            "mood": "",
+        }
 
 
 def _m3_handler(name: str):
@@ -57,7 +143,7 @@ reflection_classifier_agent_spec = AgentSpec(
     autonomy=AutonomyLevel.FULL,
     tenant_scopes=[],
     description="Classifies raw reflection text into pillar_scores, mood, structured fields; writes reflection_entries.",
-    handler=_m3_handler("ReflectionClassifierAgent"),
+    handler=_reflection_classifier_handler,
 )
 
 identity_vector_agent_spec = AgentSpec(
