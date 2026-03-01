@@ -849,10 +849,14 @@ export async function m3Reflect(body: {
 export async function m3ListReflections(params?: {
   limit?: number;
   q?: string;
+  since?: string;
+  until?: string;
 }): Promise<M3ReflectionsResponse> {
   const p: Record<string, string | number | undefined> = {};
   if (params?.limit != null) p.limit = params.limit;
   if (params?.q != null && params.q.trim() !== "") p.q = params.q.trim();
+  if (params?.since != null && params.since.trim() !== "") p.since = params.since.trim();
+  if (params?.until != null && params.until.trim() !== "") p.until = params.until.trim();
   return get<M3ReflectionsResponse>("/api/v1/m3/reflections", p);
 }
 

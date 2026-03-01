@@ -219,3 +219,18 @@ Build log for the M3 governed module inside KIRP. Each entry: timestamp, what wa
   - **Next:** Optional: dashboard date filter UI; more agents.
 
 ---
+
+- **2025-02-19 (Step 29)**  
+  - **What:** Dashboard date filter for reflections: apiClient m3ListReflections(since?, until?); M3 page state dateSince/dateUntil; preset buttons "All", "Last 7 days", "Last 30 days" that call load({ since, until }).  
+  - **Why:** Filter reflections by date range from UI (Step 28 backend).  
+  - **Files touched:** `lib/apiClient.ts`, `app/(dashboard)/m3/page.tsx`.  
+
+---
+
+- **2025-02-19 (Step 30 — Phase 1 complete)**  
+  - **What:** docs/M3.md updated (GET /m3/reflections since/until, dashboard description, ReflectionClassifierAgent persistence). Full self-check: imports (m3 module, pipeline, event_registry, agent_registry, memory, api v1_m3), event types registered, metadata.module = m3, list_reflections with since/before, update_last_reflection_classification.  
+  - **Why:** Close M3 IdentityOS Phase 1 build per protocol; single source of truth for API and behaviour.  
+  - **Files touched:** `docs/M3.md`, `BUILD_PROGRESS.md`.  
+  - **Next:** Phase 2 (optional): more agents (GapAnalysis, MicroActionGenerator) with LLM; M3 export; dashboard pillar_scores display.
+
+---

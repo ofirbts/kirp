@@ -35,10 +35,15 @@ export default function M3Page() {
   const [actions, setActions] = useState<M3MicroAction[]>([]);
   const [syntheses, setSyntheses] = useState<M3Synthesis[]>([]);
   const [evolutions, setEvolutions] = useState<M3Evolution[]>([]);
+  const [dateSince, setDateSince] = useState<string>("");
+  const [dateUntil, setDateUntil] = useState<string>("");
+  const [filterPreset, setFilterPreset] = useState<"all" | "7" | "30">("all");
 
-  const load = useCallback(async (opts?: { q?: string }) => {
+  const load = useCallback(async (opts?: { q?: string; since?: string; until?: string }) => {
     setLoading(true);
     setError(null);
+    const since = opts?.since ?? dateSince;
+    const until = opts?.until ?? dateUntil;
     try {
       if (opts?.q) {
         const refRes = await apiClient.m3ListReflections({ limit: 20, q: opts.q });
@@ -46,7 +51,7 @@ export default function M3Page() {
         setReflectionsMeta(refRes.meta ?? null);
       } else {
         const [refRes, kpisRes, actionsRes, synthRes, evoRes] = await Promise.all([
-          apiClient.m3ListReflections({ limit: 20 }),
+          apiClient.m3ListReflections({ limit: 50, since: since || undefined, until: until || undefined }),
           apiClient.m3GetKpis({ days: 7 }),
           apiClient.m3ListActions({ limit: 50 }),
           apiClient.m3ListSynthesis({ limit: 10 }),
@@ -64,7 +69,7 @@ export default function M3Page() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [dateSince, dateUntil]);
 
   useEffect(() => {
     load();
@@ -411,6 +416,65 @@ export default function M3Page() {
           </form>
           {searchLoading && (
             <p className="text-textSoft text-sm">Searching…</p>
+          )}
+          {!isSearchResults && (
+            <div className="flex flex-wrap gap-2 items-center">
+              <span className="text-textSoft text-xs">Date range:</span>
+              <Button
+                type="button"
+                variant={filterPreset === "all" ? "secondary" : "ghost"}
+                size="sm"
+                onClick={() => {
+                  setFilterPreset("all");
+                  setDateSince("");
+                  setDateUntil("");
+                  load({ since: "", until: "" });
+                }}
+              >
+                All
+              </Button>
+              <Button
+                type="button"
+                variant={filterPreset === "7" ? "secondary" : "ghost"}
+                size="sm"
+                onClick={() => {
+                  setFilterPreset("7");
+                  const today = new Date();
+                  const until = today.toISOString().slice(0, 10);
+                  const since = new Date(today);
+                  since.setDate(since.getDate() - 7);
+                  const sinceStr = since.toISOString().slice(0, 10);
+                  setDateSince(sinceStr);
+                  setDateUntil(until);
+                  load({ since: sinceStr, until });
+                }}
+              >
+                Last 7 days
+              </Button>
+              <Button
+                type="button"
+                variant={filterPreset === "30" ? "secondary" : "ghost"}
+                size="sm"
+                onClick={() => {
+                  setFilterPreset("30");
+                  const today = new Date();
+                  const until = today.toISOString().slice(0, 10);
+                  const since = new Date(today);
+                  since.setDate(since.getDate() - 30);
+                  const sinceStr = since.toISOString().slice(0, 10);
+                  setDateSince(sinceStr);
+                  setDateUntil(until);
+                  load({ since: sinceStr, until });
+                }}
+              >
+                Last 30 days
+              </Button>
+              {(dateSince || dateUntil) && (
+                <span className="text-textSoft text-xs">
+                  {dateSince || "…"} – {dateUntil || "…"}
+                </span>
+              )}
+            </div>
           )}
           {reflections.length === 0 ? (
             <p className="text-textSoft text-sm">
