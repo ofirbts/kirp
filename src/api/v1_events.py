@@ -8,6 +8,7 @@ Uses existing events_service; POST delegates to ingest (Kafka).
 from __future__ import annotations
 
 from typing import Any
+from uuid import uuid4
 
 from fastapi import APIRouter, Depends, Query
 
@@ -58,6 +59,10 @@ async def create_event_v1(
     content = payload.get("content", "")
     source = payload.get("source", "api")
     metadata = payload.get("metadata") or {}
+    run_id = f"run_{uuid4().hex}"
+    trace_id = f"tr_{uuid4().hex[:12]}"
+    workflow_type = "ingest_event"
+    idempotency_key = payload.get("idempotency_key")
     try:
         from src.agents.kafka_event_agent import KafkaEventAgent, EventEnvelope
         KafkaEventAgent().emit(EventEnvelope(
@@ -67,13 +72,26 @@ async def create_event_v1(
                 "space_id": space_id,
                 "user_id": user_id,
                 "content": content,
-                "metadata": metadata,
+                "trace_id": trace_id,
+                "run_id": run_id,
+                "workflow_type": workflow_type,
+                "idempotency_key": idempotency_key,
+                "metadata": {
+                    **metadata,
+                    "trace_id": trace_id,
+                    "run_id": run_id,
+                    "workflow_type": workflow_type,
+                },
                 "source": source,
             },
             tenant_id=tenant_id,
             space_id=space_id,
             user_id=user_id,
+            run_id=run_id,
+            workflow_type=workflow_type,
+            trace_id=trace_id,
+            idempotency_key=idempotency_key,
         ))
-        return {"ok": True, "event_id": "queued"}
+        return {"ok": True, "event_id": "queued", "run_id": run_id, "trace_id": trace_id}
     except Exception:
-        return {"ok": True, "event_id": "queued"}
+        return {"ok": True, "event_id": "queued", "run_id": run_id, "trace_id": trace_id}

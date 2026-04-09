@@ -58,6 +58,14 @@ async def handle_m3_event(event: CanonicalEvent) -> UUID:
     meta = ensure_m3_metadata(event.metadata)
     if event.trace_id:
         meta.setdefault("trace_id", event.trace_id)
+    if event.run_id:
+        meta.setdefault("run_id", event.run_id)
+    if event.workflow_type:
+        meta.setdefault("workflow_type", event.workflow_type)
+    if event.idempotency_key:
+        meta.setdefault("idempotency_key", event.idempotency_key)
+    if event.parent_run_id:
+        meta.setdefault("parent_run_id", event.parent_run_id)
 
     # Content: for ingest-like M3 events use content or a stringified payload from metadata
     content = event.content or ""

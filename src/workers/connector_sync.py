@@ -10,6 +10,7 @@ from __future__ import annotations
 import asyncio
 import logging
 from typing import Any
+from uuid import uuid4
 
 logger = logging.getLogger(__name__)
 
@@ -39,13 +40,28 @@ async def _ingest_payloads_idempotent(
             skipped += 1
             continue
         try:
+            from src.core.run_controller import get_run_controller
+
+            meta_out = dict(meta)
+            if not meta_out.get("run_id"):
+                rid = f"run_{uuid4().hex}"
+                tr = f"tr_{uuid4().hex[:12]}"
+                await get_run_controller().create_run(
+                    workflow_type="connector_sync",
+                    tenant_id=p["tenant_id"],
+                    trace_id=tr,
+                    run_id=rid,
+                )
+                meta_out["run_id"] = rid
+                meta_out.setdefault("trace_id", tr)
+                meta_out.setdefault("workflow_type", "connector_sync")
             await pipeline.run(
                 tenant_id=p["tenant_id"],
                 space_id=p["space_id"],
                 user_id=p["user_id"],
                 source=source,
                 content=p.get("content", ""),
-                metadata=meta,
+                metadata=meta_out,
             )
             ingested += 1
         except Exception as e:

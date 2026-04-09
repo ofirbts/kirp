@@ -8,6 +8,7 @@ notion_sync, calendar_event, system.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -96,26 +97,80 @@ class HistoryEntry:
 class HistoryStore:
     """MongoDB store for history entries. Collection: history."""
 
-    def __init__(self, mongo_uri: str, db_name: str = "kirp") -> None:
+    def __init__(
+        self,
+        mongo_uri: str,
+        db_name: str = "kirp",
+        *,
+        connect_max_attempts: int = 5,
+        connect_base_delay_sec: float = 0.5,
+        server_selection_timeout_ms: int = 5000,
+    ) -> None:
         self._mongo_uri = mongo_uri
         self._db_name = db_name
+        self._connect_max_attempts = max(1, connect_max_attempts)
+        self._connect_base_delay_sec = connect_base_delay_sec
+        self._server_selection_timeout_ms = server_selection_timeout_ms
         self._client: Any = None
         self._db: Any = None
 
+    async def health_check(self) -> bool:
+        """Return True if MongoDB responds to ping."""
+        if self._db is None:
+            return False
+        try:
+            await self._db.command("ping")
+            return True
+        except Exception as e:
+            logger.warning("HistoryStore health_check failed: %s", e)
+            return False
+
     async def connect(self) -> None:
         if self._db is not None:
-            return
-        try:
-            from motor.motor_asyncio import AsyncIOMotorClient
-            self._client = AsyncIOMotorClient(self._mongo_uri)
-            self._db = self._client[self._db_name]
-            await self._db.command("ping")
-            # Index: tenant_id + user_id + created_at for timeline queries
-            await self._db.history.create_index([("tenant_id", 1), ("user_id", 1), ("created_at", -1)])
-            logger.info("HistoryStore connected to MongoDB")
-        except Exception as e:
-            logger.error("HistoryStore connect failed: %s", e)
-            raise
+            if await self.health_check():
+                return
+            self._reset_connection()
+
+        last_err: Exception | None = None
+        for attempt in range(1, self._connect_max_attempts + 1):
+            try:
+                from motor.motor_asyncio import AsyncIOMotorClient
+
+                self._client = AsyncIOMotorClient(
+                    self._mongo_uri,
+                    serverSelectionTimeoutMS=self._server_selection_timeout_ms,
+                )
+                self._db = self._client[self._db_name]
+                await self._db.command("ping")
+                await self._db.history.create_index(
+                    [("tenant_id", 1), ("user_id", 1), ("created_at", -1)]
+                )
+                logger.info("HistoryStore connected to MongoDB (attempt %s)", attempt)
+                return
+            except Exception as e:
+                last_err = e
+                self._reset_connection()
+                logger.warning(
+                    "HistoryStore connect attempt %s/%s failed: %s",
+                    attempt,
+                    self._connect_max_attempts,
+                    e,
+                )
+                if attempt < self._connect_max_attempts:
+                    await asyncio.sleep(self._connect_base_delay_sec * attempt)
+        logger.error("HistoryStore connect exhausted retries: %s", last_err)
+        if last_err is not None:
+            raise last_err
+        raise RuntimeError("HistoryStore connect failed with no exception detail")
+
+    def _reset_connection(self) -> None:
+        if self._client is not None:
+            try:
+                self._client.close()
+            except Exception:
+                pass
+        self._client = None
+        self._db = None
 
     @property
     def _coll(self) -> Any:

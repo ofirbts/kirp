@@ -49,6 +49,7 @@ celery_app.conf.update(
         "src.workers.tasks.slack_sync_task": {"queue": "ingest"},
         "src.workers.tasks.notion_sync_task": {"queue": "ingest"},
         "src.workers.tasks.reminder_run_task": {"queue": "scheduled"},
+        "src.workers.tasks.reconcile_partial_runs_task": {"queue": "scheduled"},
     },
     beat_schedule={
         "daily-intelligence-08:00": {
@@ -90,6 +91,11 @@ celery_app.conf.update(
             "task": "reminder_run_task",
             "schedule": crontab(minute=30, hour="*"),
             "kwargs": {"tenant_id": "default", "space_id": "all", "user_id": "system", "horizon_days": 7},
+        },
+        "reconcile-partial-runs-15m": {
+            "task": "reconcile_partial_runs_task",
+            "schedule": 900.0,
+            "kwargs": {"max_runs": 50},
         },
     },
 )

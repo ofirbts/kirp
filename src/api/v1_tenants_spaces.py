@@ -7,11 +7,12 @@ Uses existing tenants_service; same shapes as /api/tenants.
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 
 from src.auth.tenant_context import TenantContext, get_effective_tenant_context
 from src.services import tenants_service
+from src.services.tenants_service import TenantLifecycleError, update_tenant_lifecycle
 
 
 router = APIRouter(prefix="/api/v1", tags=["V1 Tenants & Spaces"])
@@ -25,6 +26,10 @@ class CreateTenantBody(BaseModel):
 class CreateSpaceBody(BaseModel):
     name: str
     slug: str | None = None
+
+
+class SetTenantLifecycleBody(BaseModel):
+    lifecycle: str
 
 
 @router.get("/tenants")
@@ -43,6 +48,22 @@ async def create_tenant_v1(
 ):
     """Create a tenant and default space."""
     tenant = await tenants_service.create_tenant(name=body.name, slug=body.slug)
+    return {"data": tenant, "meta": {}}
+
+
+@router.patch("/tenants/{tenant_id}/lifecycle")
+async def patch_tenant_lifecycle_v1(
+    tenant_id: str,
+    body: SetTenantLifecycleBody,
+    ctx: TenantContext = Depends(get_effective_tenant_context),
+):
+    """Update SaaS lifecycle (same tenant as JWT / dev context). Stripe webhooks can use service layer directly."""
+    if ctx.tenant_id != tenant_id:
+        raise HTTPException(status_code=403, detail="tenant mismatch")
+    try:
+        tenant = await update_tenant_lifecycle(tenant_id, body.lifecycle)
+    except TenantLifecycleError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
     return {"data": tenant, "meta": {}}
 
 

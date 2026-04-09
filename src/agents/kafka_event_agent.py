@@ -27,6 +27,11 @@ class EventEnvelope:
     tenant_id: str
     space_id: str
     user_id: str
+    run_id: str | None = None
+    workflow_type: str | None = None
+    trace_id: str | None = None
+    idempotency_key: str | None = None
+    parent_run_id: str | None = None
 
 
 class KafkaEventAgent:
@@ -45,6 +50,11 @@ class KafkaEventAgent:
                 "tenant_id": event.tenant_id,
                 "space_id": event.space_id,
                 "user_id": event.user_id,
+                "run_id": event.run_id,
+                "workflow_type": event.workflow_type,
+                "trace_id": event.trace_id,
+                "idempotency_key": event.idempotency_key,
+                "parent_run_id": event.parent_run_id,
             }
             producer.produce(
                 EVENT_TOPIC,

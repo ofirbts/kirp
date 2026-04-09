@@ -12,6 +12,7 @@ import sys
 from pathlib import Path
 from contextlib import asynccontextmanager
 from typing import Any
+from uuid import uuid4
 
 from dotenv import load_dotenv
 load_dotenv()
@@ -21,8 +22,10 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 from fastapi import FastAPI, HTTPException, Depends, Body, Request
+
+from src.core.quotas import QuotaExceeded
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel
 from src.api import governance, observability, whatsapp_os, brand
 import src.api.command as command
@@ -216,6 +219,23 @@ async def http_exception_handler(request: Request, exc: HTTPException) -> JSONRe
     return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail}, headers=headers)
 
 
+@app.exception_handler(QuotaExceeded)
+async def quota_exceeded_handler(request: Request, exc: QuotaExceeded) -> JSONResponse:
+    origin = request.headers.get("origin")
+    headers = _cors_headers(origin)
+    return JSONResponse(
+        status_code=429,
+        content={
+            "detail": "quota_exceeded",
+            "tenant_id": exc.tenant_id,
+            "llm_cost_used": round(exc.llm_cost_used, 6),
+            "limit": exc.limit_usd,
+            "estimated_cost": round(exc.estimated_cost, 6),
+        },
+        headers=headers,
+    )
+
+
 @app.exception_handler(Exception)
 async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
     origin = request.headers.get("origin")
@@ -284,6 +304,29 @@ async def health() -> dict[str, Any]:
         raise HTTPException(status_code=503, detail=str(e))
 
 
+@app.post("/api/v1/stripe/webhook")
+async def stripe_webhook(request: Request) -> dict[str, Any]:
+    """
+    Stripe billing webhooks (raw body required for signature verification).
+    Configure ``STRIPE_WEBHOOK_SECRET``; put ``tenant_id`` on subscription metadata.
+    """
+    import stripe
+
+    from src.services.stripe_service import handle_webhook, verify_webhook_signature
+
+    payload = await request.body()
+    sig = request.headers.get("stripe-signature") or ""
+    try:
+        event = verify_webhook_signature(payload, sig)
+        await handle_webhook(event)
+    except stripe.SignatureVerificationError as e:
+        logger.warning("Stripe webhook signature failed: %s", e)
+        raise HTTPException(status_code=400, detail="Invalid signature") from e
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    return {"received": True}
+
+
 @app.get("/healthz")
 async def healthz() -> dict[str, Any]:
     """
@@ -293,6 +336,162 @@ async def healthz() -> dict[str, Any]:
     services (Mongo, Qdrant, etc.) are not available.
     """
     return {"status": "ok", "service": "kirp-enterprise-api"}
+
+
+@app.get("/api/v1/run/{run_id}/status")
+async def get_run_status_endpoint(run_id: str, request: Request) -> dict[str, Any]:
+    """
+    Unified run lifecycle for dashboards/monitoring.
+    Reads from RunController (partitioned Redis `tenant:{tenant_id}:{run_id}` + run_lookup, legacy read optional).
+    In production, tenant_id on the run must match the authenticated tenant (404 if not).
+    """
+    from src.auth.tenant_context import get_tenant_context, is_local_or_skip_auth
+    from src.core.run_controller import get_run_controller
+
+    rc = get_run_controller()
+    auth_ctx = None
+    if not is_local_or_skip_auth():
+        auth_ctx = get_tenant_context(request)
+    status = await rc.get_run_status(
+        run_id, tenant_id=(auth_ctx.tenant_id if auth_ctx else None)
+    )
+    if status is None:
+        raise HTTPException(status_code=404, detail="run not found")
+    if auth_ctx is not None:
+        if (status.get("tenant_id") or "") != (auth_ctx.tenant_id or ""):
+            raise HTTPException(status_code=404, detail="run not found")
+    state = str(status.get("state") or "accepted")
+    steps = status.get("steps") or []
+    from src.core.run_controller import infer_llm_route_from_steps
+
+    model = infer_llm_route_from_steps(steps if isinstance(steps, list) else [])
+    return {
+        "run_id": run_id,
+        "state": state,
+        "timeline": steps,
+        "overall_status": state,
+        "is_complete": state in ("completed", "failed"),
+        "model": model,
+    }
+
+
+@app.get("/api/v1/tenant/{tenant_id}/runs")
+async def get_tenant_runs(
+    tenant_id: str,
+    request: Request,
+    limit: int = 50,
+) -> dict[str, Any]:
+    """
+    Tenant run dashboard: recent runs plus aggregate stats for the returned page.
+    Caller must be authenticated for the same tenant as `tenant_id` (403 on mismatch).
+    """
+    from src.auth.tenant_context import get_tenant_context
+    from src.core.run_controller import get_run_controller
+
+    ctx = get_tenant_context(request)
+    if ctx.tenant_id != tenant_id:
+        raise HTTPException(status_code=403, detail="tenant mismatch")
+
+    rc = get_run_controller()
+    runs = await rc.get_recent_runs(tenant_id, limit=limit)
+    return {
+        "tenant_id": tenant_id,
+        "runs": runs,
+        "stats": {
+            "total": len(runs),
+            "completed": sum(1 for r in runs if r.get("state") == "completed"),
+            "partial": sum(1 for r in runs if r.get("state") == "partial"),
+            "failed": sum(1 for r in runs if r.get("state") == "failed"),
+        },
+    }
+
+
+@app.get("/api/v1/tenant/{tenant_id}/runs/stream")
+async def tenant_runs_stream(
+    tenant_id: str,
+    request: Request,
+    limit: int = 50,
+) -> StreamingResponse:
+    """
+    Server-Sent Events: periodic JSON snapshots of tenant runs (same shape as GET /runs).
+    Clients should use fetch-based SSE (e.g. @microsoft/fetch-event-source) to send Authorization.
+    """
+    import asyncio
+    import json
+
+    from src.auth.tenant_context import get_tenant_context
+    from src.core.run_controller import get_run_controller
+
+    ctx = get_tenant_context(request)
+    if ctx.tenant_id != tenant_id:
+        raise HTTPException(status_code=403, detail="tenant mismatch")
+
+    lim = max(1, min(int(limit), 200))
+
+    async def event_iter():
+        rc = get_run_controller()
+        while True:
+            if await request.is_disconnected():
+                break
+            runs = await rc.get_recent_runs(tenant_id, limit=lim)
+            stats = {
+                "total": len(runs),
+                "completed": sum(1 for r in runs if r.get("state") == "completed"),
+                "partial": sum(1 for r in runs if r.get("state") == "partial"),
+                "failed": sum(1 for r in runs if r.get("state") == "failed"),
+            }
+            payload = {"tenant_id": tenant_id, "runs": runs, "stats": stats}
+            yield f"data: {json.dumps(payload)}\n\n"
+            await asyncio.sleep(15)
+
+    return StreamingResponse(
+        event_iter(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
+
+
+@app.get("/api/v1/tenant/{tenant_id}/alerts")
+async def get_tenant_alerts(tenant_id: str, request: Request) -> dict[str, Any]:
+    """
+    Active production alerts for a tenant (Redis `tenant:{tenant_id}:alerts:active`).
+    Populated when failure thresholds fire (see `src/core/alerting.py`).
+    """
+    from src.auth.tenant_context import get_tenant_context
+    from src.core.alerting import get_active_alerts
+
+    ctx = get_tenant_context(request)
+    if ctx.tenant_id != tenant_id:
+        raise HTTPException(status_code=403, detail="tenant mismatch")
+
+    alerts = await get_active_alerts(tenant_id)
+    return {"tenant_id": tenant_id, "alerts": alerts, "count": len(alerts)}
+
+
+@app.get("/api/v1/tenant/{tenant_id}/usage")
+async def get_tenant_llm_usage(tenant_id: str, request: Request) -> dict[str, Any]:
+    """
+    LLM spend vs configured quota (Redis counter `tenant:{tenant_id}:llm_cost`).
+    Set LLM_QUOTA_LIMIT_USD>0 to enforce caps in LLMClient.invoke (429 when exceeded).
+    """
+    from src.auth.tenant_context import get_tenant_context
+    from src.core.quotas import get_effective_llm_quota_limit_usd, get_tenant_llm_cost_used
+
+    ctx = get_tenant_context(request)
+    if ctx.tenant_id != tenant_id:
+        raise HTTPException(status_code=403, detail="tenant mismatch")
+
+    used = await get_tenant_llm_cost_used(tenant_id)
+    limit = get_effective_llm_quota_limit_usd()
+    return {
+        "tenant_id": tenant_id,
+        "llm_cost_used": round(used, 4),
+        "limit": limit if limit > 0 else None,
+    }
 
 
 @app.get("/api/v1/stats")
@@ -330,9 +529,11 @@ async def ingest(req: IngestRequest, request: Request) -> dict[str, Any]:
     Publish ingest envelope to Kafka. Uses ONLY get_tenant_context(request) from JWT.
     No body defaults; no "dev" fallback. Missing user_id → 403.
     """
+    run_id: str | None = None
     try:
         from src.agents.kafka_event_agent import KafkaEventAgent, EventEnvelope
         from src.auth.tenant_context import get_tenant_context
+        from src.core.run_controller import get_run_controller
 
         ctx = get_tenant_context(request)
         tenant_id = ctx.tenant_id
@@ -341,13 +542,33 @@ async def ingest(req: IngestRequest, request: Request) -> dict[str, Any]:
         if not user_id or not str(user_id).strip():
             raise HTTPException(status_code=403, detail="user_id required for ingest")
 
+        trace_id = f"tr_{uuid4().hex[:12]}"
+        workflow_type = "ingest_event"
+        idempotency_key = request.headers.get("Idempotency-Key") or request.headers.get("idempotency-key")
+        run = get_run_controller()
+        run_id = await run.create_run(
+            workflow_type=workflow_type,
+            tenant_id=tenant_id,
+            idempotency_key=idempotency_key,
+            trace_id=trace_id,
+        )
+
         payload = {
             "text": req.content,
             "tenant_id": tenant_id,
             "space_id": space_id,
             "user_id": user_id,
             "source": req.source,
-            "metadata": req.metadata or {},
+            "trace_id": trace_id,
+            "run_id": run_id,
+            "workflow_type": workflow_type,
+            "idempotency_key": idempotency_key,
+            "metadata": {
+                **(req.metadata or {}),
+                "trace_id": trace_id,
+                "run_id": run_id,
+                "workflow_type": workflow_type,
+            },
         }
         emitted = KafkaEventAgent().emit(EventEnvelope(
             type="ingest",
@@ -355,13 +576,25 @@ async def ingest(req: IngestRequest, request: Request) -> dict[str, Any]:
             tenant_id=tenant_id,
             space_id=space_id,
             user_id=user_id,
+            run_id=run_id,
+            workflow_type=workflow_type,
+            trace_id=trace_id,
+            idempotency_key=idempotency_key,
         ))
         if not emitted:
+            await run.update_step(run_id, "kafka_emitted", "failed", error="Event bus unavailable")
             raise HTTPException(status_code=503, detail="Event bus unavailable; ingest not published")
-        return {"ok": True}
+        await run.update_step(run_id, "kafka_emitted", "completed")
+        return {"ok": True, "run_id": run_id, "trace_id": trace_id}
     except PermissionError as e:
         raise HTTPException(status_code=403, detail=str(e))
     except Exception as e:
+        if run_id:
+            try:
+                from src.core.run_controller import get_run_controller
+                await get_run_controller().update_step(run_id, "api_failed", "failed", error=str(e))
+            except Exception:
+                pass
         logger.exception("Ingest failed")
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -405,22 +638,29 @@ async def ask(
     try:
         rag = await get_rag_engine()
         from src.agents.insight import InsightAgent
+        from src.core.llm_run_context import reset_llm_tenant_id, set_llm_tenant_id
 
         agent = InsightAgent(rag)
         tenant_id = user.tenant_id
         space_id = "all"
         user_id = user.id
-        result = await agent.ask(
-            tenant_id=tenant_id,
-            space_id=space_id,
-            query=req.query,
-            user_id=user_id,
-        )
+        ttok = set_llm_tenant_id(tenant_id)
+        try:
+            result = await agent.ask(
+                tenant_id=tenant_id,
+                space_id=space_id,
+                query=req.query,
+                user_id=user_id,
+            )
+        finally:
+            reset_llm_tenant_id(ttok)
         return {
             "answer": result.answer,
             "sources": result.sources,
             "needs_external_info": result.needs_external_info,
         }
+    except QuotaExceeded:
+        raise
     except Exception as e:
         logger.exception("Ask failed")
         raise HTTPException(status_code=500, detail=str(e))
@@ -469,6 +709,7 @@ async def run_agent_v1(
 ) -> dict[str, Any]:
     """Run agent now and log result. Tenant/user/space from JWT; agents get RAG context internally when needed."""
     from src.core.agent_scheduler import AgentScheduler, get_agent_logs_store
+    from src.core.run_controller import get_run_controller
     agents = await get_agent_framework()
     spec = agents.get(agent_id)
     if not spec:
@@ -476,8 +717,19 @@ async def run_agent_v1(
     tenant_id = user.tenant_id
     space_id = "all"
     user_id = user.id
+    run_controller = get_run_controller()
+    run_id = await run_controller.create_run(
+        workflow_type="agent_run",
+        tenant_id=tenant_id,
+        idempotency_key=None,
+    )
+    trace_id = f"tr_{uuid4().hex[:12]}"
     # Inject RAG context so agents that need it (e.g. PatternAnalyzerAgent) do not return missing_rag_context.
-    initial_context: dict[str, Any] = {}
+    initial_context: dict[str, Any] = {
+        "run_id": run_id,
+        "trace_id": trace_id,
+        "workflow_type": "agent_run",
+    }
     try:
         rag = await get_rag_engine()
         rag_response = await rag.search(
@@ -493,6 +745,12 @@ async def run_agent_v1(
     scheduler = AgentScheduler(agents, None)
     result = await scheduler.run_agent_and_log(
         agent_id, tenant_id, space_id, user_id, "manual", initial_context=initial_context
+    )
+    await run_controller.update_step(
+        run_id,
+        "agent_scheduler_run",
+        "completed" if result.get("ok") else "failed",
+        error=result.get("error"),
     )
     try:
         from src.core.notifications import notify_user
@@ -533,7 +791,13 @@ async def run_agent_v1(
                 await store.create(doc)
     except Exception as e:
         logger.debug("run_agent_v1: could not push agent_insight to actions store: %s", e)
-    return {"ok": result.get("ok", False), "agent_id": agent_id, "result": result}
+    return {
+        "ok": result.get("ok", False),
+        "agent_id": agent_id,
+        "run_id": run_id,
+        "trace_id": trace_id,
+        "result": result,
+    }
 
 
 @app.get("/api/v1/agents/logs")

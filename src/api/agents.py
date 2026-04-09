@@ -13,6 +13,7 @@ TypeScript types, and are fully tenant-aware via query/body params.
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from uuid import uuid4
 
 from src.auth.tenant_context import TenantContext, get_effective_tenant_context
 from src.schemas.api_models import AgentsListResponse, AgentItemResponse, RunAgentResponse
@@ -75,12 +76,16 @@ async def run_agent(
         input_context=dict(body or {}),
     )
     await engine.enqueue_run(run)
+    trace_id = f"tr_{uuid4().hex[:12]}"
+    workflow_type = "agent_run"
     try:
         from src.agents.kafka_event_agent import KafkaEventAgent, EventEnvelope
         KafkaEventAgent().emit(EventEnvelope(
             type="agent_run",
             payload={
                 "run_id": str(run.run_id),
+                "trace_id": trace_id,
+                "workflow_type": workflow_type,
                 "agent_name": agent_id,
                 "tenant_id": ctx.tenant_id,
                 "space_id": ctx.space_id,
@@ -90,10 +95,16 @@ async def run_agent(
             tenant_id=ctx.tenant_id,
             space_id=ctx.space_id,
             user_id=ctx.user_id,
+            run_id=str(run.run_id),
+            workflow_type=workflow_type,
+            trace_id=trace_id,
         ))
     except Exception:
         pass
-    return RunAgentResponse(data={"decisionId": str(run.run_id), "status": AgentRunState.IDLE.value}, meta={})
+    return RunAgentResponse(
+        data={"decisionId": str(run.run_id), "status": AgentRunState.IDLE.value, "traceId": trace_id},
+        meta={},
+    )
 
 
 @router.get("/runs/{run_id}")

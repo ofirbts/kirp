@@ -4,6 +4,7 @@ Basic core tests — Event, EventStore, RAGEngine, AgentFramework, Governance.
 
 from __future__ import annotations
 
+import asyncio
 from datetime import datetime, timezone
 from uuid import uuid4
 
@@ -52,9 +53,11 @@ def test_agent_framework_register_list() -> None:
     assert len(af.list_all()) == 1
 
 
-@pytest.mark.asyncio
-async def test_governance_disabled() -> None:
-    gov = GovernanceEngine(opa_url="")  # disabled when no OPA URL
-    check = await gov.check("t1", "s1", "u1", "read", "event")
+def test_governance_disabled() -> None:
+    async def _check() -> GovernanceCheck:
+        gov = GovernanceEngine(opa_url="")  # disabled when no OPA URL
+        return await gov.check("t1", "s1", "u1", "read", "event")
+
+    check = asyncio.run(_check())
     assert check.allowed is True
     assert "disabled" in check.reason.lower() or "opa" in check.reason.lower() or "no opa" in check.reason.lower()

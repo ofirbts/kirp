@@ -37,6 +37,10 @@ class CanonicalEvent:
     user_id: str
     source: str
     trace_id: str | None = None
+    run_id: str | None = None
+    workflow_type: str | None = None
+    idempotency_key: str | None = None
+    parent_run_id: str | None = None
     parent_event_id: UUID | None = None
     version: int = 1
 
@@ -60,6 +64,10 @@ class CanonicalEvent:
             "user_id": self.user_id,
             "source": self.source,
             "trace_id": self.trace_id,
+            "run_id": self.run_id,
+            "workflow_type": self.workflow_type,
+            "idempotency_key": self.idempotency_key,
+            "parent_run_id": self.parent_run_id,
             "parent_event_id": str(self.parent_event_id) if self.parent_event_id else None,
             "version": self.version,
             "event_type": self.event_type,
@@ -101,6 +109,10 @@ class CanonicalEvent:
             user_id=user_id,
             source=data.get("source", ""),
             trace_id=data.get("trace_id"),
+            run_id=data.get("run_id"),
+            workflow_type=data.get("workflow_type"),
+            idempotency_key=data.get("idempotency_key"),
+            parent_run_id=data.get("parent_run_id"),
             parent_event_id=UUID(parent) if isinstance(parent, str) and parent else None,
             version=int(data.get("version", 1)),
             event_type=event_type,

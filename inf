@@ -1,0 +1,544 @@
+חלק 1 – שאלות ראיון + תשובות + הרחבה
+שכבה 1 – LLM ו‑מודלים
+1.1 LLM Router
+שאלה לקרסר
+האם במערכת מוגדרים כמה מודלי LLM? איפה מוגדר מי משמש למה?
+
+תשובת ראיון (קצרה)
+“כן. יש לנו שכבת ניתוב בשם llm_router שממפה סוג משימה (critical / reasoning / bulk / ui / dev) לספק ומודל ספציפיים. ברירת המחדל היא מיפוי סטטי, ואפשר לשנות ספקים דרך משתני סביבה, אבל אין היום ניתוב דינמי לפי latency או עלות בזמן ריצה.”
+
+הרחבה
+
+איך זה ממומש היום ב‑KIRP
+
+הקובץ המרכזי הוא src/core/llm_router.py.
+מוגדר שם מילון PROVIDERS שממפה task types ל־provider + model:
+critical → OpenAI (למשל gpt-4o-mini)
+reasoning → Anthropic (claude-3.5-sonnet…)
+bulk → Groq (llama-3.1-8b-instant)
+ui → Gemini (gemini-1.5-flash)
+dev → Ollama (llama3)
+יש אפשרות override באמצעות env כמו REASONING_PROVIDER, BULK_PROVIDER וכו’ – אם תגדיר REASONING_PROVIDER=groq, ה־router יבחר Groq וידביק לו מודל ברירת מחדל.
+get_llm_for_task(task_type) מחזיר LLMClient שמסתיר את ההבדלים בין הספקים, כך שה‑agents עובדים מול API אחיד.
+למה זה ככה (tradeoffs)
+
+פשטות: אפשר לשלוט בבחירת ספק פר task‑type בלי להכניס מיד שכבת A/B מורכבת.
+גמישות קונפיגורציה: CI/CD פשוט – משנים env ומקבלים ספק אחר לקטגוריה שלמה (למשל להעביר reasoning ל‑Groq מחוץ לקוד).
+הפרדה לוגית: ההחלטה “איזה LLM מתאים למשימה” מונחת בשכבה ייעודית, לא מפוזרת בכל agent.
+אלטרנטיבות נפוצות
+
+Router דינמי עם:
+איסוף מדדי latency/quality/cost לכל ספק.
+החלטה בזמן ריצה לפי עומס / תקציב / tier של tenant.
+Multi‑provider SDK (כמו OpenRouter, LiteLLM) שמספק ניתוב מובנה.
+אצלך, הבחירה היא סטטית + env, לא runtime optimization.
+Pitfalls / למה להיזהר
+
+אין היום מדדים אמיתיים של עלות/latency/quality – אם תגיד בראיון “אנחנו בוחרים לפי latency/עלות” זה יהיה תיאור רצוי, לא המימוש בפועל.
+אם מישהו עוקף את llm_router וקורא ישירות ל‑OpenAI, מאבדים את היכולת לשלוט מערכתית על ספקים.
+קונסיסטנטיות: חשוב שכל agent חדש יבחר task_type מתאים – אחרת תקבל שימוש במודל “זול” למשימה “critical”.
+1.2 Tokenizer / Context Window
+שאלות לקרסר
+איך המערכת מתייחסת לאורך טקסט (טוקנים)? האם יש ניהול מודע של context window?
+איך אתם מונעים הצפה של ההקשר? האם יש מנגנון בחירה מה נכנס לפרומפט?
+
+תשובת ראיון (כנה)
+“ברמת הקוד היום אין מנגנון מרכזי שמודד טוקנים או מנהל context window. השליטה באורך נעשית בעיקר דרך RAG – אנחנו מגבילים את מספר התוצאות וה‑snippets שנכנסים לפרומפט, אבל אין חישוב טוקנים מפורש ולא קיימת שכבת חיתוך/סיכום גלובלית.”
+
+הרחבה
+
+איך זה ממומש בפועל
+
+RAG (RAGEngine.search) מחזיר מספר מוגבל של תוצאות (למשל limit=10 ב‑InsightAgent).
+ב‑InsightAgent בונים context_snippets כ‑bullet list של הטקסטים שנמצאו, וגוזרים רק את ה־top‑N.
+אין חישוב טוקנים באף אחת מהשכבות (לא tokenizer, לא num_tokens_from_messages).
+בשיחות מתמשכות (M3, agents) ההקשר נשען על:
+Qdrant (חיפוש לפי tenant_id/space_id/user_id)
+M3 memory (reflections, syntheses, evolutions)
+אין “conversation buffer” קלאסי שנחתך לפי טוקנים.
+אסטרטגיות קיימות אצלך
+
+Top‑k בלבד: מגבילים k תוצאות ב‑RAG וב־agents (למשל 10 מקורות).
+סינון לפי ציון/רלוונטיות: RAG מנקד תוצאות, ומכניס רק את אלה מעל סף מסוים.
+שימוש ב‑history קצרה: חלק מהprompts משתמשים רק באירועים/רפלקציות אחרונות, לא בכל ההיסטוריה.
+אלטרנטיבות שלא קיימות עדיין
+
+מודול Token Management גלובלי:
+חישוב טוקנים לפני כל קריאת LLM, וסיגמנטציה של השיחה.
+“Tiered memory”: שכבות של זיכרון (Immediate, Recent, Distant) עם Summarization אוטומטי.
+Sliding window מתוחכם בשיחות.
+Pitfalls
+
+בלי ניהול טוקנים, קל להגיע ל‑context too long כשעוברים למודלים עם חלון קטן יותר.
+Prompt bloat: הכנסת יותר מדי snippets ב‑RAG יכולה להוריד איכות (המודל צריך “להתברבר” בתוך רעש).
+1.3 Prompting / System Prompt / Active Instructions
+שאלות לקרסר
+איפה מוגדר ה‑system prompt של המערכת?
+האם יש Active Instructions דינמיים (לפי טננט, משתמש, משימה)?
+
+תשובת ראיון (כנה)
+“ה‑system prompts היום הם ברמת agent/שימוש, ולא קיימת שכבת System Prompt גלובלית לכל המערכת. יש prompts ספציפיים בתוך agents כמו InsightAgent או M3 agents, אבל אין Active Instructions דינמיים per‑tenant מעבר למה שעובר דרך הנתונים עצמם.”
+
+הרחבה
+
+איך זה ממומש כיום
+
+למשל ב‑InsightAgent מוגדר system_prompt קבוע שמשקף:
+“אתה KIRP Insight Agent, אל תחולל עובדות, תענה רק על בסיס הקונטקסט” וכו’.
+M3 agents (GapAnalysis, MicroActionGenerator וכו’) גם מחזיקים prompts ייעודיים משל עצמם.
+אין single source לקונפיגורציית prompts; כל agent מגדיר את ה‑system & task prompt שלו.
+למה זה ככה
+
+גמישות מהירה: כל agent ניסיוני; קל לשנות prompt אחד מבלי לפגוע בכל המערכת.
+היעדר שכבת prompt‑management עוד: המערכת עדיין בתהליך התגבשות כ‑AI OS, כך שניהול prompts גלובלי עוד לא הוגדר.
+אלטרנטיבות נפוצות
+
+Prompt store / Prompt registry:
+טבלאות prompts עם גרסאות, ניסויים (A/B), ו‑per‑tenant overrides.
+Layered prompting:
+System → Tenant policy → Task type → Agent specific → User input.
+Feature flags לנסיונות prompts.
+Pitfalls
+
+קיים סיכון לחוסר עקביות אם שני agents מגדירים System persona שונים.
+אין היום מנגנון versioning – קשה לדעת “איזה prompt הוביל לאיזה תוצאה” לאורך זמן.
+1.4 Reasoning / Planning
+שאלות לקרסר
+האם יש שימוש במודלים “חושבים” או ב‑planning explicit?
+איפה זה קורה בקוד, ואיך ה‑planner משתלב עם agents / MCP?
+
+תשובת ראיון (כנה)
+“אנחנו כן מבדילים לוגית בין קריאות reasoning עמוקות לקריאות bulk, דרך ה‑llm_router, אבל אין היום Planner מפורש שמנהל state machine של משימה מורכבת. התכנון נמצא יותר ברמת ה‑agents (למשל M3 stages) מאשר בשכבת Planner עצמאית.”
+
+הרחבה
+
+בפועל
+
+Task type reasoning מפנה למודל איכותי (למשל Claude 3.5). משתמשים בו:
+ב‑InsightAgent כדי לסכם הקשר מורכב.
+בחלק מה‑agents שמבצעים ניתוחים יותר “עמוקים”.
+M3 משתמש בסדרה של agents (“stages”) – זה סוג של planning קשיח:
+Reflection → Classification → GapAnalysis → MicroActions → Evolution.
+ה‑plan כאן הוא ידני/דטרמיניסטי, לא משהו שהמודל מחליט עליו.
+אלטרנטיבות
+
+Planner LLM מפורש:
+קריאה ראשונה ל‑planner שמפיק רשימת sub‑tasks, ואז AgentEngine מבצע אותן.
+Tree‑of‑thoughts / multi‑step reasoning מובנה.
+Auto‑agents שיכולים לייצר תוכנית ולבצע אותה בלי הרצה ידנית של stages.
+Pitfalls
+
+Planning גרוע מוביל ללולאות או לפיצול יתר של משימות.
+כשאין separation בין planner ל‑executor, קשה לחבר observability ו‑governance (מי החליט מה, ומתי).
+1.5 Function Calling / Tool Use / JSON Mode
+שאלות לקרסר
+איך מוגדרים הכלים שה‑LLM יכול לקרוא?
+האם יש חוזה JSON ברור לכל כלי?
+
+תשובת ראיון (כנה)
+“רוב הכלים אצלנו הם services פנימיים שה‑agents קוראים אליהם ישירות בקוד (SchemaEngine, RAG, AgentActionsStore). אין היום שכבת ‘tool calling’ סטנדרטית בסגנון OpenAI function‑calling; ה‑LLM מחזיר טקסט או JSON חופשי, ואנחנו מפענחים אותו וממפים ל‑actions במודלים שלנו.”
+
+הרחבה
+
+כיום
+
+“Tools” בפועל הם:
+EventPipeline, RAGEngine, SchemaEngine, AgentActionsStore, HistoryStore, M3 memory וכו’.
+בסוף, LLM מחזיר:
+טקסט חופשי (למשל סיכום).
+או JSON “לפי prompt” (למשל תיאור micro‑actions), שאותו ממפים ל‑ACTION_* ב‑AgentActionsStore.
+אין טיפוס ToolDefinition רשום במערכת, ואין contract ברמת JSON Schema לכל כלי.
+אלטרנטיבות
+
+שכבת tools עם:
+שם, תיאור, schema של input ו‑output.
+proxy שמציג אותם ל‑LLM כ‑function calling.
+שימוש ב‑“JSON mode” מוגדר עם strict schema.
+Pitfalls
+
+פלט JSON חלקי או שבור: צריך לעשות post‑processing זהיר (try/except, retry).
+אין central validation – אם prompt של agent א’ אומר פורמט X, וB מתייחס לזה אחרת, תקבל שברים.
+שכבה 2 – RAG
+2.1 Embedding Models
+שאלה לקרסר
+איזה embedding model בשימוש? האם יש יותר מאחד? איפה זה מוגדר?
+
+תשובת ראיון (קצרה)
+“יש לנו embedding אחד עיקרי שמוגדר ב‑RAGEngine – ברירת מחדל OpenAI text-embedding-3-small, עם אפשרות להחליף provider ומודל דרך משתני סביבה. אין היום multi‑embedding strategy פר‑טננט.”
+
+הרחבה
+
+ב‑RAGEngine (src/core/rag_engine.py) יש קונפיגורציה:
+embedding_provider (ברירת מחדל openai).
+embedding_model (ברירת מחדל text-embedding-3-small).
+EventPipeline קורא rag.embed(content) לפני upsert ל‑Qdrant.
+אין ניהול של כמה embedding spaces מקבילים (למשל semantic + instruction).
+2.2 Vector DB
+שאלה לקרסר
+איזה VectorDB בשימוש? איך נשמרים בו tenant_id / space_id / metadata?
+
+תשובת ראיון (קצרה)
+“אנחנו עובדים עם Qdrant כ‑Vector DB יחיד. כל נקודה מכילה payload עשיר עם tenant_id, space_id, user_id, source, event_type ועוד, ואנחנו תמיד מסננים לפי tenant_id כדי לאכוף multi‑tenant isolation בתוך אותו collection.”
+
+הרחבה
+
+RAGEngine.upsert():
+בונה PointStruct לכל event:
+embedding: הווקטור.
+payload: event_id, content, source, tenant_id, space_id, user_id, timestamp, trace_id, event_type, ול‑M3 גם module=m3.
+מוסיף תמיד tenant_id ו־space_id ב‑payload.
+החיפוש (search) מסנן לפי tenant_id (ותקפיד גם על space/user כשצריך).
+2.3 Chunking & Metadata
+שאלות לקרסר
+איך אתם חותכים מסמכים? איפה מוגדר גודל chunk וה‑overlap?
+איזה metadata נשמר לכל chunk?
+
+תשובת ראיון (כנה)
+“ה‑unit העיקרי שלנו הוא event (לא מסמך ענק). אין אצלנו היום מנגנון chunking מפורש כמו ‘כל 512 טוקנים’; כל event נכנס כנקודה אחת ל‑Qdrant. ה‑metadata שלנו עשיר מאוד ברמת event – tenant, space, user, source, event_type, timestamps, ולעתים external_id – ואנחנו משתמשים בו לפילוח ולהקשר.”
+
+הרחבה
+
+Chunking:
+KIRP עובד על events: Email, WhatsApp, Reflection, Notion page וכו’.
+אם דוקומנט ענק נכנס, הוא נשמר כ‑event אחד (או קומץ events) – אין slicing לפי tokens/characters.
+Metadata:
+כל chunk (event) כולל:
+tenant_id, space_id, user_id
+source (email/notion/whatsapp וכו’)
+event_type (ingest, m3.*)
+trace_id, timestamp
+לעתים external_id (Notion, integrations).
+2.4 Retrievers / Re-ranking
+שאלה לקרסר
+איזה retriever בשימוש? האם יש רה‑רנקינג (לדוגמה, LLM‑rerank)?
+
+תשובת ראיון (כנה)
+“אנחנו משתמשים ברטריבר בסיסי של Qdrant – חיפוש וקטורי (עם אפשרות ל‑BM25 היברידי). אין היום שלב רה‑רנקינג באמצעות LLM; אנחנו מסתמכים על ציוני הרלוונטיות של המנוע.”
+
+הרחבה
+
+RAGEngine:
+משתמש ב‑Qdrant vector search, ובקונפיגורציה מסוימת גם ב‑BM25 hybrid.
+מחזיר רשימת תוצאות (טקסט, ציון, metadata).
+InsightAgent:
+לוקח את top‑k תוצאות ומעביר אותן לפרומפט; אין rerank נוסף עם LLM.
+2.5 Ingestion / Query Pipeline
+שאלות לקרסר
+איך נראה ingestion pipeline למסמכים ב‑KIRP מקצה לקצה?
+איך נראה query pipeline לשאלות, מהרגע שיש user query עד prompt ל‑LLM?
+
+תשובת ראיון (קצרה)
+“ingest עובר דרך Kafka → KafkaProcessor → EventRegistry → EventPipeline, ששם אנחנו עושים governance, embedding, upsert ל‑Qdrant, כתיבה ל‑Mongo (events + history) ול‑Postgres (schema). Query עובר דרך InsightAgent: RAG search ב‑Qdrant לפי tenant/space/user, ואז LLM reasoning שמסכם את התוצאות.”
+
+הרחבה (התחברת לזה יפה כבר ב‑SYSTEM_ARCHITECTURE, אז רק מדגיש את הצד RAG‑י)
+
+Ingestion:
+Kafka event (עם tenant_id, user_id, content, metadata).
+KafkaProcessor יוצר CanonicalEvent ומעביר ל‑EventRegistry.
+handle_ingest_v1 → _get_pipeline() → EventPipeline.run():
+rag.embed(content)
+rag.upsert() (Qdrant + payload)
+EventStore.ingest() (Mongo)
+record_history() (Mongo history)
+extract_life_objects + SchemaEngine.upsert_node() (Postgres).
+Query (/ask):
+InsightAgent.ask():
+rag.search(query, tenant_id, space_id, user_id, limit=10)
+בניית context מהתוצאות.
+llm = get_llm_for_task("reasoning") → סיכום לתשובה.
+2.6 Re-indexing / Re-embedding
+שאלות לקרסר
+מתי ואיך אתם עושים re‑indexing / re‑embedding?
+האם יש טריגרים/תהליכים אוטומטיים או שזה תהליך ידני/מבוקר בלבד?
+
+תשובת ראיון (כנה)
+“אין לנו היום מנגנון re‑embedding גורף לכל הדאטה. יש לנו מסלול מצומצם שבו אם אירוע מסוים מתעדכן (למשל Notion page באותו external_id), KafkaProcessor יכול להריץ run_post_ingest_for_event לאותו אירוע ולסנכרן מחדש את ה‑RAG וה‑schema. Re‑indexing גלובלי הוא תהליך חיצוני/ידני.”
+
+הרחבה
+
+ב‑kafka_processor יש ענף:
+אם מגיע Event עם external_id (למשל Notion), והוא קיים ב‑Mongo:
+מעדכן את התוכן ב‑EventStore.
+בונה RAGEngine + SchemaEngine + Governance + AgentFramework.
+קורא EventPipeline.run_post_ingest_for_event(existing.id) – זה re‑process ל‑event יחיד.
+אין לולאת re‑embed לכל הדאטה (למשל בזמן החלפת מודל embedding).
+שכבה 3 – MCP / Protocol Layer
+כאן צריך להבדיל בין ה‑MCP של Cursor (שהוזכר במערכת הכלים שלך) לבין מה שקיים בתוך KIRP עצמו.
+
+ב‑KIRP עצמו אין MCP server רשמי בסגנון “MCP protocol” כמו ב‑Cursor. יש:
+
+Control plane פנימי (EventPipeline + EventRegistry + KafkaProcessor + LLMRouter + Governance).
+Clients:
+Next.js UI, אינטגרציות (Notion, WhatsApp), workers.
+נענה בסגנון ראיון אבל נציין ביושר מה קיים ומה לא.
+
+שאלות לקרסר (מפורשות)
+אילו MCP servers קיימים במערכת? אילו כלים/משאבים כל אחד חושף?
+איך ה‑client (ה‑LLM/האפליקציה) מתחבר אליהם?
+
+תשובת ראיון (כנה)
+“ב‑KIRP אין MCP server רשמי כמו ב‑Cursor. יש לנו Control Plane פנימי שמבוסס על EventPipeline, EventRegistry ו‑Kafka, שמנהל events, agents, RAG ו‑governance. ה‑clients (UI, workers, אינטגרציות) מדברים מול FastAPI ו‑Kafka, ולא מול MCP server סטנדרטי.”
+
+הרחבה (בקצרה כי זה כבר יצא ארוך):
+
+Context storage:
+מצב ארוך טווח: Mongo events/history, Qdrant vectors, Postgres schema, M3 memory.
+קצר טווח: Redis (cache, idempotency).
+Token management ברמת MCP: לא קיים כ‑feature מובנה (אין global token budget/distribution).
+חלק 2 – מפת על היררכית (AI OS / KIRP)
+אעשה את העץ שנתת, ואמלא אותו ספציפית ל‑KIRP.
+
+AI OS / KIRP – מפת על
+1. LLM & Reasoning
+קונספטואלית: שכבת מודלים (OpenAI, Anthropic, Groq, Gemini, Ollama) + לוגיקת ניתוב, שמשרתים reasoning, סיכום, יצירת טקסט ותכנון.
+ב‑KIRP:
+llm_router.py – משייך task types לספקים.
+LLMClient – עוטף את ה‑SDKs.
+Agents כמו InsightAgent, M3 agents – משתמשים ב‑router.
+סטטוס: Routing סטטי + env; אין token management ואפשרות dynamic routing לפי metrics.
+2. RAG Layer
+קונספטואלית: שכבת זיכרון סמנטי – embeddings, vector DB, metadata, retrievers.
+ב‑KIRP:
+RAGEngine (Qdrant + embeddings).
+EventPipeline כותב ל‑Qdrant; InsightAgent ומודולים אחרים קוראים ממנו.
+סטטוס: RAG מאוחד לכל ה‑events; ללא chunking מתקדם ורה‑רנקינג; יש אינטגרציה עם life graph (schema).
+3. MCP / Protocol Layer
+קונספטואלית: שכבת פרוטוקול שמנהלת חיבורים בין LLM/agents/tools, חשיפת כלים, הרשאות, הקשרים.
+ב‑KIRP:
+Event-driven control plane: Kafka, KafkaProcessor, EventRegistry, EventPipeline.
+FastAPI כ‑API gateway.
+אין MCP רשמי, אבל הלוגיקה מתנהגת כמו MCP פנימי.
+סטטוס: MCP “דפקטו” פנימי; אין MCP server אחיד סטנדרטי.
+4. Agents Layer
+קונספטואלית: שכבת סוכנים (planner, executor, critic, supervisor) שמבצעים משימות על בסיס הכלים וה‑memory.
+ב‑KIRP:
+AgentFramework (specs, registry),
+AgentEngine (execution, Redis‑backed queue),
+AgentScheduler (triggers + logs),
+AgentActionsStore + ExecutionAgent.
+בפרקטיקה יש types שונים: InsightAgent, M3 agents, ExecutionAgent.
+סטטוס: יש AgentEngine וסוגי agents שונים; planning מפורש עדיין יחסית קשיח ולא גנרי.
+5. Skills Layer
+קונספטואלית: סקילס (יכולות לוגיות/דומייניות) שניתן להפעיל ולשרשר.
+ב‑KIRP:
+אין SkillRegistry מפורש; skills “מקודדים” בתוך agents (למשל M3 GapAnalysis = “skill” סמנטי).
+סטטוס: שכבה רעיונית קיימת דרך agents, אך לא כ‑API רשמי של skills.
+6. Control Plane
+קונספטואלית: המקום שמחליט מה רץ איפה – events, governance, routing, caching, idempotency, metrics.
+ב‑KIRP:
+EventStore, EventPipeline, EventRegistry, KafkaProcessor.
+GovernanceEngine (OPA),
+llm_router,
+Redis idempotency + cache,
+Metrics דרך observability/metrics.
+סטטוס: די מפותח – יש EventPipeline אחיד, governance, multi‑tenant, Kafka, Redis, metrics בסיסיים.
+7. Data & Memory
+קונספטואלית: זיכרון קצר/ארוך טווח, אפיזודי/סמנטי, פרופיל משתמש.
+ב‑KIRP:
+אפיזודי: Mongo events + history.
+סמנטי: Qdrant.
+M3: reflections, syntheses, evolutions, micro‑actions (M3 memory).
+קצר טווח: Redis cache/idempotency.
+סטטוס: שכבת memory עשירה אך מפוזרת במס’ DBs; אין abstraction אחוד של “Memory Service”.
+8. Tools & Integrations
+קונספטואלית: אינטגרציות ל‑email, calendar, Notion, WhatsApp, DBים, וכד’.
+ב‑KIRP:
+Modules תחת src/integrations (gmail, calendar, whatsapp וכו’).
+Webhooks ו‑workers.
+סטטוס: כלים קיימים אך נצרכים לרוב ע”י pipeline/agents, לא כ‑MCP tools רשמיים.
+9. Infrastructure
+קונספטואלית: Docker/K8s, Kafka כ‑event bus, DBs, monitoring, autoscaling.
+ב‑KIRP:
+Dockerfiles, docker‑compose, Kafka, Mongo, Postgres, Redis, Qdrant, OPA.
+סטטוס: infra די סטנדרטי לסביבת multi‑service.
+10. UX Layer
+קונספטואלית: UI לשיחה, timeline, explainability, task graph.
+ב‑KIRP:
+Next.js dashboard.
+M3 UI (reflections, scores).
+היסטוריה / timeline נגישים דרך APIs.
+סטטוס: יש UI פונקציונלי; אפשר להעמיק יותר ב‑Explainability ו‑Memory Viewer.
+11. Advanced Capabilities
+קונספטואלית: Agentic workflows, self‑improvement, multi‑agent societies, world models.
+ב‑KIRP:
+M3 הוא סוג של mini‑OS לזהות אישית עם agents שחוזרים על עצמם.
+אין עדיין עולם מלא של multi‑agent society כללי.
+סטטוס: בדרך – KIRP מתקדם מהמערכת ה”רגילה”, אבל עדיין לא “full AI OS”.
+חלק 3 – Roadmap חכם לבניית מערכת כמו KIRP מאפס
+אעבור שלב‑שלב, ואגיד:
+
+מה בונים.
+קריטריונים לסיום.
+מה קורה אם מדלגים.
+איפה KIRP היום.
+1. הגדרת חזון וגבולות
+מה בונים
+
+מסמך חזון: מה המערכת עושה (למשל “Agent Orchestrator למשתמשים ועסקים”), אילו use‑cases, ואילו לא.
+גבולות: איזה כלים מותר לסוכנים להפעיל, מה רמת האוטונומיה, מה רמת הסיכון (money, data).
+קריטריוני סיום
+
+אפשר להסביר ב־2–3 דקות “מה זה KIRP” ו”מה הוא לא”.
+יש רשימה קצרה של workflows ראשוניים שצריך לתמוך בהם.
+אם מדלגים
+
+מקבלים Spaghetti של פיצ’רים ללא קו מנחה.
+קשה אחר כך להכניס governance.
+KIRP היום
+
+די ברור: Event OS עם M3 כמודול זהות. יש כבר חזון של AI OS.
+2. בסיס LLM + UX שיחה
+מה בונים
+
+Service אחד של LLM proxy (כמו LLMClient).
+UI פשוט לשיחה (Next.js / SPA).
+Auth בסיסי (JWT).
+קריטריונים
+
+אפשר לדבר עם מודל אחד דרך UI.
+יש logging בסיסי של שיחות.
+אם מדלגים
+
+מתחילים לבנות RAG/Agents בלי תשתית מוצקה לשיחה ולתצפית על התוצאות.
+KIRP
+
+יש FastAPI, LLMClient ו‑Next.js UI – השלב הזה סגור.
+3. RAG בסיסי
+מה בונים
+
+Embedding service (RAGEngine) + Vector DB (Qdrant).
+API בסיסי ל‑ingest ול‑query (ללא EventPipeline עדיין).
+קריטריונים
+
+אפשר להעלות מסמך/אירוע, ולשאול עליו שאלה, ולקבל תשובה שמבוססת על ההקשר.
+אם מדלגים
+
+הכל ישב רק על long‑context → יקר, fragile, קשה scale.
+KIRP
+
+כבר יש RAGEngine, Qdrant, ו‑InsightAgent – RAG בסיסי + קצת מעבר.
+4. Tools & Function Calling
+מה בונים
+
+אוסף כלים בסיסיים (DB, Email, Calendar, Tasks).
+באידיאל: הגדרה מפורשת כ‑tools שה‑LLM יכול לקרוא; אצלך זה יותר “services פנימיים”.
+קריטריונים
+
+LLM או agent יכול להפיק “פעולה” שממופה לקוד רלוונטי (למשל ACTION_CREATE_TASK).
+אם מדלגים
+
+נשארים ב‑“צ’אט בוט שמדבר” בלי יכולת אקטיבית.
+KIRP
+
+יש AgentActionsStore + ExecutionAgent – זה בדיוק tools מפורשים ברמת DB ושירותים.
+5. Control Plane v1 (Event Pipeline)
+מה בונים
+
+Event model אחיד (CanonicalEvent).
+Event store (Mongo).
+EventPipeline שמבצע ingest → store → (בהמשך RAG, schema וכו’).
+Kafka כ‑bus בין API ל‑processor.
+קריטריונים
+
+כל שינוי state עובר דרך event אחד ברור; אין כתיבה ישירה ל‑DB בלי event.
+אם מדלגים
+
+מערכת לא ניתנת ל‑audit/replay; קשה להוסיף governance.
+KIRP
+
+כאן הוא חזק: CanonicalEvent, EventStore, EventPipeline, Kafka, EventRegistry.
+6. Agents v1
+מה בונים
+
+AgentEngine בסיסי שמקבל: run_id, agent_name, context, handler.
+AgentRegistry / AgentFramework עם רשימת agents.
+AgentScheduler ל‑triggers בסיסיים; AgentLogsStore.
+קריטריונים
+
+אפשר לקרוא /agents/{agent_id}/run ולקבל תוצאה + לוגים + actions.
+אם מדלגים
+
+כל “אינטליגנציה” נחנקת בשכבת ה‑LLM היחיד; אין יכולת להרחיב.
+KIRP
+
+כבר שם: AgentFramework, AgentEngine, AgentScheduler, AgentLogs, AgentActions.
+7. RAG מתקדם + Memory
+מה בונים
+
+שילוב RAG חזק עם event pipeline: כל ingest → Qdrant + metadata.
+Memory models: אפיזודי (events), סמנטי (vectors), state‑ful (M3 memory / user profile).
+מנגנוני summarization / consolidation.
+קריטריונים
+
+אפשר לענות על שאלות לאורך זמן, לא רק על המסמך האחרון.
+יש מודל של “מי המשתמש, מה חשוב לו, מה ההיסטוריה”.
+אם מדלגים
+
+מקבלים “GPT עם RAG חד‑פעמי” – לא OS מתמשך.
+KIRP
+
+יש EventPipeline↔RAG↔Schema, וגם M3 memory. Summarization חלקי (ב‑M3) אבל לא memory OS כללי.
+8. Control Plane v2 (Governance + Routing)
+מה בונים
+
+GovernanceEngine (OPA או שווה ערך) עם policies.
+Multi‑tenant isolation קשיח: tenant_id/space_id/user_id בכל שלב.
+LLM routing לפי סוג משימה וסיכון (critical vs bulk).
+Cost / latency metrics פר ספק (אצלך עדיין חסר).
+קריטריונים
+
+לכל פעולה “רגישה” יש policy, וכל LLM call חשוב מתועד עם provider/model ו‑trace_id.
+אם מדלגים
+
+קשה לשלוט בסיכון ובעלות, במיוחד בביז נסיוני/רגיש.
+KIRP
+
+GovernanceEngine + OPA קיימים; multi‑tenant קשיח. Routing קיים אך בלי cost/latency metrics.
+9. Multi-Agent & Skills
+מה בונים
+
+מערכות שבהן agents קוראים אחד לשני.
+הגדרת skills (יכולות חוזרות), ויכולת chain של skills.
+קריטריונים
+
+לפחות flow אחד שבו agent A מתכנן, agent B מבצע, agent C מעריך.
+אם מדלגים
+
+OS נשאר “single mind” – אפשרי, אבל פוחתת היכולת לפתור בעיות מורכבות.
+KIRP
+
+יש רמזים (M3 stages, ExecutionAgent) אבל אין framework מלא של multi‑agent collaboration.
+10. Observability & Multi-Tenant
+מה בונים
+
+Metrics פר tenant, פר agent, פר event_type.
+Dashboards.
+Tracing עם trace_id מקצה לקצה.
+קריטריונים
+
+אפשר לענות: מה קורה במערכת עבור Tenant X בשעה האחרונה? כמה עלה לנו?
+אם מדלגים
+
+אי אפשר לנהל את המערכת ברצינות, במיוחד בסקייל.
+KIRP
+
+יש MetricsCollector, trace_id, multi‑tenant enforced. Dashboarding מלא – תלוי ב‑infra חיצוני.
+11. Advanced Agentic Workflows
+מה בונים
+
+Workflows מורכבים (pipeline של agents, approval steps, human‑in‑the‑loop).
+Self‑evaluation ו‑self‑improvement (agents שמבקרים את עצמם).
+יכולות OS רחבות (ניהול זמן, פרויקטים, זהות – כמו M3 אבל ב‑scope רחב יותר).
+קריטריונים
+
+לפחות מס’ workflows שרצים אוטונומית לאורך זמן, עם ניטור ו‑governance.
+אם מדלגים
+
+נשארים ב‑“שכבת API אינטליגנטית” ולא מגיעים ל‑OS.
+KIRP
+
+M3 הוא התחלה של advanced workflows; עדיין לא כללי לכל הדומיינים.
+אם תרצה, אפשר בשלב הבא לקחת שכבה אחת (למשל RAG+Memory או MCP/Control Plane) ולעשות Session לימודי ממוקד: דוגמאות ארכיטקטורה + משחקי “מה אם” (failures, design alternatives) כדי לתרגל “לדבר על זה ברמת סניור”.
+
+
+

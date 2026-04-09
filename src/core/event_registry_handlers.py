@@ -59,6 +59,14 @@ async def handle_ingest_v1(event: CanonicalEvent) -> UUID:
     meta = dict(event.metadata or {})
     if event.trace_id:
         meta.setdefault("trace_id", event.trace_id)
+    if event.run_id:
+        meta.setdefault("run_id", event.run_id)
+    if event.workflow_type:
+        meta.setdefault("workflow_type", event.workflow_type)
+    if event.idempotency_key:
+        meta.setdefault("idempotency_key", event.idempotency_key)
+    if event.parent_run_id:
+        meta.setdefault("parent_run_id", event.parent_run_id)
 
     return await pipe.run(
         tenant_id=event.tenant_id,

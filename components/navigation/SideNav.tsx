@@ -2,9 +2,11 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
 import { useTenantContextStore } from "@/lib/stores/tenantContextStore";
+import { getTenantAlertsV1 } from "@/lib/apiClient";
+import { DEFAULT_TENANT_ID } from "@/lib/constants";
 import {
   LayoutDashboard,
   CheckCircle2,
@@ -17,6 +19,7 @@ import {
   Share2,
   Bell,
   Target,
+  Radio,
 } from "lucide-react";
 
 type NavItem = {
@@ -30,6 +33,11 @@ const NAV_ITEMS: NavItem[] = [
     label: "Dashboard",
     href: "/dashboard",
     icon: <LayoutDashboard className="h-4 w-4" />,
+  },
+  {
+    label: "Run monitor",
+    href: "/monitoring",
+    icon: <Radio className="h-4 w-4" />,
   },
   {
     label: "Activity",
@@ -86,6 +94,27 @@ const NAV_ITEMS: NavItem[] = [
 export const SideNav: React.FC = () => {
   const pathname = usePathname();
   const { tenantId, spaceId } = useTenantContextStore();
+  const [monitoringAlertCount, setMonitoringAlertCount] = useState(0);
+
+  useEffect(() => {
+    const tid = (tenantId || DEFAULT_TENANT_ID).trim() || DEFAULT_TENANT_ID;
+    let cancelled = false;
+    const load = () => {
+      void getTenantAlertsV1(tid)
+        .then((r) => {
+          if (!cancelled) setMonitoringAlertCount(r.count);
+        })
+        .catch(() => {
+          if (!cancelled) setMonitoringAlertCount(0);
+        });
+    };
+    load();
+    const id = setInterval(load, 90000);
+    return () => {
+      cancelled = true;
+      clearInterval(id);
+    };
+  }, [tenantId]);
 
   return (
     <div
@@ -117,7 +146,7 @@ export const SideNav: React.FC = () => {
                 key={item.href}
                 href={item.href}
                 className={cn(
-                  "flex items-center gap-3 rounded-xl px-3 py-2.5 text-textSoft transition-all hover:bg-surface2/70 hover:text-textMain",
+                  "flex w-full min-w-0 items-center gap-3 rounded-xl px-3 py-2.5 text-textSoft transition-all hover:bg-surface2/70 hover:text-textMain",
                   isActive &&
                     "bg-surface2/90 text-textMain shadow-soft border border-[color:var(--color-border-strong)]"
                 )}
@@ -131,6 +160,13 @@ export const SideNav: React.FC = () => {
                   {item.icon}
                 </span>
                 <span className="truncate font-medium">{item.label}</span>
+                {item.href === "/monitoring" && monitoringAlertCount > 0 ? (
+                  <span
+                    className="ml-auto h-2 w-2 shrink-0 rounded-full bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.7)]"
+                    title={`${monitoringAlertCount} active alert(s)`}
+                    aria-label={`${monitoringAlertCount} active alerts`}
+                  />
+                ) : null}
               </Link>
             );
           })}

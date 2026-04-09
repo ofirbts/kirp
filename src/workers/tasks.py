@@ -53,13 +53,29 @@ def ingest_task(self: Any, payload: dict[str, Any]) -> dict[str, Any]:
         gov = GovernanceEngine(os.getenv("OPA_URL"))
         af = get_agent_framework_with_all_agents()
         pipe = EventPipeline(store, rag, schema, gov, af)
+        from src.core.run_controller import get_run_controller
+
+        meta = dict(metadata or {})
+        if not meta.get("run_id"):
+            rid = f"run_{uuid4().hex}"
+            tr = f"tr_{uuid4().hex[:12]}"
+            wf = str(meta.get("workflow_type") or "celery_ingest")
+            await get_run_controller().create_run(
+                workflow_type=wf,
+                tenant_id=tenant_id,
+                trace_id=tr,
+                run_id=rid,
+            )
+            meta["run_id"] = rid
+            meta.setdefault("trace_id", tr)
+            meta.setdefault("workflow_type", wf)
         ev_id = await pipe.run(
             tenant_id=tenant_id,
             space_id=space_id,
             user_id=user_id,
             source=source,
             content=content,
-            metadata=metadata,
+            metadata=meta,
         )
         _worker_metrics.inc("ingest_success_total", labels={"tenant_id": tenant_id or "unknown"})
         return {"ok": True, "event_id": str(ev_id)}
@@ -556,3 +572,18 @@ def drain_agent_queue_task() -> dict[str, Any]:
         return {"ok": False, "error": str(e)}
     agent_run_task.delay(payload)
     return {"ok": True, "processed": 1, "run_id": payload.get("run_id")}
+
+
+@celery_app.task(bind=True, name="reconcile_partial_runs_task")
+def reconcile_partial_runs_task(self: Any, max_runs: int = 50) -> dict[str, Any]:
+    """
+    Reconcile runs in aggregate `partial` state (replay failed history / Qdrant / schema).
+    Scheduled every 15 minutes via Celery beat.
+    """
+    async def _run() -> dict[str, Any]:
+        from src.workers.reconciliation_worker import ReconciliationWorker
+
+        w = await ReconciliationWorker.create()
+        return await w.reconcile_partial_runs(max_runs=max_runs)
+
+    return _run_async_sync(_run())

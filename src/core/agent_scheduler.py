@@ -109,6 +109,16 @@ class AgentScheduler:
         result_count = 0
         errors: list[str] = []
         context = {**(initial_context or {}), "trigger": trigger}
+        llm_ctx_token = None
+        llm_tenant_token = None
+        rid = context.get("run_id")
+        if rid:
+            from src.core.llm_run_context import reset_llm_run_id, set_llm_run_id
+
+            llm_ctx_token = set_llm_run_id(str(rid))
+        from src.core.llm_run_context import reset_llm_tenant_id, set_llm_tenant_id
+
+        llm_tenant_token = set_llm_tenant_id(tenant_id)
         try:
             result = await self._framework.run(agent_name, tenant_id, space_id, user_id, context)
             if result.get("ok"):
@@ -116,8 +126,21 @@ class AgentScheduler:
             else:
                 errors.append(result.get("error", "unknown"))
         except Exception as e:
+            from src.core.quotas import QuotaExceeded
+
+            if isinstance(e, QuotaExceeded):
+                raise
             errors.append(str(e))
             result = {"ok": False, "error": str(e)}
+        finally:
+            if llm_ctx_token is not None:
+                from src.core.llm_run_context import reset_llm_run_id
+
+                reset_llm_run_id(llm_ctx_token)
+            if llm_tenant_token is not None:
+                from src.core.llm_run_context import reset_llm_tenant_id
+
+                reset_llm_tenant_id(llm_tenant_token)
         duration_ms = (time.perf_counter() - started) * 1000
         run_at = datetime.now(timezone.utc).isoformat()
         await self._logs.append(agent_name, run_at, duration_ms, result_count, errors, tenant_id, space_id, trigger)

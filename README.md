@@ -4,11 +4,34 @@ Controlled Intelligence Layer · Event-Sourced · Multi-Tenant.
 
 See [README_API.md](README_API.md) for Brand OS v3 API and full system documentation.
 
+**Operators / audit:** [SYSTEM_STATUS.md](SYSTEM_STATUS.md) — Redis run keys, pipeline vs post-ingest, cross-store failures, idempotency, OPA semantics, metrics paths, regression test index. Architecture narrative: [SYSTEM_ARCHITECTURE.md](SYSTEM_ARCHITECTURE.md).
+
 ## Phase 1 & cloud deployment
 
 - **What the system does and Phase 1 scope:** [docs/PHASE1_AND_DEPLOYMENT.md](docs/PHASE1_AND_DEPLOYMENT.md)
 - **API on RunMyDocker:** [docs/RUNMYDOCKER.md](docs/RUNMYDOCKER.md). Env: copy `.env.example` to `.env` and set values.
 - **UI on Vercel:** set `NEXT_PUBLIC_API_URL` (see `docs/env.local.example` or `.env.local`) and configure `CORS_ORIGINS` on the API.
+
+## Quick Start (לראות משהו מהר)
+
+**סכמה מלאה:** [docs/QUICKSTART.md](docs/QUICKSTART.md) — איך להריץ עם Docker, לפתוח דאשבורד (3100), M3 (רפלקציות), ופתרון בעיות נפוצות.
+
+**בקצרה:** `docker compose up -d --build` → אחרי 1–2 דקות פתח http://localhost:3100 (דאשבורד) ו־http://localhost:3100/m3 (M3 Identity).
+
+---
+
+## Backend tests (pytest)
+
+From the repo root (Python 3.10+):
+
+```bash
+pip install -r requirements.txt -r requirements-dev.txt
+python -m pytest tests/ -q
+```
+
+Regression modules are indexed in [SYSTEM_STATUS.md](SYSTEM_STATUS.md) (**Regression test index**). CI: `.github/workflows/tests.yml` (branches **main**, **kirp2**).
+
+---
 
 ## Building with Docker
 

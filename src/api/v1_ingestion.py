@@ -12,6 +12,7 @@ import hmac
 import logging
 import os
 from typing import Any
+from uuid import uuid4
 
 from fastapi import APIRouter, Body, HTTPException, Request
 
@@ -24,6 +25,10 @@ async def _ingest_one(tenant_id: str, space_id: str, user_id: str, payload: dict
     """Publish one unified payload to Kafka only. Processor runs pipeline and stores."""
     from src.agents.kafka_event_agent import KafkaEventAgent, EventEnvelope
 
+    run_id = payload.get("run_id") or f"run_{uuid4().hex}"
+    trace_id = payload.get("trace_id") or f"tr_{uuid4().hex[:12]}"
+    workflow_type = payload.get("workflow_type") or "ingest_event"
+    idempotency_key = payload.get("idempotency_key")
     KafkaEventAgent().emit(EventEnvelope(
         type="ingest",
         payload={
@@ -31,14 +36,27 @@ async def _ingest_one(tenant_id: str, space_id: str, user_id: str, payload: dict
             "space_id": space_id,
             "user_id": user_id,
             "content": payload.get("content", ""),
-            "metadata": payload.get("metadata") or {},
+            "trace_id": trace_id,
+            "run_id": run_id,
+            "workflow_type": workflow_type,
+            "idempotency_key": idempotency_key,
+            "metadata": {
+                **(payload.get("metadata") or {}),
+                "trace_id": trace_id,
+                "run_id": run_id,
+                "workflow_type": workflow_type,
+            },
             "source": payload.get("source", "webhook"),
         },
         tenant_id=tenant_id,
         space_id=space_id,
         user_id=user_id,
+        run_id=run_id,
+        workflow_type=workflow_type,
+        trace_id=trace_id,
+        idempotency_key=idempotency_key,
     ))
-    return {"ok": True}
+    return {"ok": True, "run_id": run_id, "trace_id": trace_id}
 
 
 # --- Webhooks ---
@@ -143,6 +161,9 @@ async def webhook_notion(request: Request) -> dict[str, Any]:
                     "space_id": space_id,
                     "user_id": user_id,
                     "content": payload["content"],
+                    "trace_id": f"tr_{uuid4().hex[:12]}",
+                    "run_id": f"run_{uuid4().hex}",
+                    "workflow_type": "ingest_event",
                     "metadata": meta,
                     "source": "notion",
                 },

@@ -205,6 +205,18 @@ class AgentExecutionEngine:
         data["updated_at"] = datetime.now(timezone.utc).isoformat()
         await r.hset(key, mapping={k: v if isinstance(v, str) else _json.dumps(v) for k, v in data.items()})
         await r.expire(key, 86400 * 7)  # 7 days
+        try:
+            from src.core.run_controller import get_run_controller
+            rc = get_run_controller()
+            step_status = "processing" if state == AgentRunState.RUNNING else ("completed" if state == AgentRunState.COMPLETED else ("failed" if state == AgentRunState.FAILED else "accepted"))
+            await rc.update_step(
+                str(run_id),
+                "agent_state",
+                step_status,
+                error=error,
+            )
+        except Exception:
+            pass
 
     async def get_run_state(self, run_id: UUID) -> dict[str, Any] | None:
         r = await self._redis_client()
@@ -245,19 +257,52 @@ class AgentExecutionEngine:
         handler: Callable[..., Awaitable[dict[str, Any]]],
     ) -> dict[str, Any]:
         """Execute one run (called by worker). State: idle → running → completed|failed."""
-        await self.set_run_state(run_id, AgentRunState.RUNNING)
+        from src.core.llm_run_context import (
+            reset_llm_run_id,
+            reset_llm_tenant_id,
+            set_llm_run_id,
+            set_llm_tenant_id,
+        )
+
+        llm_ctx_token = set_llm_run_id(str(run_id))
+        llm_tenant_token = set_llm_tenant_id(tenant_id)
         try:
-            result = await handler(
-                tenant_id=tenant_id,
-                space_id=space_id,
-                user_id=user_id,
-                context=context,
-            )
-            await self.set_run_state(run_id, AgentRunState.COMPLETED, output=result)
-            return result
-        except Exception as e:
-            await self.set_run_state(run_id, AgentRunState.FAILED, error=str(e))
-            raise
+            await self.set_run_state(run_id, AgentRunState.RUNNING)
+            try:
+                from src.core.run_controller import get_run_controller
+
+                await get_run_controller().update_step(str(run_id), "agent_execute_start", "processing")
+            except Exception:
+                pass
+            try:
+                result = await handler(
+                    tenant_id=tenant_id,
+                    space_id=space_id,
+                    user_id=user_id,
+                    context=context,
+                )
+                await self.set_run_state(run_id, AgentRunState.COMPLETED, output=result)
+                try:
+                    from src.core.run_controller import get_run_controller
+
+                    await get_run_controller().update_step(str(run_id), "agent_execute_complete", "completed")
+                except Exception:
+                    pass
+                return result
+            except Exception as e:
+                await self.set_run_state(run_id, AgentRunState.FAILED, error=str(e))
+                try:
+                    from src.core.run_controller import get_run_controller
+
+                    await get_run_controller().update_step(
+                        str(run_id), "agent_execute_complete", "failed", error=str(e)
+                    )
+                except Exception:
+                    pass
+                raise
+        finally:
+            reset_llm_run_id(llm_ctx_token)
+            reset_llm_tenant_id(llm_tenant_token)
 
 
 class SkillsRegistry:

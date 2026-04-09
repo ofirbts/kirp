@@ -163,6 +163,18 @@ class EventStore:
         doc = await self._db.events.find_one({"_id": str(event_id)})
         return Event.from_doc(doc) if doc else None
 
+    async def find_latest_by_run_id(self, tenant_id: str, run_id: str) -> Event | None:
+        """Latest event whose metadata contains this ingest `run_id` (tenant-scoped)."""
+        if not tenant_id or not run_id:
+            raise ValueError("tenant_id and run_id are required")
+        if self._db is None:
+            await self.connect()
+        doc = await self._db.events.find_one(
+            {"tenant_id": tenant_id, "metadata.run_id": run_id},
+            sort=[("timestamp", -1)],
+        )
+        return Event.from_doc(doc) if doc else None
+
     async def find_by_external_id(
         self,
         tenant_id: str,

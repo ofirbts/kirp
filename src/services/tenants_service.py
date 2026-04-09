@@ -18,6 +18,29 @@ from src.core.schema_engine import get_schema_engine
 from src.models.tenant import Tenant, Space
 from src.schemas.api_models import Tenant as TenantSchema, Space as SpaceSchema
 
+# SaaS tenant lifecycle (path C — Stripe/onboarding). Persisted in Tenant.extra["lifecycle"]; no migration.
+_LIFECYCLE_EXTRA_KEY = "lifecycle"
+_VALID_LIFECYCLES = frozenset(
+    {
+        "pending_onboarding",
+        "active",
+        "limited",
+        "past_due",
+        "suspended",
+    }
+)
+
+
+class TenantLifecycleError(ValueError):
+    """Invalid tenant id, unknown tenant, or invalid lifecycle value."""
+
+
+def _lifecycle_from_extra(extra: dict | None) -> str:
+    raw = (extra or {}).get(_LIFECYCLE_EXTRA_KEY)
+    if isinstance(raw, str) and raw in _VALID_LIFECYCLES:
+        return raw
+    return "active"
+
 
 async def create_tenant_if_not_exists(
     name: str = "Default",
@@ -36,7 +59,10 @@ async def create_tenant_if_not_exists(
         tenant = Tenant(
             id=uuid.uuid4(),
             name=name,
-            extra={"slug": slug or _slug(name)},
+            extra={
+                "slug": slug or _slug(name),
+                _LIFECYCLE_EXTRA_KEY: "active",
+            },
             created_at=datetime.now(timezone.utc),
             updated_at=datetime.now(timezone.utc),
         )
@@ -108,6 +134,7 @@ def _tenant_to_schema(t: Tenant) -> TenantSchema:
         id=str(t.id),
         name=t.name,
         slug=(t.extra or {}).get("slug") or _slug(t.name),
+        lifecycle=_lifecycle_from_extra(t.extra),
         createdAt=created,
         updatedAt=updated,
     )
@@ -165,6 +192,38 @@ async def list_spaces_for_tenant(tenant_id: str) -> List[SpaceSchema]:
         await session.close()
 
 
+async def update_tenant_lifecycle(tenant_id: str, lifecycle: str) -> TenantSchema:
+    """
+    Persist SaaS lifecycle on Tenant.extra (Stripe/onboarding callbacks and admin UI).
+
+    ``tenant_id`` must be the Postgres tenant UUID string.
+    """
+    life = lifecycle.strip()
+    if life not in _VALID_LIFECYCLES:
+        raise TenantLifecycleError(f"invalid lifecycle: {life!r}")
+    try:
+        tid = uuid.UUID(tenant_id)
+    except (ValueError, TypeError) as e:
+        raise TenantLifecycleError("invalid tenant id") from e
+
+    engine = await get_schema_engine()
+    session = await engine.get_session()
+    try:
+        result = await session.execute(select(Tenant).where(Tenant.id == tid).limit(1))
+        row = result.scalar_one_or_none()
+        if row is None:
+            raise TenantLifecycleError("tenant not found")
+        ex = dict(row.extra or {})
+        ex[_LIFECYCLE_EXTRA_KEY] = life
+        row.extra = ex
+        row.updated_at = datetime.now(timezone.utc)
+        await session.commit()
+        await session.refresh(row)
+        return _tenant_to_schema(row)
+    finally:
+        await session.close()
+
+
 async def create_tenant(name: str, slug: str | None = None) -> TenantSchema:
     engine = await get_schema_engine()
     session = await engine.get_session()
@@ -173,7 +232,7 @@ async def create_tenant(name: str, slug: str | None = None) -> TenantSchema:
         tenant = Tenant(
             id=uuid.uuid4(),
             name=name,
-            extra={"slug": s},
+            extra={**({"slug": s}), _LIFECYCLE_EXTRA_KEY: "pending_onboarding"},
             created_at=datetime.now(timezone.utc),
             updated_at=datetime.now(timezone.utc),
         )

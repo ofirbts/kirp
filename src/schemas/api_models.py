@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 # ---------- API schema version ----------
@@ -38,9 +38,15 @@ class AgentMetricSnapshot(BaseModel):
 
 
 class Tenant(BaseModel):
+    """Tenant row; SaaS lifecycle is stored in Postgres `tenants.extra['lifecycle']`."""
+
     id: ID
     name: str
     slug: str
+    lifecycle: str = Field(
+        default="active",
+        description="pending_onboarding | active | limited | past_due | suspended",
+    )
     createdAt: ISO8601
     updatedAt: ISO8601
 

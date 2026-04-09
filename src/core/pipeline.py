@@ -8,6 +8,7 @@ No state mutation without event. Multi-tenant isolated.
 from __future__ import annotations
 
 import logging
+import os
 from datetime import datetime, timezone
 from typing import Any
 from uuid import UUID, uuid4, uuid5
@@ -15,8 +16,15 @@ from uuid import UUID, uuid4, uuid5
 from src.core.event_store import Event, EventStore, Sensitivity
 from src.core.life_objects import extract_life_objects
 from src.models.schema import SchemaEntity
+from src.observability.metrics import MetricsCollector
 
 logger = logging.getLogger(__name__)
+
+_pipeline_metrics = MetricsCollector("kirp_pipeline")
+
+
+class RunStateMissing(ValueError):
+    """Strict pipeline policy: missing run_id, or run_id with no RunController state for tenant."""
 
 
 class EventPipeline:
@@ -54,12 +62,71 @@ class EventPipeline:
         Run full pipeline: governance → store → embed → Qdrant → (optional) trigger agents.
         Returns event ID. Pass event_id when re-ingesting from Kafka to preserve id.
         event_type: stored on the event (e.g. "ingest" or "m3.daily_reflection_submitted").
+
+        Env **PIPELINE_RUN_POLICY**: ``warn`` (default) or ``strict``. In ``strict``, a
+        ``run_id`` in metadata and matching RunController state are required before work proceeds.
+        ``STRICT_RUN_BOUNDARY_FAIL_FAST`` still applies in ``warn`` mode for orphan ``run_id`` only.
         """
         if not tenant_id or tenant_id == "*":
             raise ValueError("tenant_id is required (multi-tenant isolation)")
 
+        _policy_raw = (os.getenv("PIPELINE_RUN_POLICY", "warn") or "warn").strip().lower()
+        if _policy_raw not in ("warn", "strict"):
+            logger.warning(
+                "PIPELINE_RUN_POLICY.invalid policy=%s defaulting to warn",
+                _policy_raw,
+            )
+            _policy_raw = "warn"
+        strict_policy = _policy_raw == "strict"
+
         meta = metadata or {}
         sens = sensitivity or Sensitivity.PRIVATE
+        run_id = str(meta.get("run_id")) if meta.get("run_id") else None
+        run_controller = None
+        if not run_id:
+            logger.warning(
+                "PIPELINE_NO_RUN_ID tenant_id=%s event_type=%s source=%s",
+                tenant_id,
+                event_type,
+                source,
+            )
+            _pipeline_metrics.inc(
+                "no_run_id_total",
+                labels={"event_type": event_type, "source": source},
+            )
+            if strict_policy:
+                raise RunStateMissing("PIPELINE_RUN_ID_REQUIRED")
+        else:
+            from src.core.run_controller import get_run_controller
+
+            run_controller = get_run_controller()
+            state = await run_controller.get_run_state(run_id, tenant_id=tenant_id)
+            if state is None:
+                logger.error(
+                    "PIPELINE_ORPHAN_RUN_ID run_id=%s tenant_id=%s event_type=%s source=%s",
+                    run_id,
+                    tenant_id,
+                    event_type,
+                    source,
+                )
+                _pipeline_metrics.inc(
+                    "orphan_run_id_total",
+                    labels={"event_type": event_type, "source": source},
+                )
+                if strict_policy:
+                    raise RunStateMissing("PIPELINE_RUN_STATE_MISSING")
+                fail_fast = os.getenv("STRICT_RUN_BOUNDARY_FAIL_FAST", "").lower() in (
+                    "1",
+                    "true",
+                    "yes",
+                )
+                if fail_fast:
+                    raise RunStateMissing(
+                        "run_missing_state: metadata.run_id present but no RunController state"
+                    )
+                run_controller = None
+            else:
+                await run_controller.update_step(run_id, "pipeline_start", "processing")
 
         # Build context for governance; M3 events get identity_entropy_score and resource_type
         gov_context: dict[str, Any] = {
@@ -93,7 +160,11 @@ class EventPipeline:
             context=gov_context,
         )
         if not check.allowed:
+            if run_controller and run_id:
+                await run_controller.update_step(run_id, "governance_check", "failed", error=check.reason)
             raise PermissionError(f"Governance denied: {check.reason}")
+        if run_controller and run_id:
+            await run_controller.update_step(run_id, "governance_check", "completed")
         # M3 human governance (spec 8): when requires_approval, send WhatsApp escalation
         if check.requires_approval and event_type.startswith("m3."):
             try:
@@ -155,11 +226,17 @@ class EventPipeline:
                 tenant_id=tenant_id,
                 space_id=space_id,
             )
+            if run_controller and run_id:
+                await run_controller.update_step(run_id, "qdrant_projection", "completed")
         except Exception as e:
             logger.warning("RAG embed/upsert failed (event still stored): %s", e)
+            if run_controller and run_id:
+                await run_controller.update_step(run_id, "qdrant_projection", "failed", error=str(e))
 
         # Store in Mongo (source of truth)
         await self._store.ingest(event)
+        if run_controller and run_id:
+            await run_controller.update_step(run_id, "mongo_write", "completed")
         logger.info("Pipeline stored event %s tenant=%s trace=%s", event_id, tenant_id, trace_id)
 
         # History 2.0: human-readable timeline entry by source
@@ -203,8 +280,14 @@ class EventPipeline:
                 "[INGEST] history entry written: tenant=%s user=%s type=%s event_id=%s",
                 tenant_id, user_id, hist_type, event_id,
             )
+            if run_controller and run_id:
+                await run_controller.update_step(run_id, "history_write", "completed")
         except Exception as e:
             logger.warning("History record failed after ingest: %s", e)
+            if run_controller and run_id:
+                await run_controller.update_step(
+                    run_id, "history_write_failed", "failed", error=str(e)
+                )
 
         # Life-object extraction → classification + NLP dates → SchemaEngine upsert (Phase 2)
         try:
@@ -249,8 +332,32 @@ class EventPipeline:
                     due_date=due_date,
                     metadata=meta,
                 )
+            if run_controller and run_id:
+                await run_controller.update_step(run_id, "schema_projection", "completed")
         except Exception as e:
             logger.warning("Life-object extraction/upsert failed (event already stored): %s", e)
+            if run_controller and run_id:
+                await run_controller.update_step(run_id, "schema_projection", "failed", error=str(e))
+
+        # Optional: one bulk-routed LLM call so run timeline shows llm_call_gemma4 (or route override).
+        if run_controller and run_id and os.getenv("INGEST_PIPELINE_LLM_ACK", "").lower() in (
+            "1",
+            "true",
+            "yes",
+        ):
+            from src.core.llm_run_context import reset_llm_run_id, set_llm_run_id
+            from src.core.llm_router import get_llm_for_task
+
+            token = set_llm_run_id(run_id)
+            try:
+                llm = get_llm_for_task("bulk")
+                await llm.invoke("Reply with exactly: OK", max_tokens=16, temperature=0.0)
+            finally:
+                reset_llm_run_id(token)
+
+        if run_controller and run_id:
+            await run_controller.update_step(run_id, "pipeline_start", "completed")
+            await run_controller.update_step(run_id, "pipeline_complete", "completed")
 
         return event.id
 
@@ -331,3 +438,130 @@ class EventPipeline:
         except Exception as e:
             logger.warning("Life-object extraction/upsert failed in run_post_ingest_for_event: %s", e)
         return True
+
+    @staticmethod
+    def _last_step_status_map(steps: list[dict[str, Any]]) -> dict[str, str]:
+        last: dict[str, str] = {}
+        for s in steps:
+            name = str(s.get("step", ""))
+            if name:
+                last[name] = str(s.get("status", "")).lower()
+        return last
+
+    async def replay_history_for_event(
+        self,
+        event: Event,
+        run_id: str,
+        run_controller: Any,
+    ) -> bool:
+        """Replay History 2.0 for an existing stored event (used by reconciliation)."""
+        try:
+            from src.core.history import record_history
+
+            tenant_id = event.tenant_id
+            space_id = event.space_id
+            user_id = event.user_id
+            source = event.source
+            content = event.content
+            meta = event.metadata or {}
+            trace_id = meta.get("trace_id") or event.trace_id or ""
+            event_id = event.id
+
+            hist_type = "system"
+            title = "Content ingested"
+            body = (content[:200] + "…") if len(content) > 200 else content or ""
+            if source == "email":
+                hist_type = "email_received"
+                from_addr = (meta.get("from") or "").strip() or "unknown"
+                title = "Email received from " + (from_addr[:60] + "…" if len(from_addr) > 60 else from_addr)
+            elif source == "whatsapp":
+                hist_type = "whatsapp_message"
+                from_addr = (meta.get("from") or meta.get("sender") or "").strip() or "unknown"
+                title = "Message from " + (from_addr[:60] + "…" if len(from_addr) > 60 else from_addr)
+            elif source == "slack":
+                hist_type = "slack_message"
+                ch = (meta.get("channel") or meta.get("channel_id") or "").strip() or "channel"
+                title = "Slack message in #" + (ch[:40] + "…" if len(ch) > 40 else ch)
+            elif source == "calendar":
+                hist_type = "calendar_event"
+                title = (meta.get("summary") or content.split("\n")[0] if content else "Calendar event")[:80]
+                title = "Calendar event: " + (title or "Event")
+            elif source == "notion":
+                hist_type = "notion_sync"
+                title = "Notion page synced"
+                body = (content[:150] + "…") if len(content) > 150 else (content or "")
+
+            await record_history(
+                tenant_id=tenant_id,
+                space_id=space_id,
+                user_id=user_id,
+                type_=hist_type,
+                title=title,
+                body=body,
+                source=source,
+                entity_id=str(event_id),
+                meta={"trace_id": trace_id, "event_id": str(event_id)},
+            )
+            await run_controller.update_step(run_id, "history_write", "completed")
+            return True
+        except Exception as e:
+            logger.warning("replay_history_for_event failed: %s", e)
+            await run_controller.update_step(
+                run_id, "history_write_failed", "failed", error=str(e)
+            )
+            return False
+
+    async def reconcile_run(self, run_id: str) -> dict[str, Any]:
+        """
+        Best-effort repair for aggregate `partial` runs: replay failed history and/or
+        Qdrant+schema projections using the canonical Mongo event keyed by metadata.run_id.
+        Appends `reconciled` / completed when at least one projection succeeds.
+        """
+        from src.core.run_controller import get_run_controller
+
+        rc = get_run_controller()
+        state = await rc.get_run_state(run_id)
+        if state is None:
+            return {"run_id": run_id, "skipped": True, "reason": "run_not_found"}
+        if state.state != "partial":
+            return {"run_id": run_id, "skipped": True, "reason": "not_partial", "state": state.state}
+
+        event = await self._store.find_latest_by_run_id(state.tenant_id, run_id)
+        if event is None:
+            return {"run_id": run_id, "skipped": True, "reason": "event_not_found"}
+
+        last = self._last_step_status_map(state.steps)
+        repaired: list[str] = []
+        any_attempt = False
+
+        hist_broken = last.get("history_write_failed") == "failed" or last.get("history_write") == "failed"
+        if hist_broken:
+            any_attempt = True
+            if await self.replay_history_for_event(event, run_id, rc):
+                if last.get("history_write_failed") == "failed":
+                    await rc.update_step(run_id, "history_write_failed", "completed", error="reconciled")
+                repaired.append("history")
+
+        proj_broken = last.get("qdrant_projection") == "failed" or last.get("schema_projection") == "failed"
+        if proj_broken:
+            any_attempt = True
+            if await self.run_post_ingest_for_event(event.id):
+                await rc.update_step(run_id, "qdrant_projection", "completed")
+                await rc.update_step(run_id, "schema_projection", "completed")
+                repaired.append("projections")
+
+        if not any_attempt:
+            return {"run_id": run_id, "skipped": True, "reason": "nothing_to_repair"}
+
+        final_state: str | None = None
+        if repaired:
+            await rc.update_step(run_id, "reconciled", "completed")
+            fin = await rc.get_run_state(run_id, tenant_id=state.tenant_id)
+            final_state = fin.state if fin else None
+
+        return {
+            "run_id": run_id,
+            "skipped": False,
+            "repaired": repaired,
+            "state_after": final_state,
+        }

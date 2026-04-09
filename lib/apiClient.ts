@@ -970,6 +970,81 @@ export async function runAgent(
   return post<Record<string, unknown>>(`/api/agents/${encodeURIComponent(agentId)}/run`, body ?? {});
 }
 
+// ---------- Run monitoring (RunController / Redis) ----------
+
+export type TenantRunRow = {
+  run_id: string;
+  state: string;
+  started_at: string;
+  steps_count: number;
+  workflow_type: string;
+  trace_id: string | null;
+  /** Last LLM route from timeline step `llm_call_*` (e.g. gemma4). */
+  model: string | null;
+};
+
+export type TenantRunsResponse = {
+  tenant_id: string;
+  runs: TenantRunRow[];
+  stats: {
+    total: number;
+    completed: number;
+    partial: number;
+    failed: number;
+  };
+};
+
+export type RunTimelineStep = {
+  step: string;
+  status: string;
+  error: string | null;
+  ts: string;
+};
+
+export type RunStatusResponse = {
+  run_id: string;
+  state: string;
+  timeline: RunTimelineStep[];
+  overall_status: string;
+  is_complete: boolean;
+  /** Same derivation as tenant runs list: last `llm_call_*` suffix. */
+  model: string | null;
+};
+
+export async function getTenantRunsV1(
+  tenantId: string,
+  params?: { limit?: number },
+): Promise<TenantRunsResponse> {
+  return get(`/api/v1/tenant/${encodeURIComponent(tenantId)}/runs`, {
+    limit: params?.limit,
+  });
+}
+
+export async function getRunStatusV1(runId: string): Promise<RunStatusResponse> {
+  return get(`/api/v1/run/${encodeURIComponent(runId)}/status`);
+}
+
+export type TenantAlert = {
+  id: string;
+  type: string;
+  severity: string;
+  message: string;
+  raised_at: string;
+  meta?: Record<string, unknown>;
+};
+
+export type TenantAlertsResponse = {
+  tenant_id: string;
+  alerts: TenantAlert[];
+  count: number;
+};
+
+export async function getTenantAlertsV1(
+  tenantId: string,
+): Promise<TenantAlertsResponse> {
+  return get(`/api/v1/tenant/${encodeURIComponent(tenantId)}/alerts`);
+}
+
 // ---------- Aggregated export ----------
 
 export const apiClient = {
@@ -1035,6 +1110,8 @@ export const apiClient = {
   m3SynthesisRequest,
   m3EvolutionRequest,
   m3Export,
+  getTenantRunsV1,
+  getRunStatusV1,
 };
 
 // ---------- Connections Hub ----------

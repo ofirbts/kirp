@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from datetime import date, datetime, timezone
 from typing import Any
+from uuid import uuid4
 
 from fastapi import APIRouter, Depends, Query, Request
 from fastapi.responses import JSONResponse
@@ -30,6 +31,27 @@ from src.modules.m3.agents import M3_AGENT_SPECS
 router = APIRouter(prefix="/api/v1", tags=["M3"])
 
 
+async def _create_run_at_m3_boundary(
+    ctx: TenantContext,
+    *,
+    run_id: str,
+    trace_id: str,
+    workflow_type: str,
+    idempotency_key: str | None = None,
+) -> None:
+    """Run lifecycle must start at the HTTP boundary, not inside EventPipeline."""
+    from src.core.run_controller import get_run_controller
+
+    rc = get_run_controller()
+    await rc.create_run(
+        workflow_type=workflow_type,
+        tenant_id=ctx.tenant_id,
+        idempotency_key=idempotency_key,
+        trace_id=trace_id,
+        run_id=run_id,
+    )
+
+
 @router.get("/m3/health")
 async def m3_health() -> dict[str, Any]:
     """M3 module status: event types and agents registered (no secrets)."""
@@ -49,6 +71,11 @@ def _canonical_m3_event(
     source: str,
     content: str = "",
     metadata: dict[str, Any] | None = None,
+    trace_id: str | None = None,
+    run_id: str | None = None,
+    workflow_type: str | None = None,
+    idempotency_key: str | None = None,
+    parent_run_id: str | None = None,
 ) -> CanonicalEvent:
     """Build a CanonicalEvent for M3 with tenant/space/user from context."""
     meta = ensure_m3_metadata(metadata or {})
@@ -57,7 +84,11 @@ def _canonical_m3_event(
         space_id=ctx.space_id or "all",
         user_id=ctx.user_id,
         source=source,
-        trace_id=None,
+        trace_id=trace_id,
+        run_id=run_id,
+        workflow_type=workflow_type,
+        idempotency_key=idempotency_key,
+        parent_run_id=parent_run_id,
         parent_event_id=None,
         version=1,
         event_type=event_type,
@@ -98,19 +129,32 @@ async def m3_reflect(
     }
     if idempotency_key:
         meta["idempotency_key"] = idempotency_key
+    run_id = f"run_{uuid4().hex}"
+    trace_id = f"tr_{uuid4().hex[:12]}"
     event = _canonical_m3_event(
         ctx,
         EVENT_M3_DAILY_REFLECTION_SUBMITTED,
         "m3_reflect",
         content=reflection_text,
         metadata=meta,
+        trace_id=trace_id,
+        run_id=run_id,
+        workflow_type="m3_reflection_cycle",
+        idempotency_key=idempotency_key or None,
+    )
+    await _create_run_at_m3_boundary(
+        ctx,
+        run_id=run_id,
+        trace_id=trace_id,
+        workflow_type="m3_reflection_cycle",
+        idempotency_key=idempotency_key or None,
     )
     registry = get_event_registry()
     event_id = await registry.dispatch(event)
     if idempotency_key:
         store = get_m3_memory_store()
         await store.record_idempotency(ctx.tenant_id, ctx.user_id, idempotency_key, str(event_id))
-    return {"ok": True, "event_id": str(event_id)}
+    return {"ok": True, "event_id": str(event_id), "run_id": run_id, "trace_id": trace_id}
 
 
 @router.post("/m3/synthesis", status_code=201)
@@ -123,15 +167,26 @@ async def m3_synthesis_request(
     Body: week_start (YYYY-MM-DD), week_end (YYYY-MM-DD) optional.
     """
     payload = body or {}
+    run_id = f"run_{uuid4().hex}"
+    trace_id = f"tr_{uuid4().hex[:12]}"
     event = _canonical_m3_event(
         ctx,
         EVENT_M3_WEEKLY_SYNTHESIS_REQUESTED,
         "m3_synthesis",
         metadata={"week_start": payload.get("week_start"), "week_end": payload.get("week_end")},
+        trace_id=trace_id,
+        run_id=run_id,
+        workflow_type="m3_weekly_synthesis",
+    )
+    await _create_run_at_m3_boundary(
+        ctx,
+        run_id=run_id,
+        trace_id=trace_id,
+        workflow_type="m3_weekly_synthesis",
     )
     registry = get_event_registry()
     event_id = await registry.dispatch(event)
-    return {"ok": True, "event_id": str(event_id)}
+    return {"ok": True, "event_id": str(event_id), "run_id": run_id, "trace_id": trace_id}
 
 
 @router.post("/m3/evolution", status_code=201)
@@ -145,15 +200,26 @@ async def m3_evolution_request(
     """
     payload = body or {}
     month = payload.get("month") or datetime.now(timezone.utc).strftime("%Y-%m")
+    run_id = f"run_{uuid4().hex}"
+    trace_id = f"tr_{uuid4().hex[:12]}"
     event = _canonical_m3_event(
         ctx,
         EVENT_M3_MONTHLY_EVOLUTION_REQUESTED,
         "m3_evolution",
         metadata={"month": month},
+        trace_id=trace_id,
+        run_id=run_id,
+        workflow_type="m3_monthly_evolution",
+    )
+    await _create_run_at_m3_boundary(
+        ctx,
+        run_id=run_id,
+        trace_id=trace_id,
+        workflow_type="m3_monthly_evolution",
     )
     registry = get_event_registry()
     event_id = await registry.dispatch(event)
-    return {"ok": True, "event_id": str(event_id)}
+    return {"ok": True, "event_id": str(event_id), "run_id": run_id, "trace_id": trace_id}
 
 
 @router.get("/m3/reflections")
