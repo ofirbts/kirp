@@ -9,6 +9,7 @@ from __future__ import annotations
 import logging
 import os
 import sys
+import time
 from pathlib import Path
 from contextlib import asynccontextmanager
 from typing import Any
@@ -26,7 +27,7 @@ from fastapi import FastAPI, HTTPException, Depends, Body, Request
 from src.core.quotas import QuotaExceeded
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, EmailStr, Field
 from src.api import governance, observability, whatsapp_os, brand
 import src.api.command as command
 from src.core.auth import get_current_user, User
@@ -61,6 +62,32 @@ class QueryRequest(BaseModel):
 class AskRequest(BaseModel):
     """Body for POST /api/v1/ask. Only query is required; tenant_id/user_id/space_id come from JWT."""
     query: str
+
+
+class OnboardingRequest(BaseModel):
+    """Public SaaS signup — creates tenant + trial + API keys (secret shown once)."""
+
+    tenant_name: str = Field(..., min_length=1, max_length=255)
+    email: EmailStr
+
+
+# --- Onboarding rate limit (per client IP, in-memory; tune via ONBOARDING_RL_MAX / ONBOARDING_RL_WINDOW_SEC) ---
+_onboarding_rl_hits: dict[str, list[float]] = {}
+
+
+def _check_onboarding_rate_limit(request: Request) -> None:
+    window = float(os.getenv("ONBOARDING_RL_WINDOW_SEC", "60"))
+    max_n = int(os.getenv("ONBOARDING_RL_MAX", "10"))
+    client_host = (request.client.host if request.client else None) or "unknown"
+    now = time.time()
+    hits = _onboarding_rl_hits.setdefault(client_host, [])
+    hits[:] = [t for t in hits if now - t < window]
+    if len(hits) >= max_n:
+        raise HTTPException(
+            status_code=429,
+            detail="Too many onboarding requests; try again later",
+        )
+    hits.append(now)
 
 
 # --- Globals (lazy init) ---
@@ -158,10 +185,25 @@ async def _seed_dev_user_if_needed() -> None:
         logger.warning("Dev user seed failed (non-fatal): %s", e)
 
 
+async def validate_prod_env() -> None:
+    """
+    Fail fast in production when critical SaaS dependencies are not configured.
+    """
+    env = (os.getenv("ENV") or "").strip().lower()
+    if env not in ("production", "prod"):
+        return
+    required = ["STRIPE_SECRET_KEY", "DATABASE_URL", "REDIS_URL"]
+    missing = [k for k in required if not (os.getenv(k) or "").strip()]
+    if missing:
+        raise RuntimeError(f"Missing prod env vars: {missing}")
+    logger.info("KIRP production env validated")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Startup: prepare dirs; seed dev user; services connect lazily on first use."""
     logger.info("KIRP Enterprise starting (lazy connect: stores connect on first use)")
+    await validate_prod_env()
     prom_dir = os.environ.get("PROMETHEUS_MULTIPROC_DIR")
     if prom_dir:
         os.makedirs(prom_dir, exist_ok=True)
@@ -256,7 +298,9 @@ async def auth_middleware(request: Request, call_next):
     """
     if not hasattr(request.state, "user") or request.state.user is None:
         auth = request.headers.get("Authorization") or ""
-        if auth.startswith("Bearer "):
+        if auth.lower().startswith("kirp "):
+            pass
+        elif auth.startswith("Bearer "):
             token = auth[7:].strip()
             try:
                 from src.core.jwt_utils import decode_token
@@ -289,6 +333,14 @@ async def auth_middleware(request: Request, call_next):
     return await call_next(request)
 
 
+@app.middleware("http")
+async def kirp_api_key_middleware_layer(request: Request, call_next):
+    """Runs before auth_middleware (registered after auth = outer stack = first on request)."""
+    from src.middleware.api_key_auth import kirp_api_key_middleware
+
+    return await kirp_api_key_middleware(request, call_next)
+
+
 @app.get("/health")
 async def health() -> dict[str, Any]:
     """Health check for Docker/K8s."""
@@ -302,6 +354,62 @@ async def health() -> dict[str, Any]:
         }
     except Exception as e:
         raise HTTPException(status_code=503, detail=str(e))
+
+
+class StripePaymentIntentBody(BaseModel):
+    """Create a PaymentIntent for Stripe Elements (publishable key on client)."""
+
+    tenant_id: str | None = None
+    amount_cents: int = Field(default=500, ge=50, le=9_999_999)
+    currency: str = Field(default="usd", min_length=3, max_length=10)
+
+
+@app.post("/api/v1/stripe/create-payment-intent")
+async def stripe_create_payment_intent(body: StripePaymentIntentBody) -> dict[str, str]:
+    """Return ``clientSecret`` for ``@stripe/react-stripe-js`` Elements. Requires ``STRIPE_SECRET_KEY``."""
+    import stripe as stripe_sdk
+
+    sk = os.getenv("STRIPE_SECRET_KEY", "").strip()
+    if not sk:
+        raise HTTPException(
+            status_code=503,
+            detail="STRIPE_SECRET_KEY not configured",
+        )
+    stripe_sdk.api_key = sk
+    try:
+        intent = stripe_sdk.PaymentIntent.create(
+            amount=body.amount_cents,
+            currency=body.currency.lower(),
+            automatic_payment_methods={"enabled": True},
+            metadata={
+                "tenant_id": (body.tenant_id or "").strip(),
+            },
+        )
+    except Exception as e:
+        logger.warning("Stripe PaymentIntent create failed: %s", e)
+        raise HTTPException(status_code=502, detail="Stripe error") from e
+    cs = intent.client_secret
+    if not cs:
+        raise HTTPException(status_code=502, detail="Missing client_secret from Stripe")
+    return {"clientSecret": cs}
+
+
+@app.post("/api/v1/onboarding", status_code=201)
+async def saas_onboarding(body: OnboardingRequest, request: Request) -> dict[str, Any]:
+    """
+    Create a new tenant (30-day trial), default space, and API keys. No JWT required.
+    Store ``secret_key`` securely; it cannot be retrieved again.
+    """
+    from src.services.onboarding_service import OnboardingError, create_tenant
+
+    _check_onboarding_rate_limit(request)
+    try:
+        return await create_tenant(body.tenant_name, str(body.email))
+    except OnboardingError as e:
+        msg = str(e)
+        if "already registered" in msg.lower():
+            raise HTTPException(status_code=409, detail=msg) from e
+        raise HTTPException(status_code=400, detail=msg) from e
 
 
 @app.post("/api/v1/stripe/webhook")
@@ -937,7 +1045,22 @@ app.include_router(audit_api.router)
 app.include_router(v1_domain.router)
 app.include_router(v1_rag.router)
 
-from src.api import v1_tasks, v1_ingestion, v1_reminders, v1_execute, v1_context, v1_connections, v1_graph, v1_history, v1_tenants_spaces, v1_events, v1_users, v1_scenarios, v1_m3
+from src.api import (
+    v1_tasks,
+    v1_ingestion,
+    v1_reminders,
+    v1_execute,
+    v1_context,
+    v1_connections,
+    v1_graph,
+    v1_history,
+    v1_tenants_spaces,
+    v1_tenant_usage,
+    v1_events,
+    v1_users,
+    v1_scenarios,
+    v1_m3,
+)
 app.include_router(v1_history.router)
 app.include_router(v1_tasks.router)
 app.include_router(v1_ingestion.router)
@@ -947,6 +1070,7 @@ app.include_router(v1_context.router)
 app.include_router(v1_connections.router)
 app.include_router(v1_graph.router)
 app.include_router(v1_tenants_spaces.router)
+app.include_router(v1_tenant_usage.router)
 app.include_router(v1_events.router)
 app.include_router(v1_users.router)
 app.include_router(v1_scenarios.router)

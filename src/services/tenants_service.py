@@ -23,6 +23,7 @@ _LIFECYCLE_EXTRA_KEY = "lifecycle"
 _VALID_LIFECYCLES = frozenset(
     {
         "pending_onboarding",
+        "trial",
         "active",
         "limited",
         "past_due",

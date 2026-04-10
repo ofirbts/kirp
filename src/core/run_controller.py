@@ -396,6 +396,7 @@ class RunController:
                 "workflow_type": s.workflow_type,
                 "trace_id": s.trace_id,
                 "model": infer_llm_route_from_steps(s.steps),
+                "cost": float(s.cost or 0.0),
             }
             for s in rows
         ]

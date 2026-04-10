@@ -45,7 +45,7 @@ class Tenant(BaseModel):
     slug: str
     lifecycle: str = Field(
         default="active",
-        description="pending_onboarding | active | limited | past_due | suspended",
+        description="pending_onboarding | trial | active | limited | past_due | suspended",
     )
     createdAt: ISO8601
     updatedAt: ISO8601
