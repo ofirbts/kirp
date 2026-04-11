@@ -54,7 +54,9 @@ export const AppShell: React.FC<React.PropsWithChildren> = ({ children }) => {
       pathname === "/login" ||
       pathname === "/signup" ||
       pathname === "/reset-password";
-    if (!skipAuth && loaded && !user && !isAuthRoute) {
+    // Billing supports Kirp API keys from onboarding without dashboard JWT (dry-run / API customers).
+    const isBillingKirpRoute = pathname === "/billing" || pathname.startsWith("/billing/");
+    if (!skipAuth && loaded && !user && !isAuthRoute && !isBillingKirpRoute) {
       router.push("/login");
     }
   }, [user, loaded, pathname, router]);

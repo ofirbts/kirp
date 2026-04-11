@@ -66,13 +66,13 @@ Note: `Authorization: Kirp <secret>` (space after `Kirp`). The path accepts UUID
 ## 3. Billing UI (upgrade button)
 
 1. `npm run dev` (default `http://localhost:3000`).
-2. Open:  
-   `http://localhost:3000/billing?tenant=<TENANT_ID>`
+2. Open **`http://localhost:3000/billing`** — no dashboard login required for dry-run (AppShell allows this route for API-key flow).
+3. **One-click dry-run:** use *Create tenant & load billing* (calls `POST /api/v1/onboarding`, stores `kirp_sk_…`, loads usage with `Authorization: Kirp`).
+4. Or paste **tenant UUID + secret** under *Already have onboarding response?*
 
-**Today’s behavior:** the page calls the API with **Bearer** tokens from the dashboard session (`localStorage`), not with the onboarding `kirp_sk_` key. So:
+**Auth priority on this page:** if a Kirp secret is stored (session/local), it is used for API calls; otherwise **Bearer** from dashboard login. Clear stored key to use JWT only.
 
-- If you are **logged in** as a user for that tenant, you should see usage + **Upgrade with Stripe** (needs `STRIPE_PRICE_ID` on the API).
-- For a **cold “API-only” customer**, use the **curl** usage call above until the UI supports `Kirp` or a dev token path.
+**Stripe redirect:** checkout uses your current browser origin for success/cancel URLs (so port 3000 works without changing `FRONTEND_URL` on the API).
 
 ---
 
