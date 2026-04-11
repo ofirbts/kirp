@@ -79,6 +79,7 @@ docker compose -f deploy/docker-compose.prod.yml logs kirp-api --tail 120
 
 ## 7. Related docs
 
+- **Daily revenue dry-run (~5 min):** [`deploy/DAILY_CHECKLIST.md`](DAILY_CHECKLIST.md)
 - Architecture: [`UNIFIED_ARCHITECTURE.md`](../UNIFIED_ARCHITECTURE.md)
 - Doc index: [`docs/README.md`](../docs/README.md)
 - Incident / revenue one-pagers: `deploy/INCIDENT_RUNBOOK.md`, `deploy/SAAS_REVENUE_GUIDE.md`, `deploy/VELOCITY.md` (to be merged/slimmed over time)

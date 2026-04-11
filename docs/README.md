@@ -18,6 +18,7 @@ Use this file as the **map**. Deep design lives in linked files; avoid duplicati
 | Env & tokens (API vs UI) | [`ENV_AND_UI_TOKENS.md`](ENV_AND_UI_TOKENS.md), [`env.local.example`](env.local.example) |
 | Events | [`EVENTS.md`](EVENTS.md) |
 | Production checklist | [`production_checklist.md`](production_checklist.md) |
+| Daily revenue / stack dry-run (~5 min) | [`deploy/DAILY_CHECKLIST.md`](../deploy/DAILY_CHECKLIST.md) |
 | Repo hygiene & doc strategy | [`REPO_AND_CURSOR_HYGIENE_PLAN.md`](REPO_AND_CURSOR_HYGIENE_PLAN.md) |
 
 ## Architecture & planning (deeper)
