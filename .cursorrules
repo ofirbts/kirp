@@ -1,221 +1,36 @@
-# ============================================================
-# KIRP ENTERPRISE — CURSOR RULES (FINAL MERGED VERSION)
-# Clean, strict, safe, and production‑grade
-# ============================================================
+# KIRP — Cursor rules (short)
 
-# ------------------------------------------------------------
-# 1. FILESYSTEM BOUNDARIES
-# ------------------------------------------------------------
+**Full architecture & diagrams:** `UNIFIED_ARCHITECTURE.md`  
+**Run prod stack locally:** `deploy/README.md`  
+**Doc map:** `docs/README.md`
 
-allow:
-  - src/**
-  - app/**
-  - components/**
-  - lib/**
-  - services/**
-  - public/**
-  - scripts/**
-  - tests/**
-  - docker-compose.yml
-  - Dockerfile.api
-  - Dockerfile.dashboard
-  - Dockerfile.agent
-  - requirements.txt
-  - package.json
-  - next.config.js
-  - tailwind.config.js
-  - tsconfig.json
-  - pyproject.toml
+## Non‑negotiables
 
-deny:
-  # Legacy / archive (READ‑ONLY)
-  - archive/**
-  - brand_os_v3/**
-  - brand_os_cli/**
-  - brand_os_sdk/**
-  - brand_os_monitoring/**
-  - brand_os_scheduler/**
-  - brand_os_ui/**
-  - brand_os_integrations/**
-  - backup_pre_runmydocker/**
-  - KIRP_old/**
-  - static/**
-  - storage/**
-  - n8n_data/**
-  - logs/**
-  - reading/**
-  - transferring/**
-  - api/**            # old API version
-  - tools/archive/**
+- **Multi-tenant:** Never leak or mix tenants. `tenant_id` explicit through API → service → events; filter every read/write.
+- **Event-sourcing:** No ad-hoc DB mutations for domain state; events append-only; preserve replay/audit story unless the task explicitly changes that contract (then flag it).
+- **Governance:** External side effects go through the governance layer, not random modules.
+- **Agents / LLM:** No direct LLM calls outside the agent framework; RAG context explicit when required; register new agents properly.
+- **Run lifecycle / pipeline:** Do not change core run or pipeline semantics without explicit approval; prefer fail-fast and clear logs.
 
-  # System / accidental files (NEVER TOUCH)
-  - "--bootstrap-server"
-  - "--list"
-  - "Accept:"
-  - "GET"
-  - "User-Agent:"
-  - "[qdrant]"
-  - "[kirp-api]"
-  - "[kirp-worker]"
-  - "[kirp-dashboard]"
-  - ":USERPROFILE\\\\Desktop\\\\project_dump.txt"
+## Before you change code
 
-# ------------------------------------------------------------
-# 2. ARCHITECTURE GUARANTEES
-# ------------------------------------------------------------
+- **Verify** (read callers, tests, env) → **then** edit. Do not widen scope beyond the task.
+- **No secrets** in code, commits, or pasted logs. Do not edit `.env*` or credential files unless the user explicitly asks.
 
-architecture:
-  rules:
-    - "Do NOT create new top-level folders unless explicitly requested."
-    - "Do NOT modify docker-compose.yml or .env unless explicitly requested."
-    - "Preserve the existing architecture: api/, agents/, workers/, schemas/, models/, ui/."
-    - "You MAY extend existing layers, but you MUST NOT invent new architectural layers or frameworks."
+## Where you may work
 
-  backend:
-    avoid:
-      - "Creating new API versions."
-      - "Duplicating routers."
-      - "Creating new workers unless explicitly requested."
-      - "Touching Alembic migrations unless explicitly requested."
+- **Yes:** `src/`, `app/`, `components/`, `lib/`, `services/`, `public/`, `scripts/`, `tests/`, `tests_e2e/`, `deploy/` (when the task is deploy/smoke/docs there), `docs/`, plus root config files already in use (`package.json`, `requirements.txt`, `Dockerfile.api`, etc.).
+- **Read-only:** `archive/**` — analyze only; never modify, move, or delete.
+- **Avoid / legacy (do not touch unless explicitly asked):** `api/` (old API), `brand_os_*`, `KIRP_old/`, `backup_pre_runmydocker/`, `tools/archive/`, and other junk paths listed in older commits if still present.
 
-  frontend:
-    avoid:
-      - "Creating duplicate pages."
-      - "Creating duplicate components."
-      - "Modifying app/layout.tsx unless explicitly requested."
+## Repo hygiene
 
-# ------------------------------------------------------------
-# 3. EVENT-SOURCING & MULTI-TENANCY
-# ------------------------------------------------------------
+- **Do not** create new top-level folders unless the user explicitly requests it.
+- **Do not** change root `docker-compose.yml`, Dockerfiles, or `.env*` unless the user explicitly asks.
+- **Do not** add new architectural layers or frameworks; extend what exists.
+- **Frontend:** No duplicate pages/components; do not touch `app/layout.tsx` unless asked.
+- **Backend:** No new API versions; no duplicate routers; no new workers or Alembic migrations unless asked.
 
-event_sourcing:
-  rules:
-    - "No direct DB mutations. All state changes must go through events."
-    - "Events must be append-only and immutable."
+## Quality bar
 
-multi_tenancy:
-  rules:
-    - "Every new Event type MUST include tenant_id, space_id, user_id fields."
-    - "Every Command and Query MUST receive tenant_id explicitly as an argument."
-    - "tenant_id, space_id, user_id MUST be passed through the entire call chain (API → service → event → handler)."
-    - "Do NOT fetch tenant_id implicitly from globals or shared state."
-    - "Do NOT return data without filtering by tenant_id."
-    - "Do NOT mix data from multiple tenants in a single response."
-
-governance:
-  rules:
-    - "All external actions must go through the Governance layer."
-    - "Do NOT call external APIs directly from random modules."
-
-# ------------------------------------------------------------
-# 4. RAG & AGENTS
-# ------------------------------------------------------------
-
-rag_and_agents:
-  rules:
-    - "Do NOT call LLMs directly; use the Agent framework."
-    - "Always pass RAG context explicitly."
-    - "Do NOT bypass retrieval or send empty contexts when context is required."
-    - "All new agents must be registered via AgentFramework.register()."
-    - "Legacy agents may be modernized but NOT copied as-is."
-
-# ------------------------------------------------------------
-# 5. SCHEMA ENGINE & DATA ACCESS
-# ------------------------------------------------------------
-
-schema_engine:
-  rules:
-    - "Do NOT write raw SQL until Schema Engine is fully implemented."
-    - "Use only the provided interfaces and placeholders."
-
-data_access:
-  rules:
-    - "Do NOT introduce new ORMs."
-    - "Use typed models and Pydantic schemas."
-
-# ------------------------------------------------------------
-# 6. ALLOWED WORK (GREEN LIGHT)
-# ------------------------------------------------------------
-
-allowed_work:
-  backend:
-    - "Implement and extend the Schema Engine."
-    - "Extend the EventPipeline."
-    - "Improve RAG retrieval and context handling."
-    - "Upgrade agents to use the Agent framework."
-    - "Migrate legacy agents safely into the new architecture."
-
-  frontend:
-    - "Improve dashboard UX."
-    - "Add typed components."
-    - "Add tests for multi-tenant and governance flows."
-
-# ------------------------------------------------------------
-# 7. SAFETY CHECKLIST
-# ------------------------------------------------------------
-
-safety_checklist:
-  - "No imports or public APIs broken."
-  - "Event-sourcing preserved."
-  - "Multi-tenancy preserved."
-  - "Governance enforced."
-  - "No infra changes."
-  - "No duplicate logic."
-  - "All inputs/outputs validated."
-
-# ------------------------------------------------------------
-# 8. STYLE & QUALITY
-# ------------------------------------------------------------
-
-style:
-  python:
-    - "PEP8, typed, clean imports."
-  typescript:
-    - "Strict mode, no unused exports."
-  react:
-    - "Prefer Server Components."
-  naming:
-    - "Descriptive, consistent."
-
-tests:
-  - "Add tests for new behavior."
-  - "Cover multi-tenant and event-sourcing flows."
-
-# ------------------------------------------------------------
-# 9. HIGH-LEVEL GOALS
-# ------------------------------------------------------------
-
-goals:
-  - "Keep the project clean and stable."
-  - "Improve KIRP Enterprise incrementally."
-  - "Learn from legacy without modifying it."
-  - "Avoid regressions."
-  - "Respect architecture, event-sourcing, and multi-tenant boundaries."
-
-# ------------------------------------------------------------
-# 10. ARCHIVE (READ-ONLY ANALYSIS)
-# ------------------------------------------------------------
-
-archive_analysis:
-  rules:
-    - "You MAY read any code under archive/** for inspiration and pattern analysis."
-    - "You MUST NOT modify, move, or delete any file under archive/**."
-    - "You MAY propose improvements for the core system (src/, app/, components/, services/) based on patterns found in archive/**."
-    - "All implementation MUST stay within the current architecture and allowed folders."
-
-
-## Technical Stack
-- Backend: Python (FastAPI), Celery, Kafka.
-- Frontend: Next.js (TypeScript), Tailwind CSS.
-- Infrastructure: Docker, Docker Compose, Nginx.
-
-## Model Usage Playbook
-1. **Architectural Decisions (Plan Mode):** Use `Claude 3.5 Sonnet`. Always reference `UNIFIED_ARCHITECTURE.md`.
-2. **Backend/Logic (FastAPI/Celery):** Use `Claude 3.5 Sonnet` or `GPT-4o`. Follow PEP8.
-3. **Frontend/UI (Next.js):** Use `DeepSeek V3` (via OpenRouter) for standard components.
-4. **Documentation & Tests:** Use `Gemini 1.5 Flash` (via Google API) to save costs.
-
-## General Rules
-- Never modify Dockerfiles or `.env` files without explicit permission.
-- When adding new agents in `src/agents/`, ensure they are registered in the agent registry.
-- Always look for existing tools in the `tools/` directory before creating new ones.
+- Python: typed, PEP8-style; TS: strict. Prefer small, focused diffs; add/update tests for new behavior (especially tenant + governance paths).
