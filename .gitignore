@@ -56,6 +56,10 @@ credentials.json
 
 # Logs
 *.log
+*.pid
+
+# TypeScript build info
+*.tsbuildinfo
 
 # Database
 *.db
