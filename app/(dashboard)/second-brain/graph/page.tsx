@@ -3,7 +3,6 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import { apiClient, type GraphNodeV1, type GraphEdgeV1 } from "@/lib/apiClient";
-import { DEFAULT_TENANT_ID } from "@/lib/constants";
 import { useTenantContextStore } from "@/lib/stores/tenantContextStore";
 import { PageSkeleton } from "@/components/dashboard/PageSkeleton";
 import { ErrorState } from "@/components/feedback/ErrorState";
@@ -43,7 +42,7 @@ function buildGraphData(nodes: GraphNodeV1[], edges: GraphEdgeV1[]): GraphData {
 }
 
 export default function SecondBrainGraphPage() {
-  const { tenantId, spaceId } = useTenantContextStore();
+  const { spaceId } = useTenantContextStore();
   const [nodes, setNodes] = useState<GraphNodeV1[]>([]);
   const [edges, setEdges] = useState<GraphEdgeV1[]>([]);
   const [stats, setStats] = useState<{ node_count: number; edge_count: number } | null>(null);
@@ -61,7 +60,6 @@ export default function SecondBrainGraphPage() {
     setError(null);
     try {
       const res = await apiClient.getGraphV1({
-        tenant_id: tenantId ?? DEFAULT_TENANT_ID,
         space_id: spaceId ?? "all",
         life_area: filterLifeArea || undefined,
         project_id: filterProject || undefined,
@@ -77,7 +75,7 @@ export default function SecondBrainGraphPage() {
     } finally {
       setLoading(false);
     }
-  }, [tenantId, spaceId, filterEntity, filterLifeArea, filterProject, filterSource]);
+  }, [spaceId, filterEntity, filterLifeArea, filterProject, filterSource]);
 
   useEffect(() => {
     load();

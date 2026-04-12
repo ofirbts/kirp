@@ -275,39 +275,45 @@ class RunController:
         return None
 
     async def get_run_state(self, run_id: str, tenant_id: str | None = None) -> RunState | None:
+        # Prefer Redis when available so multi-process setups (API + kafka_processor) see the same timeline.
+        redis = await self._redis_client()
+        if redis is not None:
+            eff_tenant = tenant_id
+            if eff_tenant is None:
+                try:
+                    raw_tid = await redis.get(self._lookup_key(run_id))
+                    if raw_tid:
+                        eff_tenant = str(raw_tid)
+                except Exception as e:
+                    logger.debug("RunController run_lookup read failed: %s", e)
+            if eff_tenant is None:
+                eff_tenant = self._default_tenant_for_keys
+
+            try:
+                if eff_tenant:
+                    pkey = self.partition_run_key(eff_tenant, run_id)
+                    got = await self._read_state_from_redis_hash_key(redis, pkey)
+                    if got is not None:
+                        if tenant_id and got.tenant_id != tenant_id:
+                            return None
+                        self.run_states[run_id] = got
+                        return got
+                if _truthy_env("RUN_CONTROLLER_READ_LEGACY_KEYS", "1"):
+                    got = await self._read_state_from_redis_hash_key(redis, self._legacy_run_key(run_id))
+                    if got is not None:
+                        if tenant_id and got.tenant_id != tenant_id:
+                            return None
+                        self.run_states[run_id] = got
+                        return got
+            except Exception as e:
+                logger.warning("RunController read redis failed for %s: %s", run_id, e)
+
         if run_id in self.run_states:
             st = self.run_states[run_id]
             if tenant_id and st.tenant_id and st.tenant_id != tenant_id:
                 return None
             return st
 
-        redis = await self._redis_client()
-        if redis is None:
-            return None
-
-        eff_tenant = tenant_id
-        if eff_tenant is None:
-            try:
-                raw_tid = await redis.get(self._lookup_key(run_id))
-                if raw_tid:
-                    eff_tenant = str(raw_tid)
-            except Exception as e:
-                logger.debug("RunController run_lookup read failed: %s", e)
-        if eff_tenant is None:
-            eff_tenant = self._default_tenant_for_keys
-
-        try:
-            if eff_tenant:
-                pkey = self.partition_run_key(eff_tenant, run_id)
-                got = await self._read_state_from_redis_hash_key(redis, pkey)
-                if got is not None:
-                    return got
-            if _truthy_env("RUN_CONTROLLER_READ_LEGACY_KEYS", "1"):
-                got = await self._read_state_from_redis_hash_key(redis, self._legacy_run_key(run_id))
-                if got is not None:
-                    return got
-        except Exception as e:
-            logger.warning("RunController read redis failed for %s: %s", run_id, e)
         return None
 
     async def update_step(
@@ -509,7 +515,14 @@ class RunController:
             return "failed"
         if has_processing:
             return "processing"
-        if all(s in ("completed", "success", "accepted") for s in statuses):
+        # Terminal: full EventPipeline, or Kafka processor finished handoff (registry + kafka_processed).
+        # Do not treat api_accepted/kafka_emitted alone as completed — that was only API-side publish.
+        if last_by_step.get("pipeline_complete") == "completed":
+            return "completed"
+        if (
+            last_by_step.get("registry_dispatch") == "completed"
+            and last_by_step.get("kafka_processed") == "completed"
+        ):
             return "completed"
         return "accepted"
 

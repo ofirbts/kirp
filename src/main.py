@@ -22,7 +22,7 @@ load_dotenv()
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
-from fastapi import FastAPI, HTTPException, Depends, Body, Request
+from fastapi import FastAPI, HTTPException, Depends, Request
 
 from src.core.quotas import QuotaExceeded
 from fastapi.middleware.cors import CORSMiddleware
@@ -52,9 +52,8 @@ class IngestRequest(BaseModel):
 
 
 class QueryRequest(BaseModel):
-    tenant_id: str
-    space_id: str
-    user_id: str
+    """RAG query body. Tenant/space/user come from JWT or SKIP_AUTH context — not from client body."""
+
     query: str
     k: int = 6
 
@@ -708,15 +707,18 @@ async def ingest(req: IngestRequest, request: Request) -> dict[str, Any]:
 
 
 @app.post("/api/v1/query")
-async def query(req: QueryRequest) -> dict[str, Any]:
-    """RAG query + optional agent."""
+async def query(req: QueryRequest, request: Request) -> dict[str, Any]:
+    """RAG query scoped to authenticated tenant (same model as /api/v1/ingest)."""
+    from src.auth.tenant_context import get_tenant_context
+
+    ctx = get_tenant_context(request)
     try:
         rag = await get_rag_engine()
         resp = await rag.search(
             query=req.query,
-            tenant_id=req.tenant_id,
-            space_id=req.space_id,
-            user_id=req.user_id,
+            tenant_id=ctx.tenant_id,
+            space_id=ctx.space_id,
+            user_id=ctx.user_id,
             limit=req.k,
         )
         return {
@@ -744,7 +746,19 @@ async def ask(
     Uses InsightAgent on top of RAG, scoped to current_user.tenant_id and current_user.id.
     """
     try:
-        rag = await get_rag_engine()
+        try:
+            rag = await get_rag_engine()
+        except Exception as rag_err:
+            logger.warning("Ask: RAG engine unavailable (e.g. Qdrant down): %s", rag_err)
+            return {
+                "answer": (
+                    "Insights need the vector store (Qdrant). It is not reachable from this API "
+                    "(check QDRANT_URL or add Qdrant to your compose stack). "
+                    "Other dashboard features can still work."
+                ),
+                "sources": [],
+                "needs_external_info": True,
+            }
         from src.agents.insight import InsightAgent
         from src.core.llm_run_context import reset_llm_tenant_id, set_llm_tenant_id
 
@@ -978,16 +992,12 @@ async def insights(
     return [i.to_dict() for i in raw]
 
 
-class NotionSyncRequest(BaseModel):
-    tenant_id: str = "default"
-    space_id: str = "all"
-    user_id: str = "system"
-
-
 @app.post("/api/v1/notion/sync")
-async def notion_sync(req: NotionSyncRequest | None = Body(None)) -> dict[str, Any]:
-    """Pull Notion tasks DB and ingest new pages (idempotent)."""
-    r = req or NotionSyncRequest()
+async def notion_sync(request: Request) -> dict[str, Any]:
+    """Pull Notion tasks DB and ingest new pages (idempotent). Tenant/space/user from JWT (same as /ingest)."""
+    from src.auth.tenant_context import get_tenant_context
+
+    ctx = get_tenant_context(request)
     from src.workers.notion_sync import run_notion_sync
     store = await get_event_store()
     pipe = await get_pipeline()
@@ -995,9 +1005,9 @@ async def notion_sync(req: NotionSyncRequest | None = Body(None)) -> dict[str, A
     notion = NotionIntegration()
     notion.connect()
     result = await run_notion_sync(
-        tenant_id=r.tenant_id,
-        space_id=r.space_id,
-        user_id=r.user_id,
+        tenant_id=ctx.tenant_id,
+        space_id=ctx.space_id,
+        user_id=ctx.user_id,
         event_store=store,
         pipeline=pipe,
         notion=notion,

@@ -1,0 +1,20 @@
+{
+  "root": true,
+  "extends": ["next/core-web-vitals"],
+  "ignorePatterns": [
+    "node_modules/**",
+    ".next/**",
+    "out/**",
+    "dist/**",
+    "archive/**",
+    "api/**",
+    "brand_os_*/**",
+    "KIRP_old/**",
+    "static/**",
+    "storage/**",
+    "n8n_data/**",
+    "reading/**",
+    "transferring/**",
+    "tools/archive/**"
+  ]
+}

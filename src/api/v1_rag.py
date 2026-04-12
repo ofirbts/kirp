@@ -72,7 +72,7 @@ class RagSearchRequest(BaseModel):
     query: str = Field(..., min_length=1, description="Natural language query to search over tenant data.")
     tenant_id: Optional[str] = Field(
         default=None,
-        description="Optional tenant override. When not provided, uses authenticated user's tenant_id.",
+        description="Deprecated: ignored for routing. If set and differs from JWT tenant, request is rejected.",
     )
     limit: int = Field(
         default=10,
@@ -142,8 +142,12 @@ async def rag_search_v1(
     - Optionally restricts results to spaces the user is a member of (allowed_space_ids).
     - Supports multi-hop query expansion and hybrid retrieval.
     """
-    # Resolve effective tenant and user from authenticated context/body.
-    tenant_id = (body.tenant_id or user.tenant_id or "").strip()
+    # Tenant from JWT only — body.tenant_id cannot override (prevents cross-tenant search).
+    body_tid = (body.tenant_id or "").strip() if body.tenant_id is not None else ""
+    utid = (user.tenant_id or "").strip()
+    if body_tid and body_tid != utid:
+        raise HTTPException(status_code=403, detail="tenant mismatch")
+    tenant_id = utid
     user_id = (user.id or "").strip()
     if not tenant_id or not user_id:
         raise HTTPException(status_code=400, detail="Authenticated tenant_id and user_id are required for RAG search")

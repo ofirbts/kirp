@@ -43,6 +43,7 @@ node_modules/
 # Credentials & Secrets (CRITICAL)
 google_credentials.json
 *.json
+!.eslintrc.json
 *.key
 *.pem
 *.p12

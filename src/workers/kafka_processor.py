@@ -339,6 +339,9 @@ async def process_event(payload: dict[str, Any], retry_count: int = 0) -> bool:
             canonical.tenant_id, canonical.space_id, canonical.user_id,
             canonical.source, len(canonical.content),
         )
+        # Close kafka_received before dispatch so aggregate state is not stuck on "processing" forever.
+        if run_controller and run_id_payload:
+            await run_controller.update_step(str(run_id_payload), "kafka_received", "completed")
         registry = get_event_registry()
         if run_controller and run_id_payload:
             await run_controller.update_step(str(run_id_payload), "registry_dispatch", "processing")

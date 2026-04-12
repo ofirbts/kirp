@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import React, { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
 import { useTenantContextStore } from "@/lib/stores/tenantContextStore";
+import { useAuthStore } from "@/lib/stores/authStore";
 import { getTenantAlertsV1 } from "@/lib/apiClient";
 import { DEFAULT_TENANT_ID } from "@/lib/constants";
 import {
@@ -94,10 +95,21 @@ const NAV_ITEMS: NavItem[] = [
 export const SideNav: React.FC = () => {
   const pathname = usePathname();
   const { tenantId, spaceId } = useTenantContextStore();
+  const { user, loaded } = useAuthStore();
   const [monitoringAlertCount, setMonitoringAlertCount] = useState(0);
 
   useEffect(() => {
-    const tid = (tenantId || DEFAULT_TENANT_ID).trim() || DEFAULT_TENANT_ID;
+    if (!loaded) return;
+    const skipAuth = process.env.NEXT_PUBLIC_SKIP_AUTH === "1";
+    const tid = (
+      user?.tenant_id?.trim() ||
+      tenantId.trim() ||
+      DEFAULT_TENANT_ID
+    ).trim();
+    if (!skipAuth && !user?.tenant_id) {
+      setMonitoringAlertCount(0);
+      return;
+    }
     let cancelled = false;
     const load = () => {
       void getTenantAlertsV1(tid)
@@ -114,7 +126,7 @@ export const SideNav: React.FC = () => {
       cancelled = true;
       clearInterval(id);
     };
-  }, [tenantId]);
+  }, [tenantId, user?.tenant_id, loaded]);
 
   return (
     <div

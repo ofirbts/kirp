@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from fastapi import APIRouter, Query, Request
+from fastapi import APIRouter, HTTPException, Query, Request
 
 from src.auth.tenant_context import get_tenant_context
 from src.core.graph_engine import GraphBuilder
@@ -22,7 +22,10 @@ router = APIRouter(prefix="/api/v1", tags=["V1 Graph"])
 @router.get("/graph")
 async def get_graph_v1(
     request: Request,
-    tenant_id: str = Query("default", description="Tenant ID"),
+    tenant_id: str | None = Query(
+        None,
+        description="Optional; if sent, must match JWT tenant (otherwise 403).",
+    ),
     space_id: str | None = Query(None, description="Optional space filter"),
     life_area: str | None = Query(None, description="Filter by life area title"),
     project_id: str | None = Query(None, description="Filter by project ID"),
@@ -37,6 +40,8 @@ async def get_graph_v1(
     Tenant/space from JWT. Optional filters: life_area, project_id, date range, entity_types, source.
     """
     ctx = get_tenant_context(request)
+    if tenant_id is not None and str(tenant_id).strip() and str(tenant_id).strip() != ctx.tenant_id:
+        raise HTTPException(status_code=403, detail="tenant mismatch")
     tid = ctx.tenant_id
     sid = space_id or ctx.space_id or "all"
     schema = await get_schema_engine()

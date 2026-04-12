@@ -6,8 +6,9 @@ Used by the UI to drive tenant/space selectors and to validate access before RAG
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Query, Request
 
+from src.auth.tenant_context import get_tenant_context
 from src.services.context_service import (
     get_accessible_space_ids,
     list_spaces_for_context,
@@ -18,36 +19,36 @@ router = APIRouter(prefix="/api/v1", tags=["context"])
 
 
 @router.get("/context/accessible-spaces")
-async def get_accessible_spaces(
-    tenant_id: str = Query(..., description="Tenant ID"),
-    user_id: str = Query(..., description="User ID"),
-) -> dict:
+async def get_accessible_spaces(request: Request) -> dict:
     """
-    Return list of space_ids the user can access in this tenant.
-    Use this to validate context or to pass allowed_space_ids to RAG/SchemaEngine.
+    Return list of space_ids the user can access in this tenant (JWT / dev context only).
     """
-    space_ids = await get_accessible_space_ids(tenant_id, user_id)
-    return {"tenant_id": tenant_id, "user_id": user_id, "space_ids": space_ids}
+    ctx = get_tenant_context(request)
+    space_ids = await get_accessible_space_ids(ctx.tenant_id, ctx.user_id)
+    return {"tenant_id": ctx.tenant_id, "user_id": ctx.user_id, "space_ids": space_ids}
 
 
 @router.get("/context/spaces")
-async def get_spaces_for_context(
-    tenant_id: str = Query(..., description="Tenant ID"),
-    user_id: str = Query(..., description="User ID"),
-) -> dict:
+async def get_spaces_for_context(request: Request) -> dict:
     """
     Return list of { space_id, role } for context switching (e.g. dropdown).
     """
-    spaces = await list_spaces_for_context(tenant_id, user_id)
-    return {"tenant_id": tenant_id, "user_id": user_id, "spaces": spaces}
+    ctx = get_tenant_context(request)
+    spaces = await list_spaces_for_context(ctx.tenant_id, ctx.user_id)
+    return {"tenant_id": ctx.tenant_id, "user_id": ctx.user_id, "spaces": spaces}
 
 
 @router.get("/context/can-access")
 async def check_can_access(
-    tenant_id: str = Query(..., description="Tenant ID"),
-    user_id: str = Query(..., description="User ID"),
+    request: Request,
     space_id: str = Query(..., description="Space ID to check"),
 ) -> dict:
-    """Check whether the user can access the given space."""
-    allowed = await can_access_space(tenant_id, user_id, space_id)
-    return {"tenant_id": tenant_id, "user_id": user_id, "space_id": space_id, "allowed": allowed}
+    """Check whether the authenticated user can access the given space."""
+    ctx = get_tenant_context(request)
+    allowed = await can_access_space(ctx.tenant_id, ctx.user_id, space_id)
+    return {
+        "tenant_id": ctx.tenant_id,
+        "user_id": ctx.user_id,
+        "space_id": space_id,
+        "allowed": allowed,
+    }

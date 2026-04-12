@@ -14,7 +14,9 @@ import os
 from datetime import datetime, timezone, time
 from typing import Any
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Request
+
+from src.auth.tenant_context import get_tenant_context
 from pydantic import BaseModel
 
 import json
@@ -59,12 +61,17 @@ async def _get_components() -> tuple[EventStore, RAGEngine, AgentFramework, Meta
 
 
 @router.get("/daily-intelligence")
-async def daily_intelligence(user_id: str = Query(...), tenant_id: str = Query("default"), space_id: str = Query("private")) -> dict[str, Any]:
+async def daily_intelligence(
+    request: Request,
+    space_id: str = Query("private"),
+) -> dict[str, Any]:
     """
     Generate and send daily intelligence via WhatsApp.
-    Runs at 08:00 (scheduled via Celery).
-    Always returns JSON (TEST_E2E / jq compatible).
+    Tenant/user from JWT (or SKIP_AUTH dev context) — not from query params.
     """
+    ctx = get_tenant_context(request)
+    tenant_id = ctx.tenant_id
+    user_id = ctx.user_id
     try:
         store, rag, af, meta, wa = await _get_components()
     except Exception as e:

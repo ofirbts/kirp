@@ -51,11 +51,11 @@ async def create_event_v1(
     body: dict[str, Any] | None = None,
     ctx: TenantContext = Depends(get_effective_tenant_context),
 ) -> dict[str, Any]:
-    """Create event (publish to ingest pipeline). Minimal: accept body and return 201."""
+    """Create event (publish to ingest pipeline). Tenant/space/user from JWT only — not from body."""
     payload = body or {}
-    tenant_id = payload.get("tenant_id") or ctx.tenant_id
-    space_id = payload.get("space_id") or ctx.space_id
-    user_id = payload.get("user_id") or ctx.user_id
+    tenant_id = ctx.tenant_id
+    space_id = ctx.space_id or "all"
+    user_id = ctx.user_id
     content = payload.get("content", "")
     source = payload.get("source", "api")
     metadata = payload.get("metadata") or {}

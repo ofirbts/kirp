@@ -16,6 +16,8 @@ from uuid import uuid4
 
 from fastapi import APIRouter, Body, HTTPException, Request
 
+from src.auth.tenant_context import get_tenant_context
+
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/v1", tags=["ingestion"])
@@ -66,12 +68,13 @@ async def _ingest_one(tenant_id: str, space_id: str, user_id: str, payload: dict
 async def webhook_slack(body: dict[str, Any] = Body(...)) -> dict[str, Any]:
     """
     Slack Events API webhook. Parses event and ingests as unified events.
-    Expects body.tenant_id, body.space_id, body.user_id (or defaults: default, all, system).
+    Tenant routing: env SLACK_WEBHOOK_TENANT_ID / SLACK_WEBHOOK_SPACE_ID / SLACK_WEBHOOK_USER_ID only
+    (do not trust tenant fields in the JSON body — anyone can POST to a public URL).
     """
     from src.integrations.slack import SlackIntegration
-    tenant_id = body.get("tenant_id", "default")
-    space_id = body.get("space_id", "all")
-    user_id = body.get("user_id", "system")
+    tenant_id = os.getenv("SLACK_WEBHOOK_TENANT_ID", "default").strip() or "default"
+    space_id = os.getenv("SLACK_WEBHOOK_SPACE_ID", "all").strip() or "all"
+    user_id = os.getenv("SLACK_WEBHOOK_USER_ID", "system").strip() or "system"
     slack = SlackIntegration()
     slack.connect()
     events = slack.parse_webhook(body)
@@ -195,7 +198,7 @@ async def webhook_whatsapp(request: Request) -> dict[str, Any]:
     """
     WhatsApp (Meta/Twilio) webhook. Parses payload and ingests as unified events.
     Twilio sends application/x-www-form-urlencoded; we accept that and JSON.
-    tenant_id/space_id/user_id default to default/all/system.
+    Tenant routing: env WHATSAPP_WEBHOOK_TENANT_ID / _SPACE_ID / _USER_ID only (not from body).
 
     For Twilio, validates X-Twilio-Signature when TWILIO_AUTH_TOKEN is set.
     """
@@ -232,10 +235,9 @@ async def webhook_whatsapp(request: Request) -> dict[str, Any]:
     except Exception as e:  # pragma: no cover
         logger.warning("WhatsApp webhook signature validation skipped: %s", e)
 
-    # Use env so webhook events appear in your tenant's Inbox (default: tenant_id=default)
-    tenant_id = body.get("tenant_id") or os.getenv("WHATSAPP_WEBHOOK_TENANT_ID", "default")
-    space_id = body.get("space_id", "all")
-    user_id = body.get("user_id") or os.getenv("WHATSAPP_WEBHOOK_USER_ID", "system")
+    tenant_id = os.getenv("WHATSAPP_WEBHOOK_TENANT_ID", "default").strip() or "default"
+    space_id = os.getenv("WHATSAPP_WEBHOOK_SPACE_ID", "all").strip() or "all"
+    user_id = os.getenv("WHATSAPP_WEBHOOK_USER_ID", "system").strip() or "system"
 
     wa = WhatsAppIntegration()
     events = wa.parse_webhook_payload(body)
@@ -271,44 +273,51 @@ async def webhook_whatsapp(request: Request) -> dict[str, Any]:
 
 @router.post("/gmail/sync")
 async def gmail_sync(
-    tenant_id: str = "default",
-    space_id: str = "all",
-    user_id: str = "system",
+    request: Request,
     max_results: int = 50,
 ) -> dict[str, Any]:
-    """Pull Gmail messages and ingest new ones (idempotent by message id)."""
+    """Pull Gmail messages and ingest new ones (idempotent by message id). Scoped to JWT tenant."""
+    ctx = get_tenant_context(request)
     from src.workers.connector_sync import run_gmail_sync
-    result = await run_gmail_sync(tenant_id=tenant_id, space_id=space_id, user_id=user_id, max_results=max_results)
+    result = await run_gmail_sync(
+        tenant_id=ctx.tenant_id,
+        space_id=ctx.space_id or "all",
+        user_id=ctx.user_id,
+        max_results=max_results,
+    )
     return {"ok": True, **result}
 
 
 @router.post("/calendar/sync")
 async def calendar_sync(
-    tenant_id: str = "default",
-    space_id: str = "all",
-    user_id: str = "system",
+    request: Request,
     limit: int = 100,
 ) -> dict[str, Any]:
-    """Pull calendar events and ingest new ones (idempotent by event id)."""
+    """Pull calendar events and ingest new ones (idempotent by event id). Scoped to JWT tenant."""
+    ctx = get_tenant_context(request)
     from src.workers.connector_sync import run_calendar_sync
-    result = await run_calendar_sync(tenant_id=tenant_id, space_id=space_id, user_id=user_id, limit=limit)
+    result = await run_calendar_sync(
+        tenant_id=ctx.tenant_id,
+        space_id=ctx.space_id or "all",
+        user_id=ctx.user_id,
+        limit=limit,
+    )
     return {"ok": True, **result}
 
 
 @router.post("/slack/sync")
 async def slack_sync(
+    request: Request,
     channel_id: str,
-    tenant_id: str = "default",
-    space_id: str = "all",
-    user_id: str = "system",
     limit: int = 50,
 ) -> dict[str, Any]:
-    """Pull Slack channel messages and ingest new ones (idempotent by ts)."""
+    """Pull Slack channel messages and ingest new ones (idempotent by ts). Scoped to JWT tenant."""
+    ctx = get_tenant_context(request)
     from src.workers.connector_sync import run_slack_sync
     result = await run_slack_sync(
-        tenant_id=tenant_id,
-        space_id=space_id,
-        user_id=user_id,
+        tenant_id=ctx.tenant_id,
+        space_id=ctx.space_id or "all",
+        user_id=ctx.user_id,
         channel_id=channel_id,
         limit=limit,
     )

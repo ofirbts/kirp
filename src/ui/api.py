@@ -72,23 +72,14 @@ class KIRPApiClient:
 
     async def query(
         self,
-        tenant_id: str,
-        space_id: str,
-        user_id: str,
         query: str,
         k: int = 6,
     ) -> dict[str, Any]:
-        """POST /api/v1/query (RAG + optional agent)."""
+        """POST /api/v1/query — tenant/space/user from JWT or SKIP_AUTH (not request body)."""
         out = await self._request(
             "POST",
             "/api/v1/query",
-            json={
-                "tenant_id": tenant_id,
-                "space_id": space_id,
-                "user_id": user_id,
-                "query": query,
-                "k": k,
-            },
+            json={"query": query, "k": k},
         )
         return out if isinstance(out, dict) else {}
 

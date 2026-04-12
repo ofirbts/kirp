@@ -7,7 +7,7 @@ Uses existing tenants_service; same shapes as /api/tenants.
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
 from src.auth.tenant_context import TenantContext, get_effective_tenant_context
@@ -36,9 +36,11 @@ class SetTenantLifecycleBody(BaseModel):
 async def list_tenants_v1(
     ctx: TenantContext = Depends(get_effective_tenant_context),
 ):
-    """List tenants. Returns { data: [...], meta: {} }."""
+    """List tenants visible to the caller — only the authenticated tenant (not full directory)."""
     tenants = await tenants_service.list_tenants()
-    return {"data": tenants, "meta": {}}
+    tid = str(ctx.tenant_id).strip()
+    filtered = [t for t in tenants if str(t.id) == tid or (t.slug or "") == tid]
+    return {"data": filtered, "meta": {}}
 
 
 @router.post("/tenants", status_code=201)
@@ -69,21 +71,20 @@ async def patch_tenant_lifecycle_v1(
 
 @router.get("/spaces")
 async def list_spaces_v1(
-    tenant_id: str = Query("default", description="Tenant ID"),
     ctx: TenantContext = Depends(get_effective_tenant_context),
 ):
-    """List spaces for a tenant. Returns { data: [...], meta: {} }."""
-    spaces = await tenants_service.list_spaces_for_tenant(tenant_id)
+    """List spaces for the authenticated tenant (JWT / dev context — not from query)."""
+    spaces = await tenants_service.list_spaces_for_tenant(ctx.tenant_id)
     return {"data": spaces, "meta": {}}
 
 
 @router.post("/spaces", status_code=201)
 async def create_space_v1(
     body: CreateSpaceBody,
-    tenant_id: str = Query("default", description="Tenant ID"),
     ctx: TenantContext = Depends(get_effective_tenant_context),
 ):
-    """Create a space in a tenant. Uses create_space_if_not_exists then returns list."""
+    """Create a space in the authenticated tenant."""
+    tenant_id = ctx.tenant_id
     space_id = await tenants_service.create_space_if_not_exists(
         tenant_id, name=body.name or "all", kind="shared"
     )

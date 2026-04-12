@@ -656,18 +656,20 @@ export async function getRemindersUpcoming(params?: {
 
 // ---------- Context (accessible spaces for Second Brain) ----------
 
-export async function getContextAccessibleSpaces(
-  tenantId: string,
-  userId: string,
-): Promise<{ tenant_id: string; user_id: string; space_ids: string[] }> {
-  return get("/api/v1/context/accessible-spaces", { tenant_id: tenantId, user_id: userId });
+export async function getContextAccessibleSpaces(): Promise<{
+  tenant_id: string;
+  user_id: string;
+  space_ids: string[];
+}> {
+  return get("/api/v1/context/accessible-spaces");
 }
 
-export async function getContextSpaces(
-  tenantId: string,
-  userId: string,
-): Promise<{ tenant_id: string; user_id: string; spaces: { space_id: string; role: string | null }[] }> {
-  return get("/api/v1/context/spaces", { tenant_id: tenantId, user_id: userId });
+export async function getContextSpaces(): Promise<{
+  tenant_id: string;
+  user_id: string;
+  spaces: { space_id: string; role: string | null }[];
+}> {
+  return get("/api/v1/context/spaces");
 }
 
 // ---------- Schema nodes (life areas, commitments, tasks, projects) ----------
@@ -952,9 +954,6 @@ export async function m3Export(params?: { since?: string; until?: string }): Pro
 }
 
 export async function queryV1(body: {
-  tenant_id: string;
-  space_id: string;
-  user_id: string;
   query: string;
   k?: number;
 }): Promise<Record<string, unknown>> {

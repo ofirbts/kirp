@@ -24,9 +24,31 @@ def test_overall_state_uses_last_status_per_step_name(monkeypatch: pytest.Monkey
         await rc.update_step(rid, "kafka_received", "completed")
         await rc.update_step(rid, "pipeline_start", "processing")
         await rc.update_step(rid, "pipeline_start", "completed")
+        await rc.update_step(rid, "pipeline_complete", "completed")
         st = await rc.get_run_status(rid)
         assert st is not None
         assert st["state"] == "completed"
+
+    asyncio.run(_run())
+
+
+def test_overall_state_api_publish_only_not_completed(monkeypatch: pytest.MonkeyPatch) -> None:
+    """After ingest API: kafka_emitted must not imply run-complete (worker/pipeline pending)."""
+
+    async def _run() -> None:
+        rc = RunController(redis_ping_max_attempts=1)
+
+        async def _no_redis(self: RunController) -> object:
+            return None
+
+        monkeypatch.setattr(RunController, "_redis_client", _no_redis)
+
+        rid = "run_api_only"
+        await rc.create_run("ingest", "t1", run_id=rid)
+        await rc.update_step(rid, "kafka_emitted", "completed")
+        st = await rc.get_run_status(rid)
+        assert st is not None
+        assert st["state"] == "accepted"
 
     asyncio.run(_run())
 

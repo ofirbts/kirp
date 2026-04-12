@@ -1,26 +1,35 @@
-/** @type {import('next').NextConfig} */
-const nextConfig = {
-  // Standalone: for production deploy, copy .next/static and public/ into standalone dir
-  // so /_next/static/* and static assets resolve. See docs/APP_ROUTER_STRUCTURE.md.
-  output: "standalone",
-  reactStrictMode: true,
-  webpack(config) {
-    if (process.env.ANALYZE === "true") {
-      // When running `npm run analyze`, enable bundle analyzer
-      // (relies on @next/bundle-analyzer if installed).
-      try {
-        // eslint-disable-next-line global-require, import/no-extraneous-dependencies
-        const withBundleAnalyzer = require("@next/bundle-analyzer")({
-          enabled: true,
-        });
-        return withBundleAnalyzer(config);
-      } catch {
-        // Analyzer not installed; fall back to default config.
-        return config;
-      }
-    }
-    return config;
-  },
-};
+const { PHASE_PRODUCTION_BUILD } = require("next/constants");
 
-module.exports = nextConfig;
+/**
+ * Standalone output must apply only during `next build`, not during `next dev`.
+ * Otherwise a mixed `.next` (production trace + dev server) often yields 404 on
+ * `/_next/static/chunks/main-app.js`, `layout.css`, etc., while `webpack.js` still returns 200.
+ *
+ * @type {(phase: string) => import('next').NextConfig}
+ */
+module.exports = (phase) => {
+  /** @type {import('next').NextConfig} */
+  const nextConfig = {
+    reactStrictMode: true,
+    webpack(config) {
+      if (process.env.ANALYZE === "true") {
+        try {
+          // eslint-disable-next-line global-require, import/no-extraneous-dependencies
+          const withBundleAnalyzer = require("@next/bundle-analyzer")({
+            enabled: true,
+          });
+          return withBundleAnalyzer(config);
+        } catch {
+          return config;
+        }
+      }
+      return config;
+    },
+  };
+
+  if (phase === PHASE_PRODUCTION_BUILD) {
+    nextConfig.output = "standalone";
+  }
+
+  return nextConfig;
+};

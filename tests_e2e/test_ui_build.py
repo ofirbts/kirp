@@ -11,7 +11,7 @@ def test_unified_ui_package_json_exists() -> None:
 
 
 def test_unified_ui_next_config_exists() -> None:
-    assert (REPO / "next.config.js").is_file()
+    assert (REPO / "next.config.cjs").is_file() or (REPO / "next.config.js").is_file()
 
 
 def test_unified_ui_app_dir_exists() -> None:

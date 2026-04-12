@@ -4,10 +4,12 @@
   "private": true,
   "scripts": {
     "dev": "next dev -p 3100 -H 0.0.0.0",
+    "dev:clean": "node -e \"require('fs').rmSync('.next',{recursive:true,force:true});\" && next dev -p 3100 -H 0.0.0.0",
     "dev:kill-port": "fuser -k 3100/tcp 2>/dev/null || (lsof -ti:3100 | xargs kill -9 2>/dev/null); true",
     "build": "next build",
     "start": "next start -p 3100",
     "lint": "next lint",
+    "lint:ci": "CI=true NEXT_TELEMETRY_DISABLED=1 next lint",
     "analyze": "ANALYZE=true next build",
     "agent": "node agent.js"
   },

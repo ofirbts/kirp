@@ -240,11 +240,11 @@ async def sync_now(request: Request, integration: str, space_id: str = Query("al
 
 @router.get("/connections/{integration}/validate")
 async def validate_connection(
+    request: Request,
     integration: str,
-    tenant_id: str = Query("default"),
-    user_id: str = Query("system"),
 ) -> dict[str, Any]:
-    """Check if the stored token is valid (e.g. call a minimal API)."""
+    """Check if the stored token is valid (e.g. call a minimal API). Tenant/user from JWT."""
+    tenant_id, user_id = _ctx_ids(request)
     if integration not in INTEGRATIONS:
         raise HTTPException(status_code=400, detail=f"Unknown integration: {integration}")
     ts, _ = await _ensure_stores()
@@ -299,12 +299,12 @@ async def validate_connection(
 
 @router.get("/connections/{integration}/errors")
 async def get_connection_errors(
+    request: Request,
     integration: str,
-    tenant_id: str = Query("default"),
-    user_id: str = Query("system"),
     limit: int = Query(10, ge=1, le=20),
 ) -> dict[str, Any]:
-    """Return last N error log entries for this connector."""
+    """Return last N error log entries for this connector. Tenant/user from JWT."""
+    tenant_id, user_id = _ctx_ids(request)
     if integration not in INTEGRATIONS:
         raise HTTPException(status_code=400, detail=f"Unknown integration: {integration}")
     sl = _sync_log_store()

@@ -36,14 +36,11 @@ export const useTenantContextStore = create<TenantContextState>((set) => ({
   },
 }));
 
-// On client: clear any stale tenant/user from localStorage and ensure state is set.
+// On client: restore space only. Tenant/user come from AppShell + auth (JWT), not forced DEFAULT here
+// (forcing default caused /api/v1/tenant/default/* 403 when JWT tenant was a real UUID).
 if (typeof window !== "undefined") {
   localStorage.removeItem("kirp_tenant_id");
   localStorage.removeItem("kirp_user_id");
   const spaceId = localStorage.getItem("kirp_space_id") || "all";
-  useTenantContextStore.setState({
-    tenantId: DEFAULT_TENANT_ID,
-    userId: DEFAULT_USER_ID,
-    spaceId,
-  });
+  useTenantContextStore.setState({ spaceId });
 }

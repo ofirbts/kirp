@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { apiClient } from "@/lib/apiClient";
-import { DEFAULT_TENANT_ID, DEFAULT_USER_ID } from "@/lib/constants";
+import { DEFAULT_TENANT_ID } from "@/lib/constants";
 import { useTenantContextStore } from "@/lib/stores/tenantContextStore";
 import { PageSkeleton } from "@/components/dashboard/PageSkeleton";
 import { ErrorState } from "@/components/feedback/ErrorState";
@@ -24,7 +24,7 @@ interface DecisionRow {
 }
 
 function DecisionsContent() {
-  const { tenantId, spaceId, userId } = useTenantContextStore();
+  const { tenantId, spaceId } = useTenantContextStore();
   const [query, setQuery] = useState("");
   const [result, setResult] = useState<Record<string, unknown> | null>(null);
   const [decisions, setDecisions] = useState<DecisionRow[]>([]);
@@ -60,9 +60,6 @@ function DecisionsContent() {
     setResult(null);
     try {
       const res = await apiClient.queryV1({
-        tenant_id: tenantId ?? DEFAULT_TENANT_ID,
-        space_id: spaceId ?? "all",
-        user_id: userId ?? DEFAULT_USER_ID,
         query: query.trim(),
         k: 6,
       });
@@ -72,7 +69,7 @@ function DecisionsContent() {
     } finally {
       setLoading(false);
     }
-  }, [query, tenantId, spaceId, userId]);
+  }, [query]);
 
   return (
     <div className="space-y-6" suppressHydrationWarning>

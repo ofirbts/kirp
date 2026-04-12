@@ -76,6 +76,21 @@ VERIFY_EMAIL='you@example.com' VERIFY_PASSWORD='YourPassw0rd!' VERIFY_NAME='You'
 
 Then sign in at `http://localhost:3100/login` with the same email/password.
 
+## 4c. One-shot ingest → Kafka → pipeline (full stack only)
+
+Requires **repo root** `docker compose up` (Kafka + `kirp-agent-processor`), API typically **`http://localhost:8000`**.  
+The minimal `deploy/docker-compose.prod.yml` stack has **no Kafka** — ingest will return **503**; the script explains that.
+
+```bash
+./deploy/verify-ingest-e2e.sh
+# or against another API URL:
+KIRP_VERIFY_API_URL=http://localhost:8080 ./deploy/verify-ingest-e2e.sh
+```
+
+Success line: `INGEST_E2E_OK`. Exit **3** = no event bus; **4** = timeout (check `docker logs kirp-agent-processor`).
+
+**Webhooks (Slack / WhatsApp):** tenant routing uses env only — set `SLACK_WEBHOOK_TENANT_ID` / `SLACK_WEBHOOK_SPACE_ID` / `SLACK_WEBHOOK_USER_ID` and `WHATSAPP_WEBHOOK_*` (see `src/api/v1_ingestion.py`). The JSON body cannot choose a tenant.
+
 ## 5. Health & smoke
 
 - **Health (API):** `GET http://localhost:8080/health`  

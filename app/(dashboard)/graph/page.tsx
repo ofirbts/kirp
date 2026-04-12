@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { apiClient } from "@/lib/apiClient";
-import { DEFAULT_TENANT_ID, DEFAULT_USER_ID } from "@/lib/constants";
+import { DEFAULT_TENANT_ID } from "@/lib/constants";
 import { useTenantContextStore } from "@/lib/stores/tenantContextStore";
 import { PageSkeleton } from "@/components/dashboard/PageSkeleton";
 import { ErrorState } from "@/components/feedback/ErrorState";
@@ -29,7 +29,7 @@ interface GraphEdge {
 }
 
 function GraphContent() {
-  const { tenantId, spaceId, userId } = useTenantContextStore();
+  const { tenantId, spaceId } = useTenantContextStore();
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<Record<string, unknown> | null>(null);
   const [nodes, setNodes] = useState<GraphNode[]>([]);
@@ -66,9 +66,6 @@ function GraphContent() {
     setResults(null);
     try {
       const res = await apiClient.queryV1({
-        tenant_id: tenantId ?? DEFAULT_TENANT_ID,
-        space_id: spaceId ?? "all",
-        user_id: userId ?? DEFAULT_USER_ID,
         query: query.trim(),
         k: 10,
       });
@@ -78,7 +75,7 @@ function GraphContent() {
     } finally {
       setLoading(false);
     }
-  }, [query, tenantId, spaceId, userId]);
+  }, [query]);
 
   return (
     <div className="space-y-6" suppressHydrationWarning>

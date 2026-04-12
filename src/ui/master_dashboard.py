@@ -86,15 +86,14 @@ def run() -> None:
                     st.error(str(out))
         st.divider()
         st.subheader("Today Plan & Critical Actions")
-        tenant, space, user = "default", "private", "ofir"
         if st.button("Fetch today intelligence"):
-            data = _post("/api/v1/query", json={
-                "tenant_id": tenant,
-                "space_id": space,
-                "user_id": user,
-                "query": "What are my 3 most critical actions for today?",
-                "k": 10,
-            })
+            data = _post(
+                "/api/v1/query",
+                json={
+                    "query": "What are my 3 most critical actions for today?",
+                    "k": 10,
+                },
+            )
             if isinstance(data, dict) and data.get("ok"):
                 for i, r in enumerate((data.get("results") or [])[:5], 1):
                     st.markdown(f"**{i}.** {r.get('text', '')[:200]}")
@@ -111,13 +110,10 @@ def run() -> None:
 
     with tab_risks:
         st.subheader("Risks & Opportunities")
-        data = _post("/api/v1/query", json={
-            "tenant_id": "default",
-            "space_id": "private",
-            "user_id": "ofir",
-            "query": "Risks and opportunities",
-            "k": 10,
-        })
+        data = _post(
+            "/api/v1/query",
+            json={"query": "Risks and opportunities", "k": 10},
+        )
         if isinstance(data, dict) and data.get("results"):
             for r in data["results"][:5]:
                 st.markdown(f"- **{r.get('text', '')[:150]}**")
@@ -128,13 +124,7 @@ def run() -> None:
         st.subheader("Universal Search")
         q = st.text_input("Query", placeholder="Search knowledge, tasks, events…")
         if st.button("Search") and q:
-            data = _post("/api/v1/query", json={
-                "tenant_id": "default",
-                "space_id": "private",
-                "user_id": "ofir",
-                "query": q,
-                "k": 20,
-            })
+            data = _post("/api/v1/query", json={"query": q, "k": 20})
             if isinstance(data, dict) and data.get("results"):
                 for r in data["results"]:
                     st.markdown(f"- {r.get('text', '')[:200]}")

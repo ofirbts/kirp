@@ -102,7 +102,8 @@ function UsersRolesContent() {
             Using client-side permissions helper. Read-only until RBAC is wired.
           </p>
           <p className="mt-2 text-xs text-neutral-400">
-            can("agents", "read"): {can("agents", "read") ? "yes" : "no"} · can("agents", "write"): {can("agents", "write") ? "yes" : "no"}
+            {`can("agents", "read")`}: {can("agents", "read") ? "yes" : "no"} · {`can("agents", "write")`}:{" "}
+            {can("agents", "write") ? "yes" : "no"}
           </p>
         </CardContent>
       </Card>

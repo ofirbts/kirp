@@ -14,6 +14,7 @@ import {
 } from "@/lib/apiClient";
 import { useTenantRunsStream } from "@/lib/hooks/useTenantRunsStream";
 import { useTenantContextStore } from "@/lib/stores/tenantContextStore";
+import { useAuthStore } from "@/lib/stores/authStore";
 import { DEFAULT_TENANT_ID } from "@/lib/constants";
 import { AlertTriangle, Radio, RefreshCw } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -24,7 +25,13 @@ function MonitoringContent() {
   const searchParams = useSearchParams();
   const urlTenant = searchParams.get("tenant")?.trim();
   const { tenantId: storeTenant } = useTenantContextStore();
-  const tenantId = urlTenant || storeTenant || DEFAULT_TENANT_ID;
+  const { user, loaded } = useAuthStore();
+  const skipAuth = process.env.NEXT_PUBLIC_SKIP_AUTH === "1";
+  const tenantId =
+    urlTenant ||
+    (skipAuth
+      ? storeTenant || DEFAULT_TENANT_ID
+      : user?.tenant_id?.trim() || storeTenant || DEFAULT_TENANT_ID);
 
   const [payload, setPayload] = useState<TenantRunsResponse | null>(null);
   const [loading, setLoading] = useState(true);
@@ -59,8 +66,14 @@ function MonitoringContent() {
   }, [tenantId]);
 
   useEffect(() => {
+    if (!skipAuth && !loaded) return;
+    if (!skipAuth && !user?.tenant_id && !urlTenant) {
+      setLoading(false);
+      setError("No tenant in session. Try logging in again.");
+      return;
+    }
     void load();
-  }, [load]);
+  }, [load, skipAuth, loaded, user?.tenant_id, urlTenant]);
 
   useTenantRunsStream(tenantId, LIMIT, true, (data) => {
     setPayload(data);
@@ -69,6 +82,8 @@ function MonitoringContent() {
   });
 
   useEffect(() => {
+    if (!skipAuth && !loaded) return;
+    if (!skipAuth && !user?.tenant_id && !urlTenant) return;
     let cancelled = false;
     const tick = () => {
       void getTenantAlertsV1(tenantId)
@@ -83,7 +98,7 @@ function MonitoringContent() {
       cancelled = true;
       clearInterval(id);
     };
-  }, [tenantId]);
+  }, [tenantId, skipAuth, loaded, user?.tenant_id, urlTenant]);
 
   const onRowClick = (runId: string) => {
     setSelectedRunId(runId);
