@@ -12,6 +12,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from src.core.integrations import get_kafka_producer, get_kafka_consumer
+from src.models.kafka_wire_envelope import build_kafka_emit_dict
 
 logger = logging.getLogger(__name__)
 
@@ -44,18 +45,18 @@ class KafkaEventAgent:
             logger.warning("Kafka producer not available")
             return False
         try:
-            envelope = {
-                "type": event.type,
-                "data": event.payload,
-                "tenant_id": event.tenant_id,
-                "space_id": event.space_id,
-                "user_id": event.user_id,
-                "run_id": event.run_id,
-                "workflow_type": event.workflow_type,
-                "trace_id": event.trace_id,
-                "idempotency_key": event.idempotency_key,
-                "parent_run_id": event.parent_run_id,
-            }
+            envelope = build_kafka_emit_dict(
+                event_type=event.type,
+                data=event.payload,
+                tenant_id=event.tenant_id,
+                space_id=event.space_id,
+                user_id=event.user_id,
+                run_id=event.run_id,
+                workflow_type=event.workflow_type,
+                trace_id=event.trace_id,
+                idempotency_key=event.idempotency_key,
+                parent_run_id=event.parent_run_id,
+            )
             producer.produce(
                 EVENT_TOPIC,
                 key=event.type.encode("utf-8"),

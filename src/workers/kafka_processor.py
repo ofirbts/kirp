@@ -18,6 +18,10 @@ from typing import Any
 from src.core.integrations import get_kafka_consumer, get_redis_async
 from src.core.event_store import EventStore, Event, Sensitivity
 from src.models.event import CanonicalEvent
+from src.models.kafka_wire_envelope import (
+    flatten_kafka_envelope_to_event_data,
+    validate_ingest_tenant_context,
+)
 from src.core.event_registry import get_event_registry
 from src.core.agent_registry import get_agent_framework_with_all_agents
 from src.observability.metrics import MetricsCollector
@@ -244,30 +248,17 @@ async def process_event(payload: dict[str, Any], retry_count: int = 0) -> bool:
                 await run_controller.update_step(str(run_id_payload), "idempotency_check", "completed")
             return True
         
-        raw_data = payload.get("data") or {}
-        # Use envelope/payload values exactly — no fallbacks (multi-tenant: real tenant_id/user_id from JWT)
-        tenant_id = payload.get("tenant_id") if payload.get("tenant_id") is not None else raw_data.get("tenant_id")
-        space_id = payload.get("space_id") if payload.get("space_id") is not None else raw_data.get("space_id")
-        user_id = payload.get("user_id") if payload.get("user_id") is not None else raw_data.get("user_id")
-        data = {
-            **raw_data,
-            "tenant_id": tenant_id,
-            "space_id": space_id,
-            "user_id": user_id,
-            "run_id": payload.get("run_id") or raw_data.get("run_id"),
-            "workflow_type": payload.get("workflow_type") or raw_data.get("workflow_type"),
-            "trace_id": payload.get("trace_id") or raw_data.get("trace_id"),
-            "idempotency_key": payload.get("idempotency_key") or raw_data.get("idempotency_key"),
-            "parent_run_id": payload.get("parent_run_id") or raw_data.get("parent_run_id"),
-        }
-        if not tenant_id or tenant_id == "*":
-            logger.error("Invalid tenant_id in Kafka event: %s", tenant_id)
+        data = flatten_kafka_envelope_to_event_data(payload)
+        tenant_ctx_err = validate_ingest_tenant_context(data)
+        if tenant_ctx_err == "invalid_tenant":
+            logger.error("Invalid tenant_id in Kafka event: %s", data.get("tenant_id"))
             _metrics.inc("events_failed", labels={"event_type": event_type, "reason": "invalid_tenant"})
             return False
-        if not user_id:
+        if tenant_ctx_err == "missing_user_id":
             logger.error("Missing user_id in Kafka event (required for multi-tenancy)")
             _metrics.inc("events_failed", labels={"event_type": event_type, "reason": "missing_user_id"})
             return False
+        tenant_id = data["tenant_id"]
 
         from src.core.run_controller import get_run_controller as _get_rc
 
