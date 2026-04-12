@@ -59,6 +59,23 @@ docker compose -f deploy/docker-compose.prod.yml up -d --build
 
 ---
 
+## 4b. One-shot dashboard user + API checks (no Docker rebuild)
+
+With the stack already up and **curl** available on the host:
+
+```bash
+./deploy/local-dashboard-verify.sh
+```
+
+Creates a **new** user (unique email by default), checks `signup` → `auth/me` → `stats` with JWT.  
+Use your own test identity:
+
+```bash
+VERIFY_EMAIL='you@example.com' VERIFY_PASSWORD='YourPassw0rd!' VERIFY_NAME='You' ./deploy/local-dashboard-verify.sh
+```
+
+Then sign in at `http://localhost:3100/login` with the same email/password.
+
 ## 5. Health & smoke
 
 - **Health (API):** `GET http://localhost:8080/health`  

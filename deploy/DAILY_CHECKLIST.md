@@ -95,6 +95,16 @@ Use the **Stripe signing secret** (`STRIPE_WEBHOOK_SECRET`) and raw JSON body; s
 
 Expect: `SMOKE_OK: health=200 onboarding=201 webhook=200`.
 
+## 5b. Dashboard user + JWT (one command)
+
+After the stack is up (no rebuild):
+
+```bash
+./deploy/local-dashboard-verify.sh
+```
+
+Prints email + password to use on `http://localhost:3100/login`, and checks `signup` → `me` → `stats`.
+
 ---
 
 ## Week 7 focus
