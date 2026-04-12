@@ -17,8 +17,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Target, RefreshCw, Send, BarChart3, Calendar, CalendarDays, Search, CheckSquare, ListTodo, List, Download } from "lucide-react";
 
+type M3ReflectionRow = M3Reflection | M3ReflectionSearchHit;
+
 export default function M3Page() {
-  const [reflections, setReflections] = useState<M3Reflection[]>([]);
+  const [reflections, setReflections] = useState<M3ReflectionRow[]>([]);
   const [kpis, setKpis] = useState<M3Kpis | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -169,7 +171,7 @@ export default function M3Page() {
   }
 
   const isSearchResults = reflectionsMeta?.search === true;
-  const searchHits = isSearchResults ? (reflections as M3ReflectionSearchHit[]) : [];
+  const searchHits: M3ReflectionSearchHit[] = isSearchResults ? (reflections as M3ReflectionSearchHit[]) : [];
 
   if (loading && reflections.length === 0 && !kpis) {
     return <PageSkeleton title subtitle tableRows={5} />;

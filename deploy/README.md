@@ -75,6 +75,16 @@ docker compose -f deploy/docker-compose.prod.yml ps
 docker compose -f deploy/docker-compose.prod.yml logs kirp-api --tail 120
 ```
 
+**Do not run `docker volume prune -f` blindly.** It deletes **all** unused volumes on your machine (other projects too), not only KIRP. Prefer `docker compose -f deploy/docker-compose.prod.yml down -v` when you intend to reset **this** stack only.
+
+**Mongo / `mongosh`:** run it **inside** the container, and give Mongo a few seconds after `up` before pinging:
+
+```bash
+docker compose -f deploy/docker-compose.prod.yml exec mongo mongosh --eval 'db.adminCommand({ ping: 1 })'
+```
+
+If you see `ECONNREFUSED 127.0.0.1:27017` immediately after start, wait ~5s and retry (race on first boot).
+
 ---
 
 ## 7. Related docs
