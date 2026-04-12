@@ -68,6 +68,17 @@ export default function Page() {
         <p className="mt-1 text-xs text-textSoft">
           Enter your credentials to access your KIRP workspace.
         </p>
+        {(process.env.NODE_ENV === "development" ||
+          (process.env.NEXT_PUBLIC_API_URL || "").includes("localhost")) && (
+          <p className="mt-2 text-xs text-textSoft rounded-md bg-surface2/80 px-2 py-1.5 border border-border/60">
+            <span className="font-medium text-textMain">Local Docker stack:</span> the API seeds{" "}
+            <code className="text-[11px]">dev@localhost</code> with password{" "}
+            <code className="text-[11px]">devdevdev</code> when Mongo is empty. Or set{" "}
+            <code className="text-[11px]">SKIP_AUTH=1</code> in <code className="text-[11px]">.env.prod</code> and{" "}
+            <code className="text-[11px]">NEXT_PUBLIC_SKIP_AUTH=1</code> in <code className="text-[11px]">.env.local</code>{" "}
+            (see <code className="text-[11px]">deploy/README.md</code>).
+          </p>
+        )}
         <form onSubmit={handleSubmit} className="mt-4 space-y-3">
           <div>
             <label className="block text-xs font-medium text-textMain">

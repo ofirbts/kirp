@@ -83,9 +83,14 @@ export function useNotificationsWs(tenantId?: string | null, userId?: string | n
         clearTimeout(reconnectTimeoutRef.current);
         reconnectTimeoutRef.current = null;
       }
-      if (wsRef.current) {
-        wsRef.current.close();
-        wsRef.current = null;
+      const ws = wsRef.current;
+      wsRef.current = null;
+      if (!ws) return;
+      // Avoid React Strict Mode closing during CONNECTING (console noise: "closed before established")
+      if (ws.readyState === WebSocket.CONNECTING) {
+        ws.addEventListener("open", () => ws.close(), { once: true });
+      } else {
+        ws.close();
       }
     };
   }, [effectiveTenantId, effectiveUserId, setUnreadCount, setPulse]);

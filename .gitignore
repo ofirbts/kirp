@@ -37,6 +37,7 @@ node_modules/
 # Env files (VERY IMPORTANT)
 .env
 .env.*
+!deploy/.env.prod.example
 *.env
 
 # Credentials & Secrets (CRITICAL)

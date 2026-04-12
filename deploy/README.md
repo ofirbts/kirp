@@ -64,6 +64,20 @@ docker compose -f deploy/docker-compose.prod.yml up -d --build
 - **Health (API):** `GET http://localhost:8080/health`  
   Example: `curl -sS http://localhost:8080/health`  
   Expect `"status":"healthy"` when stores are up (not `/api/v1/health` — that path is not the app health check).
+
+**Terminal tip:** run `curl` on its **own line**. If you paste Hebrew text (e.g. “ו־”) before `curl`, the shell looks for a command named `ו־curl` → `command not found`. Without `curl` installed, use:  
+`docker compose -f deploy/docker-compose.prod.yml exec kirp-api curl -sS http://127.0.0.1:8000/health`
+
+### Dashboard auth (401 in browser)
+
+The compose stack sets **`ENV=production`**, so the API expects a **JWT** unless you opt into dev mode:
+
+| Approach | What to do |
+|----------|------------|
+| **A. Log in** | Email **`dev@localhost`**, password **`devdevdev`**. This user is seeded on API startup when Mongo is empty and seed succeeds. |
+| **B. Skip JWT (local only)** | In **`.env.prod`**: `SKIP_AUTH=1`. In **`.env.local`** (Next): `NEXT_PUBLIC_SKIP_AUTH=1` and `NEXT_PUBLIC_API_URL=http://localhost:8080`. Restart API and `npm run dev`. |
+
+Use **B** for fastest UI work; use **A** to test real login.
 - **Smoke script:** `./deploy/smoke-test.sh` — health + onboarding + Stripe webhook signature check.
 
 ---
