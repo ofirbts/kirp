@@ -78,6 +78,7 @@ async def tenant_usage_details(
 
     rc = get_run_controller()
     runs = await rc.get_recent_runs(tenant_id, limit=100)
+    recent_runs_count = len(runs)
     agg: dict[tuple[str, str], float] = defaultdict(float)
     for r in runs:
         model = str(r.get("model") or "unknown")
@@ -97,6 +98,7 @@ async def tenant_usage_details(
 
     return {
         "tenant_id": tenant_id,
+        "recent_runs_count": recent_runs_count,
         "llm_cost_used": round(used, 6),
         "llm_quota_limit_usd": None if not quota_enabled else round(limit, 4),
         "quota_enabled": quota_enabled,

@@ -72,6 +72,7 @@ def test_usage_details_ok(
     assert r.status_code == 200
     body = r.json()
     assert body["tenant_id"] == "default"
+    assert body["recent_runs_count"] == 2
     assert body["llm_cost_used"] == 3.5
     assert body["quota_enabled"] is True
     assert body["llm_quota_limit_usd"] == 25.0

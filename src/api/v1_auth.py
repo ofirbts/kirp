@@ -4,6 +4,7 @@ V1 Auth API — signup, login, me.
 
 from __future__ import annotations
 
+import logging
 import os
 from typing import Any
 
@@ -15,6 +16,8 @@ from src.core.auth import get_user_store
 from src.core.jwt_utils import create_access_token, require_auth
 from src.services import tenants_service
 
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/v1/auth", tags=["V1 Auth"])
 
@@ -73,6 +76,11 @@ async def signup(body: SignupBody) -> AuthResponse:
   # Create tenant + default space via existing service.
   tenant = await tenants_service.create_tenant(name=body.name or str(body.email))
   tenant_id = tenant.id
+
+  try:
+    await tenants_service.seed_saas_trial_for_signup(tenant_id, str(body.email))
+  except tenants_service.TenantLifecycleError as e:
+    logger.warning("seed_saas_trial_for_signup failed after signup tenant=%s: %s", tenant_id, e)
 
   # Hash password
   password_hash = _make_password_hash(body.password)

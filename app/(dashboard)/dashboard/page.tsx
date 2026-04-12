@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useState, Suspense } from "react";
+import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PageSkeleton } from "@/components/dashboard/PageSkeleton";
 import { DataTable } from "@/components/dashboard/DataTable";
@@ -8,7 +9,12 @@ import { ErrorState } from "@/components/feedback/ErrorState";
 import { StatsCard } from "@/components/ui/stats-card";
 import { RadialChart } from "@/components/charts/RadialChart";
 import { EventRateChart } from "@/components/data/EventRateChart";
-import { apiClient, type AskResponse, type InsightV1 } from "@/lib/apiClient";
+import {
+  apiClient,
+  type AskResponse,
+  type InsightV1,
+  type TenantUsageDetailsV1,
+} from "@/lib/apiClient";
 import type { Event, Agent } from "@/lib/types";
 import { Activity, Database, HeartPulse, ListChecks, Zap, Cpu, Lightbulb } from "lucide-react";
 import { DEFAULT_TENANT_ID } from "@/lib/constants";
@@ -342,6 +348,7 @@ function RealDashboardContent() {
   const [events, setEvents] = useState<Event[]>([]);
   const [health, setHealth] = useState<Record<string, unknown> | null>(null);
   const [insight, setInsight] = useState<AskResponse | null>(null);
+  const [usage, setUsage] = useState<TenantUsageDetailsV1 | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [quickContent, setQuickContent] = useState("");
@@ -355,7 +362,7 @@ function RealDashboardContent() {
     setLoading(true);
     setError(null);
     try {
-      const [tasksRes, eventsRes, healthRes, insightRes] = await Promise.all([
+      const [tasksRes, eventsRes, healthRes, insightRes, usageRes] = await Promise.all([
         apiClient
           .listTasksV1({
             tenant_id: tenantId,
@@ -375,11 +382,13 @@ function RealDashboardContent() {
         apiClient
           .askV1({ query: "What should I focus on today?" })
           .catch(() => null),
+        apiClient.getTenantUsageDetailsV1(tenantId).catch(() => null),
       ]);
       setTasks((tasksRes as { data?: TaskV1[] }).data ?? []);
       setEvents(eventsRes as Event[]);
       setHealth(healthRes as Record<string, unknown> | null);
       setInsight(insightRes as AskResponse | null);
+      setUsage(usageRes as TenantUsageDetailsV1 | null);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load dashboard");
     } finally {
@@ -458,6 +467,47 @@ function RealDashboardContent() {
           Live view of your tasks, activity, and system health.
         </p>
       </div>
+
+      {usage && (
+        <Card className="rounded-2xl border border-[color:var(--color-border-subtle)] bg-surface1/90 shadow-soft">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base text-textMain">Plan & usage</CardTitle>
+            <p className="text-xs text-textSoft mt-0.5">
+              Trial and billing align with Stripe Checkout from the Billing page.
+            </p>
+          </CardHeader>
+          <CardContent className="flex flex-wrap items-center gap-4 text-sm text-textMain">
+            <span>
+              <span className="text-textSoft">Status: </span>
+              <span className="font-medium capitalize">{usage.lifecycle}</span>
+              {usage.trial_days_remaining != null && usage.lifecycle === "trial" && (
+                <span className="text-textSoft">
+                  {" "}
+                  · {usage.trial_days_remaining}d left in trial
+                </span>
+              )}
+              {usage.suspended && (
+                <span className="ml-1 text-amber-500">(suspended)</span>
+              )}
+            </span>
+            <span className="text-textSoft">
+              Pipeline runs (recent):{" "}
+              <span className="font-medium text-textMain">{usage.recent_runs_count}</span>
+            </span>
+            <span className="text-textSoft">
+              Events in feed:{" "}
+              <span className="font-medium text-textMain">{events.length}</span>
+              <span className="text-[11px]"> (loaded)</span>
+            </span>
+            <Link
+              href="/billing"
+              className="ml-auto rounded-lg border border-[color:var(--color-primary)] px-3 py-1.5 text-xs font-medium text-[color:var(--color-primary)] hover:bg-surface2"
+            >
+              Billing & upgrade
+            </Link>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Quick add knowledge — הוספת תוכן/משימה/אירוע */}
       <Card className="rounded-2xl border border-[color:var(--color-border-subtle)] bg-surface1/90 shadow-soft">

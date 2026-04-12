@@ -54,7 +54,9 @@ export default function SignupPage() {
           Create your KIRP account
         </h1>
         <p className="mt-1 text-xs text-textSoft">
-          We&apos;ll create a personal tenant and default space for you.
+          We&apos;ll create a personal tenant and default space for you. You start on a
+          free trial; upgrade with Stripe anytime from{" "}
+          <span className="text-textMain">Billing</span> in the dashboard after you sign in.
         </p>
         <form onSubmit={handleSubmit} className="mt-4 space-y-3">
           <div>

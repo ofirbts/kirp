@@ -1044,6 +1044,29 @@ export async function getTenantAlertsV1(
   return get(`/api/v1/tenant/${encodeURIComponent(tenantId)}/alerts`);
 }
 
+/** Billing / SaaS usage (JWT tenant must match path). */
+export type TenantUsageDetailsV1 = {
+  tenant_id: string;
+  recent_runs_count: number;
+  llm_cost_used: number;
+  llm_quota_limit_usd: number | null;
+  quota_enabled: boolean;
+  quota_remaining_usd: number | null;
+  trial_days_remaining: number | null;
+  trial_ends_at: string | null;
+  lifecycle: string;
+  suspended: boolean;
+  breakdown: { model_used: string; date: string; cost_usd: number }[];
+};
+
+export async function getTenantUsageDetailsV1(
+  tenantId: string,
+): Promise<TenantUsageDetailsV1> {
+  return get(
+    `/api/v1/tenant/${encodeURIComponent(tenantId)}/usage/details`,
+  );
+}
+
 // ---------- Aggregated export ----------
 
 export const apiClient = {
@@ -1111,6 +1134,7 @@ export const apiClient = {
   m3Export,
   getTenantRunsV1,
   getRunStatusV1,
+  getTenantUsageDetailsV1,
 };
 
 // ---------- Connections Hub ----------

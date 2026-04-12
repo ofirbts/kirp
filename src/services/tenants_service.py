@@ -8,7 +8,7 @@ create_tenant_if_not_exists, create_space_if_not_exists, ensure_default_tenant.
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import List
 
 from sqlalchemy import select
@@ -30,6 +30,9 @@ _VALID_LIFECYCLES = frozenset(
         "suspended",
     }
 )
+
+# Dashboard email/password signup: align with API-key onboarding trial length (onboarding_service.TRIAL_DAYS).
+_SAAS_SIGNUP_TRIAL_DAYS = 30
 
 
 class TenantLifecycleError(ValueError):
@@ -189,6 +192,39 @@ async def list_spaces_for_tenant(tenant_id: str) -> List[SpaceSchema]:
         )
         spaces = result.scalars().all()
         return [_space_to_schema(s) for s in spaces]
+    finally:
+        await session.close()
+
+
+async def seed_saas_trial_for_signup(tenant_id: str, email: str, trial_days: int | None = None) -> None:
+    """
+    After ``/api/v1/auth/signup``: move tenant from ``pending_onboarding`` to ``trial``
+    with ``trial_ends_at`` and ``onboarding_email`` so billing / usage match Stripe flows.
+    """
+    days = trial_days if trial_days is not None else _SAAS_SIGNUP_TRIAL_DAYS
+    try:
+        tid = uuid.UUID(tenant_id)
+    except (ValueError, TypeError) as e:
+        raise TenantLifecycleError("invalid tenant id") from e
+
+    now = datetime.now(timezone.utc)
+    trial_end = now + timedelta(days=days)
+    engine = await get_schema_engine()
+    session = await engine.get_session()
+    try:
+        result = await session.execute(select(Tenant).where(Tenant.id == tid).limit(1))
+        row = result.scalar_one_or_none()
+        if row is None:
+            raise TenantLifecycleError("tenant not found")
+        ex = dict(row.extra or {})
+        ex[_LIFECYCLE_EXTRA_KEY] = "trial"
+        ex["trial_ends_at"] = trial_end.isoformat().replace("+00:00", "Z")
+        em = (email or "").strip().lower()
+        if em:
+            ex["onboarding_email"] = em
+        row.extra = ex
+        row.updated_at = now
+        await session.commit()
     finally:
         await session.close()
 
