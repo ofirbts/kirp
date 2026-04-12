@@ -353,6 +353,7 @@ function RealDashboardContent() {
   const [error, setError] = useState<string | null>(null);
   const [quickContent, setQuickContent] = useState("");
   const [ingestLoading, setIngestLoading] = useState(false);
+  const [sampleIngestLoading, setSampleIngestLoading] = useState(false);
   const [ingestSuccess, setIngestSuccess] = useState<string | null>(null);
   const [ingestError, setIngestError] = useState<string | null>(null);
 
@@ -432,6 +433,33 @@ function RealDashboardContent() {
     }
   }
 
+  async function handleSampleIngest() {
+    if (!userId) return;
+    setSampleIngestLoading(true);
+    setIngestSuccess(null);
+    setIngestError(null);
+    try {
+      await apiClient.ingestV1({
+        tenant_id: tenantId,
+        space_id: spaceId ?? "all",
+        user_id: userId,
+        content:
+          "Hello KIRP — first test event from the dashboard (sample ingest).",
+        source: "dashboard_first_run",
+      });
+      setIngestSuccess("Sample event sent. Refreshing…");
+      await load();
+      setIngestSuccess("Sample event ingested — check Recent activity below.");
+      setTimeout(() => setIngestSuccess(null), 5000);
+    } catch (e) {
+      setIngestError(
+        e instanceof Error ? e.message : "Sample ingest failed (is Kafka/API up?)",
+      );
+    } finally {
+      setSampleIngestLoading(false);
+    }
+  }
+
   if (loading) {
     return <PageSkeleton title subtitle cards={4} tableRows={5} />;
   }
@@ -505,6 +533,27 @@ function RealDashboardContent() {
             >
               Billing & upgrade
             </Link>
+          </CardContent>
+        </Card>
+      )}
+
+      {events.length === 0 && (
+        <Card className="rounded-2xl border border-dashed border-[color:var(--color-border-subtle)] bg-surface2/40 shadow-soft">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base text-textMain">No events yet</CardTitle>
+            <p className="text-xs text-textSoft mt-0.5">
+              Ingest creates your first event (Kafka → pipeline). Use the button below or type your own text in the next card.
+            </p>
+          </CardHeader>
+          <CardContent>
+            <button
+              type="button"
+              onClick={() => void handleSampleIngest()}
+              disabled={sampleIngestLoading || !userId}
+              className="rounded-xl border border-[color:var(--color-primary)] bg-[color:var(--color-primary)] px-4 py-2 text-sm font-medium text-bg hover:opacity-90 disabled:opacity-50"
+            >
+              {sampleIngestLoading ? "Sending…" : "Run first test ingest"}
+            </button>
           </CardContent>
         </Card>
       )}

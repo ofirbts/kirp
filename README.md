@@ -1,5 +1,10 @@
 # KIRP - Enterprise AI SaaS
 
+## SaaS onboarding & payments
+
+- **New users (signup → first ingest → billing):** [docs/NEW_USER_FLOW.md](docs/NEW_USER_FLOW.md)
+- **E2E payment proof (Stripe test + webhook):** [docs/SAAS_E2E_PAYMENT.md](docs/SAAS_E2E_PAYMENT.md) · run `./scripts/verify-saas-e2e.sh` (see doc for `stripe listen`).
+
 ## Start
 ```bash
 cd deploy && ./launch-prod.sh

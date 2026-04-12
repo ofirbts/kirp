@@ -31,6 +31,7 @@ Use this file as the **map**. Deep design lives in linked files; avoid duplicati
 - Router structure: [`APP_ROUTER_STRUCTURE.md`](APP_ROUTER_STRUCTURE.md)
 - UI deployment: [`UI_DEPLOYMENT.md`](UI_DEPLOYMENT.md)
 - E2E / validation: [`E2E_VERIFICATION_CHECKLIST.md`](E2E_VERIFICATION_CHECKLIST.md), [`VALIDATE_UI.md`](VALIDATE_UI.md)
+- SaaS: new-user path [`NEW_USER_FLOW.md`](NEW_USER_FLOW.md); Stripe E2E [`SAAS_E2E_PAYMENT.md`](SAAS_E2E_PAYMENT.md), script [`../scripts/verify-saas-e2e.sh`](../scripts/verify-saas-e2e.sh)
 
 ## Audits & reports (historical context)
 
