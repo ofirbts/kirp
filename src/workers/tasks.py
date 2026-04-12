@@ -33,26 +33,9 @@ def ingest_task(self: Any, payload: dict[str, Any]) -> dict[str, Any]:
     metadata = payload.get("metadata")
 
     async def _run() -> dict[str, Any]:
-        from src.core.pipeline import EventPipeline
-        from src.core.event_store import EventStore
-        from src.core.rag_engine import RAGEngine
-        from src.core.schema_engine import SchemaEngine
-        from src.core.governance import GovernanceEngine
-        from src.core.agent_registry import get_agent_framework_with_all_agents
-        store = EventStore(os.getenv("MONGO_URI", "mongodb://root:example@localhost:27017/kirp?authSource=admin"))
-        await store.connect()
-        rag = RAGEngine(
-            qdrant_url=os.getenv("QDRANT_URL", "http://localhost:6333"),
-            qdrant_api_key=os.getenv("QDRANT_API_KEY"),
-            embedding_provider=os.getenv("EMBEDDING_PROVIDER", "openai"),
-            embedding_model=os.getenv("EMBEDDING_MODEL", "text-embedding-3-small"),
-        )
-        await rag.connect()
-        schema = SchemaEngine(os.getenv("POSTGRES_URI", "postgresql+asyncpg://kirp_user:kirp_password@localhost:5432/kirp"))
-        await schema.connect()
-        gov = GovernanceEngine(os.getenv("OPA_URL"))
-        af = get_agent_framework_with_all_agents()
-        pipe = EventPipeline(store, rag, schema, gov, af)
+        from src.core.pipeline_factory import create_connected_event_pipeline
+
+        pipe = await create_connected_event_pipeline()
         from src.core.run_controller import get_run_controller
 
         meta = dict(metadata or {})

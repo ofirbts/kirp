@@ -19,10 +19,7 @@ from src.core.integrations import get_kafka_consumer, get_redis_async
 from src.core.event_store import EventStore, Event, Sensitivity
 from src.models.event import CanonicalEvent
 from src.core.event_registry import get_event_registry
-from src.core.rag_engine import RAGEngine
 from src.core.agent_registry import get_agent_framework_with_all_agents
-from src.core.governance import GovernanceEngine
-from src.core.pipeline import EventPipeline
 from src.observability.metrics import MetricsCollector
 from uuid import UUID, uuid4
 from datetime import datetime, timezone
@@ -293,19 +290,9 @@ async def process_event(payload: dict[str, Any], retry_count: int = 0) -> bool:
                     content=content_str,
                     metadata=meta,
                 )
-                rag = RAGEngine(
-                    qdrant_url=os.getenv("QDRANT_URL", "http://qdrant:6333"),
-                    qdrant_api_key=os.getenv("QDRANT_API_KEY"),
-                    embedding_provider=os.getenv("EMBEDDING_PROVIDER", "openai"),
-                    embedding_model=os.getenv("EMBEDDING_MODEL", "text-embedding-3-small"),
-                )
-                await _connect_with_retry("RAGEngine", lambda: rag.connect())
-                from src.core.schema_engine import SchemaEngine
-                schema = SchemaEngine(os.getenv("POSTGRES_URI", "postgresql+asyncpg://kirp_user:kirp_password@postgres:5432/kirp"))
-                await _connect_with_retry("SchemaEngine", lambda: schema.connect())
-                gov = GovernanceEngine(os.getenv("OPA_URL", "http://opa:8181"))
-                af = get_agent_framework_with_all_agents()
-                pipe = EventPipeline(store, rag, schema, gov, af)
+                from src.core.pipeline_factory import create_connected_event_pipeline
+
+                pipe = await create_connected_event_pipeline()
                 await pipe.run_post_ingest_for_event(existing.id)
                 await _mark_processed(idempotency_key)
                 _metrics.inc("events_processed", labels={"event_type": event_type, "tenant_id": tenant_id})

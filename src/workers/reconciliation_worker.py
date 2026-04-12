@@ -8,7 +8,6 @@ Scans RunController for aggregate state `partial`, loads the canonical Mongo eve
 from __future__ import annotations
 
 import logging
-import os
 from typing import Any
 
 from src.core.run_controller import get_run_controller
@@ -25,31 +24,9 @@ class ReconciliationWorker:
     @classmethod
     async def create(cls) -> "ReconciliationWorker":
         """Build pipeline with the same wiring as Celery ingest tasks."""
-        from src.core.agent_registry import get_agent_framework_with_all_agents
-        from src.core.event_store import EventStore
-        from src.core.governance import GovernanceEngine
-        from src.core.pipeline import EventPipeline
-        from src.core.rag_engine import RAGEngine
-        from src.core.schema_engine import SchemaEngine
+        from src.core.pipeline_factory import create_connected_event_pipeline
 
-        store = EventStore(
-            os.getenv("MONGO_URI", "mongodb://root:example@localhost:27017/kirp?authSource=admin")
-        )
-        await store.connect()
-        rag = RAGEngine(
-            qdrant_url=os.getenv("QDRANT_URL", "http://localhost:6333"),
-            qdrant_api_key=os.getenv("QDRANT_API_KEY"),
-            embedding_provider=os.getenv("EMBEDDING_PROVIDER", "openai"),
-            embedding_model=os.getenv("EMBEDDING_MODEL", "text-embedding-3-small"),
-        )
-        await rag.connect()
-        schema = SchemaEngine(
-            os.getenv("POSTGRES_URI", "postgresql+asyncpg://kirp_user:kirp_password@localhost:5432/kirp")
-        )
-        await schema.connect()
-        gov = GovernanceEngine(os.getenv("OPA_URL"))
-        af = get_agent_framework_with_all_agents()
-        pipe = EventPipeline(store, rag, schema, gov, af)
+        pipe = await create_connected_event_pipeline()
         return cls(pipe)
 
     async def reconcile_partial_runs(self, max_runs: int = 50) -> dict[str, Any]:
