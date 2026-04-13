@@ -16,6 +16,7 @@ import time
 from typing import Any
 
 from src.core.integrations import get_kafka_consumer, get_redis_async
+from src.core.structured_logging import log_json
 from src.core.event_store import EventStore, Event, Sensitivity
 from src.models.event import CanonicalEvent
 from src.models.kafka_wire_envelope import (
@@ -31,7 +32,7 @@ from datetime import datetime, timezone
 logger = logging.getLogger(__name__)
 
 EVENT_TOPIC = "kirp-events"
-MAX_RETRIES = 3
+MAX_RETRIES = 2
 RETRY_DELAY = 1.0  # seconds
 IDEMPOTENCY_TTL = 3600  # 1 hour
 CONNECT_RETRY_SEC = 5.0  # wait between connection retries at startup
@@ -166,6 +167,18 @@ async def process_event(payload: dict[str, Any], retry_count: int = 0) -> bool:
     run_id_payload = payload.get("run_id") or data.get("run_id")
     workflow_type_payload = payload.get("workflow_type") or data.get("workflow_type") or event_type
     trace_id_payload = payload.get("trace_id") or data.get("trace_id")
+    tenant_id_payload = payload.get("tenant_id") or data.get("tenant_id")
+    log_json(
+        logger,
+        "info",
+        "kafka_processor_received",
+        step="kafka_receive",
+        tenant_id=tenant_id_payload,
+        run_id=run_id_payload,
+        trace_id=trace_id_payload,
+        event_type=event_type,
+        retry_count=retry_count,
+    )
     logger.info("KafkaEventAgent received: %s", event_type)
     run_controller = None
     if run_id_payload:
@@ -184,6 +197,18 @@ async def process_event(payload: dict[str, Any], retry_count: int = 0) -> bool:
             )
             await run_controller.update_step(run_id_str, "kafka_received", "processing")
         except Exception as e:
+            log_json(
+                logger,
+                "error",
+                "kafka_processor_failed",
+                step="run_creation",
+                tenant_id=kick_tenant,
+                run_id=run_id_str,
+                trace_id=trace_id_payload,
+                event_type=event_type,
+                reason="run_creation_failed",
+                error=str(e),
+            )
             logger.error(
                 "run_creation_failed run_id=%s event_type=%s trace_id=%s error=%s",
                 run_id_str,
@@ -251,10 +276,32 @@ async def process_event(payload: dict[str, Any], retry_count: int = 0) -> bool:
         data = flatten_kafka_envelope_to_event_data(payload)
         tenant_ctx_err = validate_ingest_tenant_context(data)
         if tenant_ctx_err == "invalid_tenant":
+            log_json(
+                logger,
+                "error",
+                "kafka_processor_failed",
+                step="tenant_validate",
+                tenant_id=data.get("tenant_id"),
+                run_id=run_id_payload,
+                trace_id=trace_id_payload,
+                reason="invalid_tenant",
+                event_type=event_type,
+            )
             logger.error("Invalid tenant_id in Kafka event: %s", data.get("tenant_id"))
             _metrics.inc("events_failed", labels={"event_type": event_type, "reason": "invalid_tenant"})
             return False
         if tenant_ctx_err == "missing_user_id":
+            log_json(
+                logger,
+                "error",
+                "kafka_processor_failed",
+                step="tenant_validate",
+                tenant_id=data.get("tenant_id"),
+                run_id=run_id_payload,
+                trace_id=trace_id_payload,
+                reason="missing_user_id",
+                event_type=event_type,
+            )
             logger.error("Missing user_id in Kafka event (required for multi-tenancy)")
             _metrics.inc("events_failed", labels={"event_type": event_type, "reason": "missing_user_id"})
             return False
@@ -317,6 +364,16 @@ async def process_event(payload: dict[str, Any], retry_count: int = 0) -> bool:
             canonical.tenant_id, canonical.space_id, canonical.user_id,
             canonical.source, len(canonical.content),
         )
+        log_json(
+            logger,
+            "info",
+            "kafka_processor_dispatching",
+            step="registry_dispatch",
+            tenant_id=canonical.tenant_id,
+            run_id=canonical.run_id,
+            trace_id=canonical.trace_id,
+            event_type=event_type,
+        )
         # Close kafka_received before dispatch so aggregate state is not stuck on "processing" forever.
         if run_controller and run_id_payload:
             await run_controller.update_step(str(run_id_payload), "kafka_received", "completed")
@@ -343,6 +400,17 @@ async def process_event(payload: dict[str, Any], retry_count: int = 0) -> bool:
         
         logger.info("KafkaProcessor processed: %s run=%s trace=%s tenant=%s latency=%.2fs",
                     event_type, canonical.run_id, canonical.trace_id, tenant_id, latency)
+        log_json(
+            logger,
+            "info",
+            "kafka_processor_completed",
+            step="kafka_complete",
+            tenant_id=tenant_id,
+            run_id=canonical.run_id,
+            trace_id=canonical.trace_id,
+            event_type=event_type,
+            latency_ms=int(latency * 1000),
+        )
         return True
         
     except Exception as e:
@@ -356,12 +424,47 @@ async def process_event(payload: dict[str, Any], retry_count: int = 0) -> bool:
         _metrics.observe("event_processing_latency", latency, labels={"event_type": event_type, "status": "error"})
         
         logger.exception("KafkaProcessor failed (retry %d/%d): %s", retry_count, MAX_RETRIES, e)
+        log_json(
+            logger,
+            "error",
+            "kafka_processor_failed",
+            step="kafka_process",
+            tenant_id=tenant_id_payload,
+            run_id=run_id_payload,
+            trace_id=trace_id_payload,
+            event_type=event_type,
+            reason=str(e),
+            retry_count=retry_count,
+        )
         
         # Retry logic
         if retry_count < MAX_RETRIES:
+            log_json(
+                logger,
+                "warning",
+                "kafka_processor_retrying",
+                step="kafka_retry",
+                tenant_id=tenant_id_payload,
+                run_id=run_id_payload,
+                trace_id=trace_id_payload,
+                event_type=event_type,
+                retry_attempt=retry_count + 1,
+                retry_max=MAX_RETRIES,
+            )
             await asyncio.sleep(RETRY_DELAY * (retry_count + 1))  # Exponential backoff
             return await process_event(payload, retry_count + 1)
         else:
+            log_json(
+                logger,
+                "error",
+                "kafka_processor_max_retries_exceeded",
+                step="kafka_retry",
+                tenant_id=tenant_id_payload,
+                run_id=run_id_payload,
+                trace_id=trace_id_payload,
+                event_type=event_type,
+                retry_max=MAX_RETRIES,
+            )
             logger.error("KafkaProcessor max retries exceeded for event: %s", payload.get("trace_id"))
             return False
 

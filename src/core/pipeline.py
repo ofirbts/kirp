@@ -15,6 +15,7 @@ from uuid import UUID, uuid4, uuid5
 
 from src.core.event_store import Event, EventStore, Sensitivity
 from src.core.life_objects import extract_life_objects
+from src.core.structured_logging import log_json
 from src.models.schema import SchemaEntity
 from src.observability.metrics import MetricsCollector
 
@@ -183,6 +184,17 @@ class EventPipeline:
 
         event_id = event_id or uuid4()
         trace_id = meta.get("trace_id") or f"tr_{event_id.hex[:8]}"
+        log_json(
+            logger,
+            "info",
+            "pipeline_started",
+            step="pipeline_start",
+            tenant_id=tenant_id,
+            run_id=run_id,
+            trace_id=trace_id,
+            event_type=event_type,
+            source=source,
+        )
 
         # Create event (embedding filled below)
         event = Event(
@@ -358,6 +370,16 @@ class EventPipeline:
         if run_controller and run_id:
             await run_controller.update_step(run_id, "pipeline_start", "completed")
             await run_controller.update_step(run_id, "pipeline_complete", "completed")
+        log_json(
+            logger,
+            "info",
+            "pipeline_completed",
+            step="pipeline_complete",
+            tenant_id=tenant_id,
+            run_id=run_id,
+            trace_id=trace_id,
+            event_type=event_type,
+        )
 
         return event.id
 

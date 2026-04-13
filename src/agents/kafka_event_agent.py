@@ -12,6 +12,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from src.core.integrations import get_kafka_producer, get_kafka_consumer
+from src.core.structured_logging import log_json
 from src.models.kafka_wire_envelope import build_kafka_emit_dict
 
 logger = logging.getLogger(__name__)
@@ -42,6 +43,16 @@ class KafkaEventAgent:
         """Emit event to Kafka topic."""
         producer = get_kafka_producer()
         if producer is None:
+            log_json(
+                logger,
+                "error",
+                "kafka_emit_failed",
+                step="kafka_emit",
+                tenant_id=event.tenant_id,
+                run_id=event.run_id,
+                trace_id=event.trace_id,
+                reason="producer_unavailable",
+            )
             logger.warning("Kafka producer not available")
             return False
         try:
@@ -63,9 +74,30 @@ class KafkaEventAgent:
                 value=json.dumps(envelope, default=str).encode("utf-8"),
             )
             producer.flush(timeout=5.0)
+            log_json(
+                logger,
+                "info",
+                "kafka_emit_success",
+                step="kafka_emit",
+                tenant_id=event.tenant_id,
+                run_id=event.run_id,
+                trace_id=event.trace_id,
+                event_type=event.type,
+            )
             logger.info("KafkaEventAgent emitted: %s", event.type)
             return True
         except Exception as e:
+            log_json(
+                logger,
+                "error",
+                "kafka_emit_failed",
+                step="kafka_emit",
+                tenant_id=event.tenant_id,
+                run_id=event.run_id,
+                trace_id=event.trace_id,
+                reason=str(e),
+                event_type=event.type,
+            )
             logger.error("Kafka emit failed: %s", e)
             return False
 

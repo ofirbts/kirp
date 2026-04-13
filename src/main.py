@@ -32,6 +32,7 @@ from src.api import governance, observability, whatsapp_os, brand
 import src.api.command as command
 from src.core.auth import get_current_user, User
 from src.core.jwt_utils import require_auth
+from src.core.structured_logging import log_json
 from src.core.auth import get_current_user, User
 from src.core.jwt_utils import require_auth
 
@@ -423,13 +424,60 @@ async def stripe_webhook(request: Request) -> dict[str, Any]:
 
     payload = await request.body()
     sig = request.headers.get("stripe-signature") or ""
+    wh_tenant_id: str | None = None
+    wh_trace_id: str | None = None
     try:
         event = verify_webhook_signature(payload, sig)
+        obj = ((event or {}).get("data") or {}).get("object") or {}
+        meta = obj.get("metadata") or {}
+        tenant_id = meta.get("tenant_id")
+        wh_tenant_id = tenant_id if isinstance(tenant_id, str) else None
+        wh_trace_id = (event or {}).get("id")
+        log_json(
+            logger,
+            "info",
+            "stripe_webhook_received",
+            step="stripe_webhook",
+            tenant_id=tenant_id,
+            run_id=None,
+            trace_id=(event or {}).get("id"),
+            event_type=(event or {}).get("type"),
+        )
         await handle_webhook(event)
+        log_json(
+            logger,
+            "info",
+            "stripe_webhook_processed",
+            step="stripe_webhook",
+            tenant_id=tenant_id,
+            run_id=None,
+            trace_id=(event or {}).get("id"),
+            event_type=(event or {}).get("type"),
+        )
     except stripe.SignatureVerificationError as e:
+        log_json(
+            logger,
+            "error",
+            "stripe_webhook_failed",
+            step="stripe_webhook_signature",
+            tenant_id=None,
+            run_id=None,
+            trace_id=None,
+            reason=str(e),
+        )
         logger.warning("Stripe webhook signature failed: %s", e)
         raise HTTPException(status_code=400, detail="Invalid signature") from e
     except ValueError as e:
+        log_json(
+            logger,
+            "error",
+            "stripe_webhook_failed",
+            step="stripe_webhook_value_error",
+            tenant_id=wh_tenant_id,
+            run_id=None,
+            trace_id=wh_trace_id,
+            reason=str(e),
+        )
         raise HTTPException(status_code=400, detail=str(e)) from e
     return {"received": True}
 
@@ -637,6 +685,8 @@ async def ingest(req: IngestRequest, request: Request) -> dict[str, Any]:
     No body defaults; no "dev" fallback. Missing user_id → 403.
     """
     run_id: str | None = None
+    trace_id: str | None = None
+    tenant_id: str | None = None
     try:
         from src.agents.kafka_event_agent import KafkaEventAgent, EventEnvelope
         from src.auth.tenant_context import get_tenant_context
@@ -658,6 +708,16 @@ async def ingest(req: IngestRequest, request: Request) -> dict[str, Any]:
             tenant_id=tenant_id,
             idempotency_key=idempotency_key,
             trace_id=trace_id,
+        )
+        log_json(
+            logger,
+            "info",
+            "ingest_api_received",
+            step="api_ingest",
+            tenant_id=tenant_id,
+            run_id=run_id,
+            trace_id=trace_id,
+            source=req.source,
         )
 
         payload = {
@@ -689,12 +749,33 @@ async def ingest(req: IngestRequest, request: Request) -> dict[str, Any]:
             idempotency_key=idempotency_key,
         ))
         if not emitted:
+            log_json(
+                logger,
+                "error",
+                "ingest_api_emit_failed",
+                step="kafka_emit",
+                tenant_id=tenant_id,
+                run_id=run_id,
+                trace_id=trace_id,
+                reason="event_bus_unavailable",
+            )
             await run.update_step(run_id, "kafka_emitted", "failed", error="Event bus unavailable")
             raise HTTPException(status_code=503, detail="Event bus unavailable; ingest not published")
         await run.update_step(run_id, "kafka_emitted", "completed")
+        log_json(
+            logger,
+            "info",
+            "ingest_api_published",
+            step="kafka_emit",
+            tenant_id=tenant_id,
+            run_id=run_id,
+            trace_id=trace_id,
+        )
         return {"ok": True, "run_id": run_id, "trace_id": trace_id}
+    except HTTPException:
+        raise
     except PermissionError as e:
-        raise HTTPException(status_code=403, detail=str(e))
+        raise HTTPException(status_code=403, detail=str(e)) from e
     except Exception as e:
         if run_id:
             try:
@@ -702,8 +783,18 @@ async def ingest(req: IngestRequest, request: Request) -> dict[str, Any]:
                 await get_run_controller().update_step(run_id, "api_failed", "failed", error=str(e))
             except Exception:
                 pass
+        log_json(
+            logger,
+            "error",
+            "ingest_api_failed",
+            step="api_ingest",
+            tenant_id=tenant_id,
+            run_id=run_id,
+            trace_id=trace_id,
+            reason=str(e),
+        )
         logger.exception("Ingest failed")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 @app.post("/api/v1/query")
