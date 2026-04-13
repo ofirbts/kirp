@@ -35,10 +35,38 @@ http_get() {
   curl -sS "$url" "$@"
 }
 
+preflight() {
+  echo "==> Preflight: API health"
+  local h
+  h=$(http_get "${API_BASE}/healthz") || die "API not reachable at ${API_BASE}"
+  local st
+  st=$(printf '%s' "$h" | json_get "['status']" 2>/dev/null || true)
+  [[ "$st" == "ok" ]] || die "healthz not ok: $h"
+  echo "    OK healthz=status=ok"
+}
+
+ingest_smoke() {
+  local label=$1
+  local token tenant_id
+  token=$(python3 -c "import json, pathlib; j=json.loads(pathlib.Path('${STATE_FILE}').read_text()); print(j['token'])")
+  tenant_id=$(python3 -c "import json, pathlib; j=json.loads(pathlib.Path('${STATE_FILE}').read_text()); print(j['tenant_id'])")
+
+  echo "==> POST /api/v1/ingest (${label})"
+  local ibody
+  ibody=$(curl -sS -X POST "${API_BASE}/api/v1/ingest" \
+    -H "Authorization: Bearer ${token}" \
+    -H "Content-Type: application/json" \
+    -d "{\"content\":\"SaaS E2E ${label} ingest\", \"source\":\"saas_e2e\"}") || die "ingest curl failed"
+  local ok
+  ok=$(printf '%s' "$ibody" | json_get "['ok']" 2>/dev/null || true)
+  [[ "$ok" == "True" || "$ok" == "true" ]] || die "ingest failed: $ibody"
+  echo "    OK ingest accepted (tenant=${tenant_id})"
+}
+
 signup_and_checkout() {
   local suffix
   suffix=$(python3 -c "import time; print(int(time.time()))")
-  local email="saas-e2e-${suffix}@kirp-e2e.test"
+  local email="saas-e2e-${suffix}@example.com"
   local password="${E2E_PASSWORD:-KirpE2EPass123456}"
   local name="SaaS E2E"
 
@@ -125,7 +153,9 @@ stripe_trigger_path() {
     || die "stripe trigger failed (is 'stripe listen' running and logged in?)"
 }
 
+preflight
 signup_and_checkout
+ingest_smoke "before_upgrade"
 
 if [[ "$USE_TRIGGER" == 1 ]]; then
   stripe_trigger_path
@@ -135,3 +165,6 @@ else
   read -r -p "Press Enter after you have completed Checkout in the browser (webhook delivered)... " _
   poll_active
 fi
+
+ingest_smoke "after_upgrade"
+echo "PASS: complete journey validated (signup -> ingest -> active -> ingest)."
