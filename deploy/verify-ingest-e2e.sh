@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 # Prove one real path: signup → JWT → POST /api/v1/ingest → Kafka → processor → pipeline → run status.
-# Works with the FULL stack (repo root: docker compose up) — API :8000, Kafka + kirp-agent-processor running.
-# Minimal deploy (deploy/docker-compose.prod.yml) has NO Kafka: ingest returns 503 — script explains that.
+# Works with deploy stack default API port :8080 (override via KIRP_VERIFY_API_URL).
+# Full stack setups on :8000 still work by setting KIRP_VERIFY_API_URL explicitly.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-BASE_URL="${KIRP_VERIFY_API_URL:-http://localhost:8000}"
+BASE_URL="${KIRP_VERIFY_API_URL:-http://localhost:8080}"
 BASE_URL="${BASE_URL%/}"
 POLL_SEC="${VERIFY_INGEST_POLL_SEC:-90}"
 SLEEP_SEC="${VERIFY_INGEST_SLEEP_SEC:-2}"

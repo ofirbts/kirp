@@ -414,11 +414,6 @@ async def process_event(payload: dict[str, Any], retry_count: int = 0) -> bool:
         return True
         
     except Exception as e:
-        if run_controller and run_id_payload:
-            try:
-                await run_controller.update_step(str(run_id_payload), "kafka_failed", "failed", error=str(e))
-            except Exception:
-                pass
         latency = time.time() - start_time
         _metrics.inc("events_failed", labels={"event_type": event_type, "retry": str(retry_count)})
         _metrics.observe("event_processing_latency", latency, labels={"event_type": event_type, "status": "error"})
@@ -454,6 +449,11 @@ async def process_event(payload: dict[str, Any], retry_count: int = 0) -> bool:
             await asyncio.sleep(RETRY_DELAY * (retry_count + 1))  # Exponential backoff
             return await process_event(payload, retry_count + 1)
         else:
+            if run_controller and run_id_payload:
+                try:
+                    await run_controller.update_step(str(run_id_payload), "kafka_failed", "failed", error=str(e))
+                except Exception:
+                    pass
             log_json(
                 logger,
                 "error",

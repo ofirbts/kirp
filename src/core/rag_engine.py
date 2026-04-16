@@ -98,14 +98,21 @@ class RAGEngine:
             embedding_dim = int(os.environ.get("EMBEDDING_DIMENSION", "1536"))
             collections = self._client.get_collections().collections
             if not any(c.name == self._collection for c in collections):
-                self._client.create_collection(
-                    collection_name=self._collection,
-                    vectors_config=models.VectorParams(
-                        size=embedding_dim,
-                        distance=models.Distance.COSINE,
-                    ),
-                )
-                logger.info("RAGEngine created Qdrant collection: %s", self._collection)
+                try:
+                    self._client.create_collection(
+                        collection_name=self._collection,
+                        vectors_config=models.VectorParams(
+                            size=embedding_dim,
+                            distance=models.Distance.COSINE,
+                        ),
+                    )
+                    logger.info("RAGEngine created Qdrant collection: %s", self._collection)
+                except Exception as create_err:
+                    err_text = str(create_err).lower()
+                    if "already exists" in err_text or "409" in err_text or "conflict" in err_text:
+                        logger.info("Qdrant collection already exists: %s", self._collection)
+                    else:
+                        raise
             # Ensure payload indexes for filter (tenant_id, space_id, user_id) — required by Qdrant Cloud
             for field in ("tenant_id", "space_id", "user_id"):
                 try:
