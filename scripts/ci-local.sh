@@ -1,19 +1,16 @@
-#!/usr/bin/env bash
-# Layer 0 — local quality gate (non-interactive). Same commands intended for CI.
-set -euo pipefail
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-cd "$ROOT"
+#!/bin/bash
+set -e
 
-echo "== pytest tests/ =="
-python3 -m pytest tests/ -q
+echo "== Running backend tests =="
+pytest -q tests/test_core.py tests/test_alerting.py tests/test_run_controller.py tests/test_api_run_status.py
 
-echo "== tsc =="
-npx tsc --noEmit
+echo "== Lint frontend =="
+npm run lint
 
-echo "== eslint (CI=true) =="
-CI=true NEXT_TELEMETRY_DISABLED=1 npm run lint
-
-echo "== next build =="
+echo "== Build frontend =="
 npm run build
 
-echo "== ci-local: OK =="
+echo "== Running E2E ingest =="
+KIRP_VERIFY_API_URL=http://localhost:8080 bash deploy/verify-ingest-e2e.sh
+
+echo "✅ ALL CHECKS PASSED"

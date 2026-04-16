@@ -527,7 +527,32 @@ async def get_run_status_endpoint(run_id: str, request: Request) -> dict[str, An
         "overall_status": state,
         "is_complete": state in ("completed", "failed"),
         "model": model,
+        "started_at": status.get("started_at"),
+        "completed_at": status.get("completed_at"),
+        "duration_ms": status.get("duration_ms"),
     }
+
+
+@app.get("/runs/{run_id}")
+async def get_run_visibility_endpoint(run_id: str, request: Request) -> dict[str, Any]:
+    """
+    Compact run visibility: id, trace, aggregate state, wall duration, per-step timing.
+    Same tenant isolation as GET /api/v1/run/{run_id}/status (additive endpoint).
+    """
+    from src.auth.tenant_context import get_tenant_context, is_local_or_skip_auth
+    from src.core.run_controller import get_run_controller, run_visibility_payload
+
+    rc = get_run_controller()
+    auth_ctx = None
+    if not is_local_or_skip_auth():
+        auth_ctx = get_tenant_context(request)
+    state = await rc.get_run_state(run_id, tenant_id=(auth_ctx.tenant_id if auth_ctx else None))
+    if state is None:
+        raise HTTPException(status_code=404, detail="run not found")
+    if auth_ctx is not None:
+        if (state.tenant_id or "") != (auth_ctx.tenant_id or ""):
+            raise HTTPException(status_code=404, detail="run not found")
+    return run_visibility_payload(state)
 
 
 @app.get("/api/v1/tenant/{tenant_id}/runs")

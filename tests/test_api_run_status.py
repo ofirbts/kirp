@@ -62,6 +62,20 @@ def test_get_run_status_ok(client: TestClient, seeded_run: str) -> None:
     assert any(s.get("step") == "llm_call_gemma4" for s in body["timeline"])
 
 
+def test_get_run_visibility_ok(client: TestClient, seeded_run: str) -> None:
+    r = client.get(f"/runs/{seeded_run}")
+    assert r.status_code == 200
+    body = r.json()
+    assert body["run_id"] == seeded_run
+    assert body["trace_id"] == "trace_1"
+    assert body["state"] == "completed"
+    assert isinstance(body["duration_ms"], int)
+    assert isinstance(body["steps"], list)
+    assert body["steps"]
+    for s in body["steps"]:
+        assert "name" in s and "status" in s and "duration_ms" in s
+
+
 def test_get_run_status_not_found(client: TestClient, monkeypatch: pytest.MonkeyPatch) -> None:
     async def _noop() -> None:
         c = rcmod.RunController(redis_ping_max_attempts=1)

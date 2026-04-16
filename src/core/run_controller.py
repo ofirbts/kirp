@@ -41,11 +41,63 @@ class RunState:
     steps: list[dict[str, Any]] = field(default_factory=list)
     cost: float = 0.0
     started_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+    completed_at: str | None = None
     updated_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
 
 
 def _truthy_env(name: str, default: str = "1") -> bool:
     return (os.getenv(name, default) or "").strip().lower() in ("1", "true", "yes", "on")
+
+
+def _parse_iso_dt(value: str | None) -> datetime | None:
+    if not value or not str(value).strip():
+        return None
+    s = str(value).strip()
+    try:
+        if s.endswith("Z"):
+            s = s[:-1] + "+00:00"
+        return datetime.fromisoformat(s)
+    except ValueError:
+        return None
+
+
+def compute_run_duration_ms(state: RunState) -> int | None:
+    """Wall-clock duration for terminal runs; None while still in-flight."""
+    st = (state.state or "").lower()
+    if st not in ("completed", "failed", "partial"):
+        return None
+    start = _parse_iso_dt(state.started_at)
+    end_iso = state.completed_at or state.updated_at
+    end = _parse_iso_dt(end_iso)
+    if start is None or end is None:
+        return None
+    delta_ms = int((end - start).total_seconds() * 1000)
+    return max(0, delta_ms)
+
+
+def run_visibility_payload(state: RunState) -> dict[str, Any]:
+    """Stable shape for GET /runs/{run_id} (additive fields on top of internal step records)."""
+    steps_out: list[dict[str, Any]] = []
+    for s in state.steps or []:
+        if not isinstance(s, dict):
+            continue
+        name = str(s.get("step") or "")
+        dm = s.get("duration_ms")
+        row: dict[str, Any] = {
+            "name": name,
+            "status": str(s.get("status") or ""),
+            "duration_ms": int(dm) if dm is not None else None,
+        }
+        steps_out.append(row)
+    tid = state.trace_id or ""
+    dur = compute_run_duration_ms(state)
+    return {
+        "run_id": state.run_id,
+        "trace_id": tid,
+        "state": state.state,
+        "duration_ms": dur,
+        "steps": steps_out,
+    }
 
 
 class RunController:
@@ -189,6 +241,7 @@ class RunController:
             "idempotency_key": d.get("idempotency_key") or "",
             "cost": str(float(d.get("cost") or 0.0)),
             "started_at": str(d.get("started_at") or ""),
+            "completed_at": str(d.get("completed_at") or ""),
             "updated_at": str(d.get("updated_at") or ""),
         }
 
@@ -214,6 +267,9 @@ class RunController:
             cost = float(h.get("cost") or 0.0)
         except (TypeError, ValueError):
             cost = 0.0
+        ca_raw = h.get("completed_at") or None
+        if ca_raw == "":
+            ca_raw = None
         return RunState(
             run_id=rid,
             workflow_type=h.get("workflow_type") or "",
@@ -224,6 +280,7 @@ class RunController:
             steps=list(steps) if isinstance(steps, list) else [],
             cost=cost,
             started_at=h.get("started_at") or "",
+            completed_at=ca_raw,
             updated_at=h.get("updated_at") or "",
         )
 
@@ -327,16 +384,33 @@ class RunController:
         state = await self.get_run_state(run_id)
         if state is None:
             return None
-        state.steps.append(
-            {
-                "step": step_name,
-                "status": status,
-                "error": error,
-                "ts": datetime.now(timezone.utc).isoformat(),
-            }
-        )
+        now_dt = datetime.now(timezone.utc)
+        now_iso = now_dt.isoformat()
+        prev_ts: str | None = None
+        if state.steps:
+            last = state.steps[-1]
+            if isinstance(last, dict) and last.get("ts"):
+                prev_ts = str(last.get("ts"))
+        if not prev_ts and state.started_at:
+            prev_ts = str(state.started_at)
+        duration_ms: int | None = None
+        prev_dt = _parse_iso_dt(prev_ts)
+        if prev_dt is not None:
+            duration_ms = max(0, int((now_dt - prev_dt).total_seconds() * 1000))
+        step_row: dict[str, Any] = {
+            "step": step_name,
+            "status": status,
+            "error": error,
+            "ts": now_iso,
+        }
+        if duration_ms is not None:
+            step_row["duration_ms"] = duration_ms
+        state.steps.append(step_row)
         state.cost = float(state.cost or 0.0) + float(cost_delta or 0.0)
         state.state = self._compute_overall_state(state.steps)
+        term = state.state.lower() in ("completed", "failed", "partial")
+        if term and not (state.completed_at or "").strip():
+            state.completed_at = now_iso
         await self.set_run_state(run_id, state)
         try:
             from src.core.alerting import on_run_controller_step
@@ -348,7 +422,11 @@ class RunController:
 
     async def get_run_status(self, run_id: str, tenant_id: str | None = None) -> dict[str, Any] | None:
         state = await self.get_run_state(run_id, tenant_id=tenant_id)
-        return asdict(state) if state else None
+        if state is None:
+            return None
+        out = asdict(state)
+        out["duration_ms"] = compute_run_duration_ms(state)
+        return out
 
     async def get_recent_runs(self, tenant_id: str, limit: int = 50) -> list[dict[str, Any]]:
         """

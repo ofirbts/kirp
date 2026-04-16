@@ -6,7 +6,7 @@ import asyncio
 
 import pytest
 
-from src.core.run_controller import RunController, RunState
+from src.core.run_controller import RunController, RunState, compute_run_duration_ms, run_visibility_payload
 
 
 def test_overall_state_uses_last_status_per_step_name(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -71,6 +71,37 @@ def test_hash_mapping_roundtrip() -> None:
     assert out.state == "completed"
     assert len(out.steps) == 1
     assert out.steps[0]["step"] == "history_write"
+
+
+def test_update_step_sets_duration_ms_and_completed_at(monkeypatch: pytest.MonkeyPatch) -> None:
+    async def _run() -> None:
+        rc = RunController(redis_ping_max_attempts=1)
+
+        async def _no_redis(self: RunController) -> object:
+            return None
+
+        monkeypatch.setattr(RunController, "_redis_client", _no_redis)
+
+        rid = "run_timing"
+        await rc.create_run("ingest", "t1", run_id=rid, trace_id="tr_x")
+        await rc.update_step(rid, "kafka_emitted", "completed")
+        st = await rc.get_run_state(rid)
+        assert st is not None
+        assert st.steps[-1].get("duration_ms") is not None
+        assert isinstance(st.steps[-1]["duration_ms"], int)
+        await rc.update_step(rid, "pipeline_complete", "completed")
+        st2 = await rc.get_run_state(rid)
+        assert st2 is not None
+        assert st2.completed_at
+        assert compute_run_duration_ms(st2) is not None
+        vis = run_visibility_payload(st2)
+        assert vis["run_id"] == rid
+        assert vis["trace_id"] == "tr_x"
+        assert vis["state"] == "completed"
+        assert isinstance(vis["duration_ms"], int)
+        assert vis["steps"] and all("duration_ms" in x for x in vis["steps"])
+
+    asyncio.run(_run())
 
 
 class _FakeRedis:
