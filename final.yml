@@ -177,7 +177,7 @@ services:
       OLLAMA_MODEL: llama3
       OLLAMA_URL: http://ollama:11434
       OPA_URL: http://opa:8181
-      OPENAI_API_KEY: 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
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       OTEL_EXPORTER_OTLP_ENDPOINT: ""
       POSTGRES_DB: kirp
       POSTGRES_HOST: postgres
@@ -302,7 +302,7 @@ services:
       OLLAMA_MODEL: llama3
       OLLAMA_URL: http://ollama:11434
       OPA_URL: http://opa:8181
-      OPENAI_API_KEY: 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
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       OTEL_EXPORTER_OTLP_ENDPOINT: ""
       POSTGRES_DB: kirp
       POSTGRES_HOST: postgres
@@ -418,7 +418,7 @@ services:
       OLLAMA_MODEL: llama3
       OLLAMA_URL: http://ollama:11434
       OPA_URL: http://localhost:8181
-      OPENAI_API_KEY: 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
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       OTEL_EXPORTER_OTLP_ENDPOINT: ""
       POSTGRES_DB: kirp
       POSTGRES_HOST: postgres
@@ -544,7 +544,7 @@ services:
       OLLAMA_MODEL: llama3
       OLLAMA_URL: http://ollama:11434
       OPA_URL: http://opa:8181
-      OPENAI_API_KEY: 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
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       OTEL_EXPORTER_OTLP_ENDPOINT: ""
       POSTGRES_DB: kirp
       POSTGRES_HOST: postgres
