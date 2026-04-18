@@ -1,6 +1,6 @@
 "use client";
 
-import React, { Suspense, useCallback, useEffect, useState } from "react";
+import React, { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { PageSkeleton } from "@/components/dashboard/PageSkeleton";
 import { RunStatsPie } from "@/components/monitoring/RunStatsPie";
@@ -9,6 +9,7 @@ import { RunDetailModal } from "@/components/monitoring/RunDetailModal";
 import {
   getTenantAlertsV1,
   getTenantRunsV1,
+  type TenantRunRow,
   type TenantAlertsResponse,
   type TenantRunsResponse,
 } from "@/lib/apiClient";
@@ -20,6 +21,173 @@ import { AlertTriangle, Radio, RefreshCw } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 const LIMIT = 20;
+
+type NextActionKind = "failed" | "partial" | "processing" | "completed" | "idle";
+
+type NextAction = {
+  action: string;
+  outcome: string;
+  reason: string;
+  confidence: string;
+  impact: string;
+  resultLabel: string;
+  targetRunId: string | null;
+  kind: NextActionKind;
+};
+
+const IDLE_ACTION: NextAction = {
+  action: "Start your next focused move",
+  outcome: "You create momentum in your work instead of waiting for urgency.",
+  reason: "You have a clear window, so one small move now compounds.",
+  confidence: "Based on low-risk current context and no critical pending issues.",
+  impact: "Creates forward momentum for your current priorities.",
+  resultLabel: "Ready for your next step",
+  targetRunId: null,
+  kind: "idle",
+};
+
+function beforeAfterLabel(kind: NextActionKind): string {
+  switch (kind) {
+    case "failed":
+      return "Blocked flow → Unblocked";
+    case "partial":
+      return "Incomplete → Completed";
+    case "processing":
+      return "Drifting → On track";
+    case "completed":
+      return "New output → Clear next step";
+    case "idle":
+    default:
+      return "Idle → Started momentum";
+  }
+}
+
+function riskTrustLine(kind: NextActionKind): string {
+  switch (kind) {
+    case "failed":
+      return "Trust: Low risk · Reversible · You stay in control";
+    case "partial":
+      return "Trust: Safe · Finishes what already started";
+    case "processing":
+      return "Trust: Low risk · Keeps momentum without side effects";
+    case "completed":
+      return "Trust: Safe · Review only, no changes yet";
+    case "idle":
+    default:
+      return "Trust: Low risk · Small step, easy to adjust";
+  }
+}
+
+function hasMeaningfulOutput(row: TenantRunRow): boolean {
+  // Heuristic only: richer workflows tend to emit more steps or model-attributed work.
+  return row.steps_count >= 8 || Boolean(row.model);
+}
+
+function computeNextAction(
+  runs: TenantRunRow[],
+  actedRunIds: Set<string>,
+): NextAction {
+  if (!runs.length) return IDLE_ACTION;
+
+  const mk = (
+    row: TenantRunRow,
+    kind: Exclude<NextActionKind, "idle">,
+    action: string,
+    outcome: string,
+    reason: string,
+    confidence: string,
+    impact: string,
+    resultLabel: string,
+  ) => ({ row, kind, action, outcome, reason, confidence, impact, resultLabel });
+
+  const candidates = [
+    ...runs
+      .filter((r) => r.state === "failed")
+      .map((r) =>
+        mk(
+          r,
+          "failed",
+          "Fix what is blocking your progress",
+          "You restore momentum in your work and get things moving again.",
+          "Something important is stuck, and one action now reopens your flow.",
+          "Based on the most recent blocked activity and unresolved errors.",
+          "This will unblock pending work that cannot move without this fix.",
+          "Progress unblocked",
+        ),
+      ),
+    ...runs
+      .filter((r) => r.state === "partial")
+      .map((r) =>
+        mk(
+          r,
+          "partial",
+          "Finish what your work already started",
+          "You turn partial progress into a completed outcome.",
+          "Most of the effort is already done, so closing now gives the fastest win.",
+          "Based on recent activity that advanced but did not fully close.",
+          "This completes the last missing part of your current flow.",
+          "Flow completed",
+        ),
+      ),
+    ...runs
+      .filter((r) => r.state === "processing" || r.state === "accepted")
+      .map((r) =>
+        mk(
+          r,
+          "processing",
+          "Keep your work moving forward",
+          "You maintain momentum and avoid losing focus.",
+          "Your active flow is already warm, so continuing now is the easiest path.",
+          "Based on live in-progress activity detected in the latest timeline.",
+          "This keeps your current workflow on track without extra context switching.",
+          "Forward motion secured",
+        ),
+      ),
+    ...runs
+      .filter((r) => r.state === "completed" && hasMeaningfulOutput(r))
+      .map((r) =>
+        mk(
+          r,
+          "completed",
+          "Review the result to unlock your next move",
+          "You turn fresh output into a confident next decision.",
+          "A meaningful outcome is ready now, and quick review keeps your flow sharp.",
+          "Based on a recent completed item with substantial output signals.",
+          "This helps you convert new output into immediate follow-up action.",
+          "Ready for next step",
+        ),
+      ),
+  ];
+
+  if (!candidates.length) return IDLE_ACTION;
+
+  const basePriority: Record<Exclude<NextActionKind, "idle">, number> = {
+    failed: 500,
+    partial: 400,
+    processing: 300,
+    completed: 200,
+  };
+
+  // Do not skip acted runs entirely; lower their rank so fresh items win first.
+  const scored = candidates
+    .map((c, idx) => ({
+      ...c,
+      score: basePriority[c.kind] - (actedRunIds.has(c.row.run_id) ? 120 : 0) - idx * 0.01,
+    }))
+    .sort((a, b) => b.score - a.score);
+
+  const top = scored[0];
+  return {
+    action: top.action,
+    outcome: top.outcome,
+    reason: top.reason,
+    confidence: top.confidence,
+    impact: top.impact,
+    resultLabel: top.resultLabel,
+    targetRunId: top.row.run_id,
+    kind: top.kind,
+  };
+}
 
 function MonitoringContent() {
   const searchParams = useSearchParams();
@@ -43,6 +211,10 @@ function MonitoringContent() {
   const [alertsPayload, setAlertsPayload] = useState<TenantAlertsResponse | null>(
     null,
   );
+  const [actedRunIds, setActedRunIds] = useState<Set<string>>(new Set());
+  const [resultState, setResultState] = useState<string | null>(null);
+  const [progressFlash, setProgressFlash] = useState<string | null>(null);
+  const [recentProgress, setRecentProgress] = useState<string[]>([]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -105,18 +277,50 @@ function MonitoringContent() {
     setModalOpen(true);
   };
 
-  if (loading && !payload) {
-    return <PageSkeleton title subtitle cards={2} tableRows={6} />;
-  }
-
+  const runs = useMemo(() => payload?.runs ?? [], [payload?.runs]);
   const stats = payload?.stats ?? {
     total: 0,
     completed: 0,
     partial: 0,
     failed: 0,
   };
-  const runs = payload?.runs ?? [];
+  const nextAction = useMemo(
+    () => computeNextAction(runs, actedRunIds),
+    [runs, actedRunIds],
+  );
+
+  const peekNextAction = useMemo(() => {
+    const sim = new Set(actedRunIds);
+    if (nextAction.targetRunId) sim.add(nextAction.targetRunId);
+    return computeNextAction(runs, sim);
+  }, [runs, actedRunIds, nextAction]);
+
   const alertCount = alertsPayload?.count ?? 0;
+
+  if (loading && !payload) {
+    return <PageSkeleton title subtitle cards={2} tableRows={6} />;
+  }
+
+  const onNextActionClick = () => {
+    // Intentional simulation only for interaction testing.
+    console.log("[NextAction]", nextAction.kind, nextAction.targetRunId, nextAction.action);
+    const ba = beforeAfterLabel(nextAction.kind);
+    setProgressFlash(ba);
+    setResultState(nextAction.resultLabel);
+    const memoryLine = `${ba} — ${nextAction.resultLabel}`;
+    setRecentProgress((prev) => [memoryLine, ...prev].slice(0, 3));
+    if (nextAction.targetRunId) {
+      setActedRunIds((prev) => {
+        const next = new Set(prev);
+        next.add(nextAction.targetRunId as string);
+        return next;
+      });
+    }
+    setTimeout(() => {
+      setResultState(null);
+      setProgressFlash(null);
+    }, 1600);
+  };
 
   return (
     <div className="space-y-6" suppressHydrationWarning>
@@ -178,6 +382,71 @@ function MonitoringContent() {
           {error}
         </div>
       )}
+
+      <Card className="rounded-2xl border-[color:var(--color-border-subtle)] bg-surface1/90">
+        <CardHeader>
+          <CardTitle className="text-base text-textMain">Next Action</CardTitle>
+          <p className="text-xs text-textSoft">
+            One recommended move to keep progress clear and continuous.
+          </p>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {resultState ? (
+            <div>
+              {progressFlash ? (
+                <p className="text-sm font-medium text-textMain">{progressFlash}</p>
+              ) : null}
+              <p className="text-lg font-semibold text-textMain">{resultState}</p>
+              <p className="mt-1 text-sm text-textSoft">Preparing your next best move…</p>
+            </div>
+          ) : (
+            <>
+              <div>
+                <p className="text-lg font-semibold text-textMain">{nextAction.action}</p>
+                <p className="mt-1 text-sm text-textSoft">{nextAction.outcome}</p>
+              </div>
+              <p className="text-xs text-textSoft">{nextAction.impact}</p>
+            </>
+          )}
+          <div>
+            <button
+              type="button"
+              onClick={onNextActionClick}
+              disabled={Boolean(resultState)}
+              className="inline-flex items-center gap-2 rounded-xl border border-[color:var(--color-border-subtle)] bg-primary px-3 py-2 text-sm font-medium text-white hover:opacity-90"
+            >
+              {resultState ? "Applying…" : "Continue"}
+            </button>
+          </div>
+          {!resultState ? (
+            <div className="space-y-1 border-t border-[color:var(--color-border-subtle)] pt-3">
+              <p className="text-[11px] leading-snug text-textSoft">
+                Why now: {nextAction.reason}
+              </p>
+              <p className="text-[11px] leading-snug text-textSoft">
+                {riskTrustLine(nextAction.kind)}
+              </p>
+            </div>
+          ) : null}
+          {!resultState ? (
+            <p className="text-[11px] leading-snug text-textSoft">
+              After this: {peekNextAction.action}
+            </p>
+          ) : null}
+          {recentProgress.length > 0 && !resultState ? (
+            <div className="border-t border-[color:var(--color-border-subtle)] pt-3">
+              <p className="text-[10px] font-medium uppercase tracking-wide text-textSoft">
+                Recent progress
+              </p>
+              <ul className="mt-1.5 space-y-1 text-[11px] text-textSoft">
+                {recentProgress.map((line, i) => (
+                  <li key={`${line}-${i}`}>{line}</li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+        </CardContent>
+      </Card>
 
       <div className="grid gap-6 lg:grid-cols-2">
         <Card className="rounded-2xl border-[color:var(--color-border-subtle)] bg-surface1/90">
