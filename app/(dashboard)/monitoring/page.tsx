@@ -295,6 +295,17 @@ function MonitoringContent() {
     return computeNextAction(runs, sim);
   }, [runs, actedRunIds, nextAction]);
 
+  const afterThisLine = useMemo(() => {
+    const samePeek =
+      nextAction.action === peekNextAction.action &&
+      nextAction.kind === peekNextAction.kind &&
+      nextAction.targetRunId === peekNextAction.targetRunId;
+    if (samePeek) {
+      return "After this: The next best move will surface here when it is ready.";
+    }
+    return `After this: ${peekNextAction.action}`;
+  }, [nextAction, peekNextAction]);
+
   const alertCount = alertsPayload?.count ?? 0;
 
   if (loading && !payload) {
@@ -429,9 +440,7 @@ function MonitoringContent() {
             </div>
           ) : null}
           {!resultState ? (
-            <p className="text-[11px] leading-snug text-textSoft">
-              After this: {peekNextAction.action}
-            </p>
+            <p className="text-[11px] leading-snug text-textSoft">{afterThisLine}</p>
           ) : null}
           {recentProgress.length > 0 && !resultState ? (
             <div className="border-t border-[color:var(--color-border-subtle)] pt-3">
