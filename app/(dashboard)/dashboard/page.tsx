@@ -356,6 +356,7 @@ function RealDashboardContent() {
   const [sampleIngestLoading, setSampleIngestLoading] = useState(false);
   const [ingestSuccess, setIngestSuccess] = useState<string | null>(null);
   const [ingestError, setIngestError] = useState<string | null>(null);
+  const [ingestKindHint, setIngestKindHint] = useState<"task" | "info">("info");
 
   const skipAuth = process.env.NEXT_PUBLIC_SKIP_AUTH === "1";
 
@@ -363,7 +364,7 @@ function RealDashboardContent() {
     setLoading(true);
     setError(null);
     try {
-      const [tasksRes, eventsRes, healthRes, insightRes, usageRes] = await Promise.all([
+      const [tasksRes, eventsRes, healthRes, usageRes] = await Promise.all([
         apiClient
           .listTasksV1({
             tenant_id: tenantId,
@@ -380,15 +381,11 @@ function RealDashboardContent() {
           .then((r) => r.data ?? [])
           .catch(() => []),
         apiClient.getObservabilityHealth().catch(() => null),
-        apiClient
-          .askV1({ query: "What should I focus on today?" })
-          .catch(() => null),
         apiClient.getTenantUsageDetailsV1(tenantId).catch(() => null),
       ]);
       setTasks((tasksRes as { data?: TaskV1[] }).data ?? []);
       setEvents(eventsRes as Event[]);
       setHealth(healthRes as Record<string, unknown> | null);
-      setInsight(insightRes as AskResponse | null);
       setUsage(usageRes as TenantUsageDetailsV1 | null);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load dashboard");
@@ -400,6 +397,53 @@ function RealDashboardContent() {
   useEffect(() => {
     if (loaded && (user || skipAuth)) load();
   }, [load, loaded, user, skipAuth]);
+
+  useEffect(() => {
+    if (!loaded || (!user && !skipAuth)) return;
+    let cancelled = false;
+    void apiClient
+      .askV1({ query: "What should I focus on today?" })
+      .then((res) => {
+        if (!cancelled) setInsight(res as AskResponse);
+      })
+      .catch(() => {
+        if (!cancelled) setInsight(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [loaded, user, skipAuth, tenantId, spaceId]);
+
+  useEffect(() => {
+    const text = quickContent.trim();
+    if (!text) {
+      setIngestKindHint("info");
+      return;
+    }
+    const lower = text.toLowerCase();
+    const isTaskLike =
+      lower.startsWith("משימה:") ||
+      lower.startsWith("task:") ||
+      lower.startsWith("todo:") ||
+      /(?:מחר|שבוע הבא|יום\s+\S+|דדליין|צריך|חייב|להגיש|לבצע|לסיים)/.test(text) ||
+      /\b(todo|task|due|deadline|need to|must)\b/.test(lower);
+    setIngestKindHint(isTaskLike ? "task" : "info");
+  }, [quickContent]);
+
+  async function waitForRunCompletion(runId: string, timeoutMs = 10000): Promise<boolean> {
+    const start = Date.now();
+    while (Date.now() - start < timeoutMs) {
+      try {
+        const vis = await apiClient.getRunVisibilityV1(runId);
+        const s = (vis?.state || "").toLowerCase();
+        if (s === "completed" || s === "failed" || s === "partial") return true;
+      } catch {
+        // ignore poll errors and keep trying for a short window
+      }
+      await new Promise((r) => setTimeout(r, 700));
+    }
+    return false;
+  }
 
   if (!loaded) {
     return <PageSkeleton title subtitle cards={4} tableRows={5} />;
@@ -414,17 +458,25 @@ function RealDashboardContent() {
     setIngestSuccess(null);
     setIngestError(null);
     try {
-      await apiClient.ingestV1({
+      const payload = quickContent.trim();
+      const ingestRes = (await apiClient.ingestV1({
         tenant_id: tenantId,
         space_id: spaceId ?? "all",
         user_id: userId,
-        content: quickContent.trim(),
+        content: payload,
         source: "dashboard",
-      });
+      })) as { run_id?: string };
       setQuickContent("");
-      setIngestSuccess("נוסף. מרענן…");
+      setIngestSuccess("נשמר. מסיים עיבוד…");
+      if (ingestRes?.run_id) {
+        await waitForRunCompletion(ingestRes.run_id, 11000);
+      }
       await load();
-      setIngestSuccess("התוכן נשמר והופיע באירועים ובמשימות.");
+      setIngestSuccess(
+        ingestKindHint === "task"
+          ? "זוהתה משימה. התוכן עודכן ב-Recent activity ובמשימות."
+          : "נשמר כמידע. התוכן עודכן ב-Recent activity.",
+      );
       setTimeout(() => setIngestSuccess(null), 4000);
     } catch (e) {
       setIngestError(e instanceof Error ? e.message : "הכנסה נכשלה. בדוק API פעיל.");
@@ -585,6 +637,15 @@ function RealDashboardContent() {
               {ingestLoading ? "מוסיף…" : "הוסף"}
             </button>
           </div>
+          <p className="text-[11px] text-textSoft">
+            זיהוי כרגע:{" "}
+            <span className="font-medium text-textMain">
+              {ingestKindHint === "task" ? "משימה" : "מידע"}
+            </span>{" "}
+            {ingestKindHint === "task"
+              ? "— יופיע גם ב-Open tasks לאחר עיבוד."
+              : "— יופיע ב-Recent activity (ללא יצירת משימה)."}
+          </p>
           {ingestSuccess && <p className="text-xs text-green-400">{ingestSuccess}</p>}
           {ingestError && <p className="text-xs text-red-400">{ingestError}</p>}
         </CardContent>

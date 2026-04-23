@@ -1023,6 +1023,48 @@ export async function getRunStatusV1(runId: string): Promise<RunStatusResponse> 
   return get(`/api/v1/run/${encodeURIComponent(runId)}/status`);
 }
 
+/** Compact run visibility from `GET /runs/{run_id}` (same auth as other v1 calls). */
+export type RunVisibilityStep = {
+  name: string;
+  status: string;
+  duration_ms: number | null;
+};
+
+export type RunVisibilityResponse = {
+  run_id: string;
+  trace_id: string;
+  state: string;
+  duration_ms: number | null;
+  steps: RunVisibilityStep[];
+};
+
+export async function getRunVisibilityV1(runId: string): Promise<RunVisibilityResponse> {
+  return get(`/runs/${encodeURIComponent(runId)}`);
+}
+
+/** POST /runs/{run_id}/retry when supported; 404 = not available (caller may fall back). */
+export type PostRunRetryOutcome = "retried" | "not_supported" | "failed";
+
+export async function postRunRetryV1(runId: string): Promise<PostRunRetryOutcome> {
+  const url = buildUrl(`/runs/${encodeURIComponent(runId)}/retry`);
+  const res = await fetch(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...authHeaders(),
+    },
+    credentials: "include",
+  });
+  if (res.status === 404) return "not_supported";
+  if (!res.ok) return "failed";
+  try {
+    await res.text();
+  } catch {
+    /* ignore body */
+  }
+  return "retried";
+}
+
 export type TenantAlert = {
   id: string;
   type: string;
@@ -1134,6 +1176,8 @@ export const apiClient = {
   m3Export,
   getTenantRunsV1,
   getRunStatusV1,
+  getRunVisibilityV1,
+  postRunRetryV1,
   getTenantUsageDetailsV1,
 };
 

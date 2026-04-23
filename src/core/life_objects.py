@@ -183,19 +183,33 @@ def classify_content(content: str) -> SchemaEntity:
     """
     if not content or not content.strip():
         return SchemaEntity.TASK
-    lower = content.strip().lower()
+    original = content.strip()
+    lower = original.lower()
+
+    # Explicit informational prefixes (Hebrew/English) should stay as knowledge only.
+    info_prefixes = (
+        "מידע:",
+        "הערה:",
+        "note:",
+        "info:",
+        "context:",
+    )
+    if any(lower.startswith(p) for p in info_prefixes):
+        return SchemaEntity.CATEGORY
 
     # Commitment: promises, meetings, deadlines, "have to", "need to", "promised", "meeting with"
     commitment_marks = [
         "promised", "commitment", "committed", "meeting with", "call with",
         "have to", "need to", "must ", "should ", "deadline", "appointment",
         "scheduled", "rsvp", "confirm", "attend", "meeting at", "call at",
+        "צריך", "חייב", "פגישה", "שיחה", "דדליין", "עד לתאריך", "עד מחר",
     ]
     if any(m in lower for m in commitment_marks):
         return SchemaEntity.COMMITMENT
 
     # Project: multi-step, "project", "launch", "build", "plan for"
     project_marks = ["project:", "project -", "launch ", "build ", "plan for", "roadmap", "milestone"]
+    project_marks += ["פרויקט", "תכנית", "תוכנית", "מפת דרכים", "אבני דרך"]
     if any(m in lower for m in project_marks):
         return SchemaEntity.PROJECT
 
@@ -204,8 +218,26 @@ def classify_content(content: str) -> SchemaEntity:
         if area.lower() in lower or f"#{area.lower()}" in lower:
             return SchemaEntity.LIFE_AREA
 
+    # Explicit task markers (Hebrew/English)
+    task_marks = (
+        "משימה:",
+        "todo:",
+        "task:",
+        "לטפל",
+        "לסיים",
+        "לבצע",
+    )
+    if any(m in lower for m in task_marks):
+        return SchemaEntity.TASK
+
     # Default: actionable item as Task
-    return SchemaEntity.TASK
+    # If no action/date signal appears, treat as informational note.
+    has_action_or_date_signal = bool(
+        parse_due_date(original)
+        or re.search(r"\b(todo|task|due|by|deadline|must|need to)\b", lower)
+        or re.search(r"(מחר|שבוע הבא|יום\s+\S+|דדליין|צריך|חייב)", original)
+    )
+    return SchemaEntity.TASK if has_action_or_date_signal else SchemaEntity.CATEGORY
 
 
 def extract_life_objects(
@@ -229,6 +261,11 @@ def extract_life_objects(
         title = "(no title)"
 
     entity = classify_content(content)
+
+    # Category is informational-only in this flow: keep it in events/history/RAG,
+    # but do not project to task-like schema objects.
+    if entity == SchemaEntity.CATEGORY:
+        return []
     meta: dict[str, Any] = {}
     if event_id:
         meta["source_event_id"] = event_id

@@ -49,13 +49,27 @@ class InsightAgent:
 
         # Reuse existing RAG behavior (semantic search + context building).
         # When user_id is provided (e.g. from JWT), use it for scoping; otherwise tenant/space only.
-        resp: RAGResponse = await self._rag.search(  # type: ignore[assignment]
-            query=query,
-            tenant_id=tenant_id,
-            space_id=space_id,
-            user_id=user_id,
-            limit=10,
-        )
+        try:
+            resp: RAGResponse = await self._rag.search(  # type: ignore[assignment]
+                query=query,
+                tenant_id=tenant_id,
+                space_id=space_id,
+                user_id=user_id,
+                limit=10,
+            )
+        except Exception as e:
+            # Keep Ask stable when vector backend is temporarily unavailable.
+            # Returning a graceful fallback avoids surfacing intermittent infra
+            # timeouts as 500s in the UI.
+            logger.warning("InsightAgent.ask RAG search failed: %s", e)
+            return InsightAnswer(
+                answer=(
+                    "I could not reach your indexed knowledge right now. "
+                    "Please try again in a moment."
+                ),
+                sources=[],
+                needs_external_info=True,
+            )
 
         logger.info(
             "InsightAgent.ask RAG results tenant=%s space=%s count=%d confidence=%.3f",
