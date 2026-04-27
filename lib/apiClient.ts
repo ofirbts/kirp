@@ -1170,6 +1170,8 @@ export type RuntimeHealthV1 = {
   version?: {
     sha: string;
     short: string;
+    build_time: string;
+    environment: string;
     source: string;
   };
 };

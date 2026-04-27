@@ -22,6 +22,8 @@ def client(skip_auth: None, monkeypatch: pytest.MonkeyPatch) -> TestClient:
     monkeypatch.setattr(main, "get_event_store", _ok_store)
     monkeypatch.setattr(main, "get_rag_engine", _ok_rag)
     monkeypatch.setattr(main, "APP_GIT_SHA", "1234567890abcdef1234567890abcdef12345678")
+    monkeypatch.setattr(main, "APP_BUILD_TIME", "2026-04-27T10:30:00Z")
+    monkeypatch.setattr(main, "APP_ENVIRONMENT", "development")
     return TestClient(main.app)
 
 
@@ -32,6 +34,8 @@ def test_health_includes_version_shape(client: TestClient) -> None:
     assert "version" in body
     assert body["version"]["sha"] == "1234567890abcdef1234567890abcdef12345678"
     assert body["version"]["short"] == "1234567"
+    assert body["version"]["build_time"] == "2026-04-27T10:30:00Z"
+    assert body["version"]["environment"] == "development"
     assert body["version"]["source"] == "env:APP_GIT_SHA"
 
 

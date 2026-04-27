@@ -40,6 +40,8 @@ from src.core.jwt_utils import require_auth
 logging.basicConfig(level=os.getenv("LOG_LEVEL", "INFO"))
 logger = logging.getLogger("KIRP")
 APP_GIT_SHA = (os.getenv("APP_GIT_SHA") or "unknown").strip() or "unknown"
+APP_BUILD_TIME = (os.getenv("APP_BUILD_TIME") or "unknown").strip() or "unknown"
+APP_ENVIRONMENT = (os.getenv("ENV") or "unknown").strip() or "unknown"
 
 
 # --- Pydantic models ---
@@ -362,6 +364,8 @@ async def health() -> dict[str, Any]:
             "version": {
                 "sha": APP_GIT_SHA,
                 "short": APP_GIT_SHA[:7] if APP_GIT_SHA != "unknown" else "unknown",
+                "build_time": APP_BUILD_TIME,
+                "environment": APP_ENVIRONMENT,
                 "source": "env:APP_GIT_SHA",
             },
         }

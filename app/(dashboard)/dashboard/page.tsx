@@ -363,6 +363,10 @@ function RealDashboardContent() {
   >(null);
   const [verifyProof, setVerifyProof] = useState<string | null>(null);
   const [runtimeVersionSha, setRuntimeVersionSha] = useState<string>("unknown");
+  const [healthVersionSha, setHealthVersionSha] = useState<string>("unknown");
+  const [apiHeaderVersionSha, setApiHeaderVersionSha] = useState<string>("unknown");
+  const [runtimeBuildTime, setRuntimeBuildTime] = useState<string>("unknown");
+  const [runtimeEnvironment, setRuntimeEnvironment] = useState<string>("unknown");
 
   const skipAuth = process.env.NEXT_PUBLIC_SKIP_AUTH === "1";
 
@@ -397,6 +401,10 @@ function RealDashboardContent() {
       const fromHealth = runtimeHealth?.version?.sha?.trim();
       const fromHeader = getRuntimeVersionHint();
       const fromBuild = process.env.NEXT_PUBLIC_APP_GIT_SHA?.trim() || null;
+      setHealthVersionSha(fromHealth || "unknown");
+      setApiHeaderVersionSha(fromHeader || "unknown");
+      setRuntimeBuildTime(runtimeHealth?.version?.build_time?.trim() || "unknown");
+      setRuntimeEnvironment(runtimeHealth?.version?.environment?.trim() || "unknown");
       const resolved =
         (fromHealth && fromHealth !== "unknown" ? fromHealth : null) ||
         (fromHeader && fromHeader !== "unknown" ? fromHeader : null) ||
@@ -620,10 +628,17 @@ function RealDashboardContent() {
       ? ((health as any).services as Record<string, { status?: string; latency_ms?: number }>)
       : {};
   const buildVersionSha = process.env.NEXT_PUBLIC_APP_GIT_SHA?.trim() || "unknown";
-  const versionMismatch =
-    runtimeVersionSha !== "unknown" &&
-    buildVersionSha !== "unknown" &&
-    runtimeVersionSha !== buildVersionSha;
+  const knownVersionValues = [
+    runtimeVersionSha,
+    healthVersionSha,
+    apiHeaderVersionSha,
+    buildVersionSha,
+  ].filter((v) => v && v !== "unknown");
+  const versionMismatch = knownVersionValues.length > 1 && new Set(knownVersionValues).size > 1;
+  const unknownRuntimeVersion =
+    runtimeVersionSha === "unknown" ||
+    healthVersionSha === "unknown" ||
+    apiHeaderVersionSha === "unknown";
 
   return (
     <div className="space-y-6" suppressHydrationWarning>
@@ -822,10 +837,21 @@ function RealDashboardContent() {
                   : `${runtimeVersionSha.slice(0, 7)} (${runtimeVersionSha})`}
               </span>
             </p>
-            {versionMismatch ? (
+            <p className="text-xs text-textSoft mb-3">
+              Build time: <span className="font-mono text-textMain">{runtimeBuildTime}</span> ·
+              Environment: <span className="font-mono text-textMain"> {runtimeEnvironment}</span>
+            </p>
+            <p className="text-xs text-textSoft mb-3">
+              Sources: health=<span className="font-mono text-textMain">{healthVersionSha}</span> ·
+              api_header=<span className="font-mono text-textMain">{apiHeaderVersionSha}</span> ·
+              ui_build=<span className="font-mono text-textMain">{buildVersionSha}</span>
+            </p>
+            {versionMismatch || unknownRuntimeVersion ? (
               <p className="text-xs text-amber-400 mb-3">
-                Runtime mismatch detected: UI build ({buildVersionSha.slice(0, 7)}) != API runtime (
-                {runtimeVersionSha.slice(0, 7)}).
+                Runtime warning:{" "}
+                {unknownRuntimeVersion
+                  ? "runtime version is unknown in at least one source."
+                  : "version mismatch detected between health, API header, and UI build."}
               </p>
             ) : null}
             <ul className="space-y-1 text-sm max-h-40 overflow-auto">
