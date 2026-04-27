@@ -11,6 +11,7 @@ import { RadialChart } from "@/components/charts/RadialChart";
 import { EventRateChart } from "@/components/data/EventRateChart";
 import {
   apiClient,
+  getRuntimeVersionHint,
   type AskResponse,
   type InsightV1,
   type TenantUsageDetailsV1,
@@ -357,6 +358,11 @@ function RealDashboardContent() {
   const [ingestSuccess, setIngestSuccess] = useState<string | null>(null);
   const [ingestError, setIngestError] = useState<string | null>(null);
   const [ingestKindHint, setIngestKindHint] = useState<"task" | "info">("info");
+  const [verifyState, setVerifyState] = useState<
+    "processing" | "success" | "failure" | "network_issue" | null
+  >(null);
+  const [verifyProof, setVerifyProof] = useState<string | null>(null);
+  const [runtimeVersionSha, setRuntimeVersionSha] = useState<string>("unknown");
 
   const skipAuth = process.env.NEXT_PUBLIC_SKIP_AUTH === "1";
 
@@ -364,7 +370,7 @@ function RealDashboardContent() {
     setLoading(true);
     setError(null);
     try {
-      const [tasksRes, eventsRes, healthRes, usageRes] = await Promise.all([
+      const [tasksRes, eventsRes, healthRes, usageRes, runtimeHealth] = await Promise.all([
         apiClient
           .listTasksV1({
             tenant_id: tenantId,
@@ -382,11 +388,21 @@ function RealDashboardContent() {
           .catch(() => []),
         apiClient.getObservabilityHealth().catch(() => null),
         apiClient.getTenantUsageDetailsV1(tenantId).catch(() => null),
+        apiClient.getRuntimeHealthV1().catch(() => null),
       ]);
       setTasks((tasksRes as { data?: TaskV1[] }).data ?? []);
       setEvents(eventsRes as Event[]);
       setHealth(healthRes as Record<string, unknown> | null);
       setUsage(usageRes as TenantUsageDetailsV1 | null);
+      const fromHealth = runtimeHealth?.version?.sha?.trim();
+      const fromHeader = getRuntimeVersionHint();
+      const fromBuild = process.env.NEXT_PUBLIC_APP_GIT_SHA?.trim() || null;
+      const resolved =
+        (fromHealth && fromHealth !== "unknown" ? fromHealth : null) ||
+        (fromHeader && fromHeader !== "unknown" ? fromHeader : null) ||
+        (fromBuild && fromBuild !== "unknown" ? fromBuild : null) ||
+        "unknown";
+      setRuntimeVersionSha(resolved);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load dashboard");
     } finally {
@@ -430,19 +446,21 @@ function RealDashboardContent() {
     setIngestKindHint(isTaskLike ? "task" : "info");
   }, [quickContent]);
 
-  async function waitForRunCompletion(runId: string, timeoutMs = 10000): Promise<boolean> {
-    const start = Date.now();
-    while (Date.now() - start < timeoutMs) {
-      try {
-        const vis = await apiClient.getRunVisibilityV1(runId);
-        const s = (vis?.state || "").toLowerCase();
-        if (s === "completed" || s === "failed" || s === "partial") return true;
-      } catch {
-        // ignore poll errors and keep trying for a short window
-      }
-      await new Promise((r) => setTimeout(r, 700));
-    }
-    return false;
+  async function waitForRunCompletion(
+    runId: string,
+    timeoutMs = 10000,
+  ): Promise<
+    | { kind: "ok"; vis: Awaited<ReturnType<typeof apiClient.getRunVisibilityV1>> }
+    | { kind: "network_error"; vis: null }
+    | { kind: "timeout"; vis: null }
+  > {
+    const poll = apiClient.getRunVisibilityV1(runId)
+      .then((vis) => ({ kind: "ok" as const, vis }))
+      .catch(() => ({ kind: "network_error" as const, vis: null }));
+    const timer = new Promise<{ kind: "timeout"; vis: null }>((resolve) =>
+      setTimeout(() => resolve({ kind: "timeout", vis: null }), timeoutMs),
+    );
+    return Promise.race([poll, timer]);
   }
 
   if (!loaded) {
@@ -457,6 +475,8 @@ function RealDashboardContent() {
     setIngestLoading(true);
     setIngestSuccess(null);
     setIngestError(null);
+    setVerifyState(null);
+    setVerifyProof(null);
     try {
       const payload = quickContent.trim();
       const ingestRes = (await apiClient.ingestV1({
@@ -469,14 +489,75 @@ function RealDashboardContent() {
       setQuickContent("");
       setIngestSuccess("נשמר. מסיים עיבוד…");
       if (ingestRes?.run_id) {
-        await waitForRunCompletion(ingestRes.run_id, 11000);
+        const first = await waitForRunCompletion(ingestRes.run_id, 8000);
+        if (first.kind === "network_error") {
+          setVerifyState("network_issue");
+          setIngestError("Network issue while checking status");
+          setVerifyProof("Could not reach the server");
+          return;
+        }
+        if (first.kind === "timeout") {
+          setVerifyState("processing");
+          setIngestSuccess("Still processing — this can take a bit longer");
+          setVerifyProof("Still processing in backend");
+          await new Promise((r) => setTimeout(r, 1500));
+          const second = await waitForRunCompletion(ingestRes.run_id, 8000);
+          if (second.kind === "network_error") {
+            setVerifyState("network_issue");
+            setIngestError("Network issue while checking status");
+            setVerifyProof("Could not reach the server");
+            return;
+          }
+          if (second.kind === "timeout") {
+            setVerifyState("processing");
+            setIngestSuccess("Still processing — this can take a bit longer");
+            setVerifyProof("Run is still processing");
+            return;
+          }
+          const retryState = ((second.vis?.state || "").toLowerCase());
+          if (retryState === "failed") {
+            setVerifyState("failure");
+            setIngestError("Still needs attention — details are in the panel");
+            setVerifyProof("Still blocked — needs attention");
+            return;
+          }
+          setVerifyState("success");
+          setIngestSuccess(
+            retryState === "completed"
+              ? "Done — this is now resolved"
+              : "Progress resumed",
+          );
+          setVerifyProof(
+            retryState === "completed"
+              ? "Flow completed successfully"
+              : "Flow is continuing",
+          );
+          await load();
+          return;
+        }
+        const state = (first.vis?.state || "").toLowerCase();
+        if (state === "failed") {
+          setVerifyState("failure");
+          setIngestError("Still needs attention — details are in the panel");
+          setVerifyProof("Still blocked — needs attention");
+          return;
+        }
+        setVerifyState("success");
+        setIngestSuccess(
+          state === "completed" ? "Done — this is now resolved" : "Progress resumed",
+        );
+        setVerifyProof(
+          state === "completed" ? "Flow completed successfully" : "Flow is continuing",
+        );
       }
       await load();
-      setIngestSuccess(
-        ingestKindHint === "task"
-          ? "זוהתה משימה. התוכן עודכן ב-Recent activity ובמשימות."
-          : "נשמר כמידע. התוכן עודכן ב-Recent activity.",
-      );
+      if (!ingestRes?.run_id) {
+        setIngestSuccess(
+          ingestKindHint === "task"
+            ? "זוהתה משימה. התוכן עודכן ב-Recent activity ובמשימות."
+            : "נשמר כמידע. התוכן עודכן ב-Recent activity.",
+        );
+      }
       setTimeout(() => setIngestSuccess(null), 4000);
     } catch (e) {
       setIngestError(e instanceof Error ? e.message : "הכנסה נכשלה. בדוק API פעיל.");
@@ -538,6 +619,11 @@ function RealDashboardContent() {
     health && typeof health === "object" && "services" in health
       ? ((health as any).services as Record<string, { status?: string; latency_ms?: number }>)
       : {};
+  const buildVersionSha = process.env.NEXT_PUBLIC_APP_GIT_SHA?.trim() || "unknown";
+  const versionMismatch =
+    runtimeVersionSha !== "unknown" &&
+    buildVersionSha !== "unknown" &&
+    runtimeVersionSha !== buildVersionSha;
 
   return (
     <div className="space-y-6" suppressHydrationWarning>
@@ -648,6 +734,11 @@ function RealDashboardContent() {
           </p>
           {ingestSuccess && <p className="text-xs text-green-400">{ingestSuccess}</p>}
           {ingestError && <p className="text-xs text-red-400">{ingestError}</p>}
+          {verifyState && verifyProof ? (
+            <p className="text-xs text-textSoft">
+              Verify state: <span className="font-medium">{verifyState}</span> · {verifyProof}
+            </p>
+          ) : null}
         </CardContent>
       </Card>
 
@@ -723,6 +814,20 @@ function RealDashboardContent() {
                 {(health as any)?.status ?? "unknown"}
               </span>
             </p>
+            <p className="text-xs text-textSoft mb-3">
+              Version:{" "}
+              <span className="font-mono text-textMain">
+                {runtimeVersionSha === "unknown"
+                  ? "unknown"
+                  : `${runtimeVersionSha.slice(0, 7)} (${runtimeVersionSha})`}
+              </span>
+            </p>
+            {versionMismatch ? (
+              <p className="text-xs text-amber-400 mb-3">
+                Runtime mismatch detected: UI build ({buildVersionSha.slice(0, 7)}) != API runtime (
+                {runtimeVersionSha.slice(0, 7)}).
+              </p>
+            ) : null}
             <ul className="space-y-1 text-sm max-h-40 overflow-auto">
               {Object.entries(services).map(([name, svc]) => (
                 <li key={name} className="flex justify-between gap-2">

@@ -34,22 +34,83 @@ No silent failure is allowed.
 
 Code path: `verifyRunAfterAction` / `fetchRunVisibilityOnce`.
 
-### Failure modes
+### Verify State Contract (explicit, deterministic)
 
-1. First fetch timeout/exception
-2. Retry fetch timeout/exception
-3. Returns malformed/unexpected state
+All post-action verification must resolve into exactly one of these states:
 
-### User sees
+1. `processing`
+2. `success`
+3. `failure`
+4. `network_issue`
 
-- If first fetch fails: `Checking latest status…`
-- If retry also fails: `Update in progress` + proof line `Update in progress`
+No other user-visible state is allowed.
 
-### System behavior
+#### State: `processing`
 
-- Performs one retry after a short delay.
-- Returns `null` if verification still unavailable.
-- Keeps action feedback and loop state; does not crash the page.
+- Trigger condition:
+  - First visibility fetch does not return data within `8s` (timeout), and no transport error is raised.
+  - Retry attempt also times out or returns non-terminal processing state (`accepted`/`processing`/`partial`).
+- User-facing lines:
+  - Headline: `Still processing — this can take a bit longer`
+  - Proof line: `Run is still processing`
+- Timeout rules:
+  - Attempt #1 timeout: `8s`
+  - Wait before retry: `1.5s`
+  - Attempt #2 timeout: `8s`
+- Fallback:
+  - Keep current success context (if task created, keep "Task created — now tracked")
+  - Show `Next:` continuation line
+  - Never switch to generic error.
+
+#### State: `success`
+
+- Trigger condition:
+  - Visibility fetch returns valid payload and run state indicates forward progress:
+    - terminal success (`completed`) OR
+    - non-terminal but positive progress (`processing`/`accepted`) after action.
+- User-facing lines:
+  - If completed: `Done — this is now resolved`
+  - If progressed: `Progress resumed` (or task-created success headline if already shown)
+  - Proof line:
+    - completed: `"<last successful step>" finished · Flow completed successfully`
+    - progressed: `Flow is continuing`
+- Timeout rules:
+  - Uses same two-attempt window; first valid success response ends verification immediately.
+- Fallback:
+  - If task was created, preserve `Task created — now tracked` as primary headline.
+
+#### State: `failure`
+
+- Trigger condition:
+  - Visibility fetch returns valid payload with blocking state (`failed`) after action.
+- User-facing lines:
+  - Headline: `Still needs attention — details are in the panel`
+  - Proof line: `Still blocked — needs attention`
+- Timeout rules:
+  - No extra retries beyond the two-attempt verify window.
+- Fallback:
+  - Keep panel-open path available for immediate context.
+  - Do not claim completion or progress.
+
+#### State: `network_issue`
+
+- Trigger condition:
+  - Visibility fetch throws transport/runtime error (DNS, connection reset, 5xx proxy error, offline) on any verify attempt.
+- User-facing lines:
+  - Headline: `Network issue while checking status`
+  - Proof line: `Could not reach the server`
+- Timeout rules:
+  - Immediate classification on transport error (no additional blind retry loop).
+- Fallback:
+  - Action result remains visible (for example task-created outcome)
+  - User can continue flow; page must not lock or spin indefinitely.
+
+### Contract Rules
+
+1. Exactly one verify state is shown at a time.
+2. `network_issue` and `processing` must never share the same copy.
+3. Verification never removes a stronger confirmed success headline (`Task created — now tracked`).
+4. If verification cannot conclude, UI remains actionable and non-blocking.
 
 No silent failure is allowed.
 

@@ -39,6 +39,7 @@ from src.core.jwt_utils import require_auth
 
 logging.basicConfig(level=os.getenv("LOG_LEVEL", "INFO"))
 logger = logging.getLogger("KIRP")
+APP_GIT_SHA = (os.getenv("APP_GIT_SHA") or "unknown").strip() or "unknown"
 
 
 # --- Pydantic models ---
@@ -341,6 +342,13 @@ async def kirp_api_key_middleware_layer(request: Request, call_next):
     return await kirp_api_key_middleware(request, call_next)
 
 
+@app.middleware("http")
+async def version_header_middleware(request: Request, call_next):
+    response = await call_next(request)
+    response.headers["X-KIRP-Version"] = APP_GIT_SHA
+    return response
+
+
 @app.get("/health")
 async def health() -> dict[str, Any]:
     """Health check for Docker/K8s."""
@@ -351,6 +359,11 @@ async def health() -> dict[str, Any]:
             "status": "healthy",
             "event_store": "ok",
             "rag_engine": "ok",
+            "version": {
+                "sha": APP_GIT_SHA,
+                "short": APP_GIT_SHA[:7] if APP_GIT_SHA != "unknown" else "unknown",
+                "source": "env:APP_GIT_SHA",
+            },
         }
     except Exception as e:
         raise HTTPException(status_code=503, detail=str(e))

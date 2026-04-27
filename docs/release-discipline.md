@@ -32,6 +32,78 @@ Required checks:
 - lint
 - build (for dashboard changes)
 
+## Automatable PR Template (exact text)
+
+This exact template is required in `.github/pull_request_template.md`:
+
+```md
+## Behavior change
+- What changed in user-visible behavior?
+- Why is this change needed now?
+
+## Contract impact
+- Which contract docs changed? (list paths)
+- If none, explain why behavior contract is unchanged.
+
+## Test proof
+- [ ] Unit/integration tests run
+- [ ] Lint run
+- [ ] Build run (if frontend touched)
+- Commands executed:
+  - `...`
+- Key output:
+  - `...`
+
+## Performance impact
+- [ ] No expected impact
+- [ ] Measured with perf script
+- Perf result link/artifact:
+  - `...`
+
+## Rollback plan
+- Previous known-good SHA:
+  - `...`
+- Rollback command/runbook step:
+  - `...`
+- Rollback trigger:
+  - `...`
+
+## Release checklist
+- [ ] No uncommitted local changes before final test
+- [ ] PR includes behavior/test/rollback sections
+- [ ] Required CI checks passed
+- [ ] Version traceability confirmed (SHA in runtime contract)
+```
+
+## Required Fields (blocking if missing)
+
+A PR is invalid unless all fields are present:
+
+1. `Behavior change`
+2. `Contract impact`
+3. `Test proof` with commands
+4. `Rollback plan` with previous SHA
+5. `Release checklist` fully checked
+
+## Automation Contract
+
+Enforce with CI checks:
+
+1. **Dirty tree guard (pre-push/local CI)**
+   - fail if `git status --porcelain` is non-empty before release step
+2. **PR template validator**
+   - fail if required headings/checklist are missing
+3. **Required status checks**
+   - `lint`
+   - `tests`
+   - `build` (when frontend files touched)
+   - `perf-regression-check` (when critical paths touched)
+
+Merge policy:
+
+- Direct pushes to protected release branch are blocked.
+- Only PR merge with all required checks passing is allowed.
+
 ## Deploy Steps (minimum safe flow)
 
 1. Merge PR to release branch.
@@ -49,6 +121,18 @@ Required checks:
   - Ask hard-fail rate above SLO
   - Task creation path regresses
 - Roll back to previous known-good artifact SHA (no hot edits on live container).
+
+## Explainability Contract
+
+Every production deploy must be answerable with:
+
+1. PR link
+2. merged commit SHA
+3. runtime SHA (`/health.version.sha`)
+4. test evidence used for approval
+5. explicit rollback command
+
+If any item is missing, deploy is non-compliant.
 
 ## Current Deploy State Snapshot (documentation requirement)
 

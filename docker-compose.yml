@@ -269,6 +269,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.api
+      args:
+        APP_GIT_SHA: ${APP_GIT_SHA:-unknown}
     container_name: kirp-api
     restart: unless-stopped
     ports:
@@ -291,6 +293,7 @@ services:
       CASSANDRA_PORT: 9042
       OPA_URL: http://opa:8181
       PYTHONPATH: /app
+      APP_GIT_SHA: ${APP_GIT_SHA:-unknown}
     depends_on:
       mongodb: { condition: service_healthy }
       postgres: { condition: service_healthy }
@@ -341,6 +344,7 @@ services:
       args:
         NEXT_PUBLIC_API_URL: http://localhost:8000
         NEXT_PUBLIC_SKIP_AUTH: "0"
+        NEXT_PUBLIC_APP_GIT_SHA: ${APP_GIT_SHA:-unknown}
     container_name: kirp-dashboard
     restart: unless-stopped
     ports:
@@ -348,6 +352,7 @@ services:
     environment:
       NEXT_PUBLIC_API_URL: http://localhost:8000
       NEXT_PUBLIC_SKIP_AUTH: "0"
+      NEXT_PUBLIC_APP_GIT_SHA: ${APP_GIT_SHA:-unknown}
     depends_on:
       kirp-api:
         condition: service_healthy

@@ -56,7 +56,7 @@ jobs:
           IMAGE_NAME: ${{ secrets.DOCKER_IMAGE_NAME || 'your-docker-user/kirp-api' }}
         run: |
           GIT_SHA=${GITHUB_SHA::7}
-          docker build -f Dockerfile.api -t "$IMAGE_NAME:$GIT_SHA" -t "$IMAGE_NAME:latest" .
+          docker build -f Dockerfile.api --build-arg APP_GIT_SHA="$GITHUB_SHA" -t "$IMAGE_NAME:$GIT_SHA" -t "$IMAGE_NAME:latest" .
           docker push "$IMAGE_NAME:$GIT_SHA"
           docker push "$IMAGE_NAME:latest"
 

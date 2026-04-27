@@ -24,3 +24,64 @@ jobs:
 
       - name: Run pytest
         run: python -m pytest tests/ -q --tb=short
+
+  dashboard-build-lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+      - name: Install frontend dependencies
+        run: npm ci
+      - name: Run lint
+        run: npm run lint
+      - name: Run dashboard build
+        run: npm run build
+
+  release-discipline:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Dirty tree guard
+        run: bash scripts/dirty_tree_guard.sh
+      - name: Validate required PR sections
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: |
+          python - <<'PY'
+          import os, sys
+          body = (os.getenv("PR_BODY") or "").lower()
+          required = [
+              "## behavior change",
+              "## contract impact",
+              "## test proof",
+              "## rollback plan",
+              "## release checklist",
+          ]
+          missing = [h for h in required if h not in body]
+          if missing:
+              print("Missing required PR sections:")
+              for h in missing:
+                  print("-", h)
+              sys.exit(1)
+          print("PR template requirements satisfied.")
+          PY
+
+  perf-regression-check:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Start runtime stack for perf check
+        run: docker compose up -d --build kirp-api kirp-dashboard
+      - name: Run perf gate
+        run: python scripts/perf_check.py --baseline docs/perf-baseline.json

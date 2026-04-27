@@ -23,6 +23,7 @@ const DEV_TOKEN =
   typeof process !== "undefined"
     ? process.env?.NEXT_PUBLIC_DEV_TOKEN ?? ""
     : "";
+const RUNTIME_VERSION_STORAGE_KEY = "kirp_runtime_version_sha";
 
 function getRuntimeToken(): string | null {
   if (typeof window === "undefined") return DEV_TOKEN || null;
@@ -46,6 +47,89 @@ function authHeaders(): Record<string, string> {
   return headers;
 }
 
+function rememberRuntimeVersion(response: Response): void {
+  const version = response.headers.get("X-KIRP-Version")?.trim();
+  if (!version || typeof window === "undefined") return;
+  window.localStorage.setItem(RUNTIME_VERSION_STORAGE_KEY, version);
+}
+
+export function getRuntimeVersionHint(): string | null {
+  if (typeof window === "undefined") return null;
+  const version = window.localStorage.getItem(RUNTIME_VERSION_STORAGE_KEY)?.trim();
+  return version || null;
+}
+
+type HttpMethod = "GET" | "POST" | "PATCH";
+
+async function tryRefreshAuth(): Promise<boolean> {
+  try {
+    const url = buildUrl("/api/v1/auth/refresh");
+    const res = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...authHeaders(),
+      },
+      credentials: "include",
+    });
+    if (!res.ok) return false;
+    const body = (await res.json().catch(() => null)) as
+      | { access_token?: string }
+      | null;
+    const token = body?.access_token?.trim();
+    if (!token || typeof window === "undefined") return Boolean(token);
+    window.localStorage.setItem("access_token", token);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function fetchWithAuthRetry(
+  path: string,
+  method: HttpMethod,
+  body?: unknown,
+  params?: Record<string, string | number | undefined>,
+  attempt = 0,
+): Promise<Response> {
+  const url = buildUrl(path, params);
+  const hasBody = body !== undefined;
+  const res = await fetch(url, {
+    method,
+    headers: {
+      ...(hasBody ? { "Content-Type": "application/json" } : {}),
+      ...authHeaders(),
+    },
+    body: hasBody ? JSON.stringify(body) : undefined,
+    credentials: "include",
+  });
+
+  if (res.status === 401 || res.status === 403) {
+    console.warn("[apiClient][auth]", {
+      method,
+      path,
+      status: res.status,
+      attempt,
+      hasToken: Boolean(getRuntimeToken()),
+    });
+  }
+
+  // Single retry policy: only on first 401, using refresh endpoint.
+  if (
+    res.status === 401 &&
+    attempt === 0 &&
+    path !== "/api/v1/auth/refresh"
+  ) {
+    const refreshed = await tryRefreshAuth();
+    if (refreshed) {
+      return fetchWithAuthRetry(path, method, body, params, attempt + 1);
+    }
+  }
+
+  rememberRuntimeVersion(res);
+  return res;
+}
+
 function buildUrl(
   path: string,
   params?: Record<string, string | number | undefined>,
@@ -66,16 +150,12 @@ async function get<T>(
   path: string,
   params?: Record<string, string | number | undefined>,
 ): Promise<T> {
-  const url = buildUrl(path, params);
-  const res = await fetch(url, {
-    credentials: "include",
-    headers: { ...authHeaders() },
-  });
+  const res = await fetchWithAuthRetry(path, "GET", undefined, params);
   if (!res.ok) {
     const text = await res.text();
     throw new Error(
       res.status === 502
-        ? `Backend unreachable: ${url}`
+        ? `Backend unreachable: ${buildUrl(path, params)}`
         : `${res.status}: ${text || res.statusText}`,
     );
   }
@@ -83,16 +163,7 @@ async function get<T>(
 }
 
 async function patch<T>(path: string, body?: unknown): Promise<T> {
-  const url = buildUrl(path);
-  const res = await fetch(url, {
-    method: "PATCH",
-    headers: {
-      "Content-Type": "application/json",
-      ...authHeaders(),
-    },
-    body: body !== undefined ? JSON.stringify(body) : undefined,
-    credentials: "include",
-  });
+  const res = await fetchWithAuthRetry(path, "PATCH", body);
   if (!res.ok) {
     const text = await res.text();
     throw new Error(`${res.status}: ${text || res.statusText}`);
@@ -105,16 +176,12 @@ async function getJson(
   path: string,
   params?: Record<string, string | number | undefined>,
 ): Promise<unknown> {
-  const url = buildUrl(path, params);
-  const res = await fetch(url, {
-    credentials: "include",
-    headers: { ...authHeaders() },
-  });
+  const res = await fetchWithAuthRetry(path, "GET", undefined, params);
   if (!res.ok) {
     const text = await res.text();
     throw new Error(
       res.status === 502
-        ? `Backend unreachable: ${url}`
+        ? `Backend unreachable: ${buildUrl(path, params)}`
         : `${res.status}: ${text || res.statusText}`,
     );
   }
@@ -122,16 +189,7 @@ async function getJson(
 }
 
 async function post<T>(path: string, body?: unknown): Promise<T> {
-  const url = buildUrl(path);
-  const res = await fetch(url, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      ...authHeaders(),
-    },
-    body: body !== undefined ? JSON.stringify(body) : undefined,
-    credentials: "include",
-  });
+  const res = await fetchWithAuthRetry(path, "POST", body);
   if (!res.ok) {
     const text = await res.text();
     throw new Error(`${res.status}: ${text || res.statusText}`);
@@ -361,12 +419,12 @@ export async function markAllNotificationsReadV1(params?: {
   const q: Record<string, string | undefined> = {};
   if (params?.tenant_id) q.tenant_id = params.tenant_id;
   if (params?.user_id) q.user_id = params.user_id;
-  const url = buildUrl("/api/v1/notifications/read-all", q);
-  const res = await fetch(url, {
-    method: "POST",
-    credentials: "include",
-    headers: { "Content-Type": "application/json", ...authHeaders() },
-  });
+  const res = await fetchWithAuthRetry(
+    "/api/v1/notifications/read-all",
+    "POST",
+    {},
+    q,
+  );
   if (!res.ok) throw new Error(`${res.status}: ${await res.text()}`);
   return res.json() as Promise<{ ok: boolean; marked_count: number }>;
 }
@@ -1046,15 +1104,11 @@ export async function getRunVisibilityV1(runId: string): Promise<RunVisibilityRe
 export type PostRunRetryOutcome = "retried" | "not_supported" | "failed";
 
 export async function postRunRetryV1(runId: string): Promise<PostRunRetryOutcome> {
-  const url = buildUrl(`/runs/${encodeURIComponent(runId)}/retry`);
-  const res = await fetch(url, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      ...authHeaders(),
-    },
-    credentials: "include",
-  });
+  const res = await fetchWithAuthRetry(
+    `/runs/${encodeURIComponent(runId)}/retry`,
+    "POST",
+    {},
+  );
   if (res.status === 404) return "not_supported";
   if (!res.ok) return "failed";
   try {
@@ -1107,6 +1161,21 @@ export async function getTenantUsageDetailsV1(
   return get(
     `/api/v1/tenant/${encodeURIComponent(tenantId)}/usage/details`,
   );
+}
+
+export type RuntimeHealthV1 = {
+  status: string;
+  event_store?: string;
+  rag_engine?: string;
+  version?: {
+    sha: string;
+    short: string;
+    source: string;
+  };
+};
+
+export async function getRuntimeHealthV1(): Promise<RuntimeHealthV1> {
+  return get<RuntimeHealthV1>("/health");
 }
 
 // ---------- Aggregated export ----------
@@ -1179,6 +1248,7 @@ export const apiClient = {
   getRunVisibilityV1,
   postRunRetryV1,
   getTenantUsageDetailsV1,
+  getRuntimeHealthV1,
 };
 
 // ---------- Connections Hub ----------

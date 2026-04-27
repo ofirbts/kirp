@@ -15,7 +15,7 @@ Source of truth: `lib/apiClient.ts`.
   - `credentials: "include"`
   - `...authHeaders()`
 
-Contract: UI code should not bypass this client for protected endpoints.
+Contract: UI code must not bypass this client for protected endpoints.
 
 ## Injection Rules
 
@@ -23,23 +23,87 @@ Contract: UI code should not bypass this client for protected endpoints.
 2. Token must be present in runtime storage for authenticated sessions.
 3. Tenant/user context must come from JWT on backend (`/api/v1/*`).
 
-## Retry Policy
+## Token Lifecycle (deterministic)
 
-Current policy:
-- No global auth refresh pipeline in `apiClient` wrappers.
-- Request fails fast on non-2xx and throws explicit error.
+1. Access token is attached on every request via `Authorization: Bearer <token>`.
+2. Access token is short-lived (contract target: 15 minutes).
+3. Refresh token is HTTP-only cookie (contract target: 7 days), never stored in JS-readable storage.
+4. Client keeps only access token in memory/storage; refresh token is server-managed.
+5. On app bootstrap:
+   - If access token exists, use it immediately.
+   - If missing/expired, attempt refresh once before declaring session invalid.
 
-Required deterministic policy (hardening target):
-1. On first `401`, attempt one token-refresh/reauth path (if available).
-2. Retry exactly once.
-3. If still unauthorized, force logged-out UX state and route to login.
+## Refresh Timing
+
+Two allowed refresh paths only:
+
+1. **Reactive refresh (required)**  
+   Trigger: request returns `401`.
+2. **Bootstrap refresh (required)**  
+   Trigger: app load with no valid access token but refresh cookie may exist.
+
+No background refresh loop, no polling refresh, no multi-refresh race.
+
+## Retry Rules (exact numbers)
+
+1. On `401`:
+   - attempt refresh exactly `1` time
+   - retry original request exactly `1` time
+2. On `403`:
+   - do not refresh
+   - do not retry automatically
+3. Maximum total attempts per request:
+   - `2` attempts for `401` path (original + one retried call)
+   - `1` attempt for `403` path
+4. If refresh endpoint fails (`401/403/5xx/network`):
+   - mark auth state as invalid immediately
+   - do not repeat refresh for the same request chain
+
+## Request Interceptor Contract
+
+All wrappers (`get`, `post`, `patch`, `getJson`) must pass through one shared request path that:
+
+1. injects auth headers
+2. handles `credentials: "include"`
+3. applies the single retry policy above
+4. logs every `401`/`403` with context:
+   - method
+   - endpoint path
+   - status code
+   - retry attempt index
+   - `hasToken` boolean
+
+No endpoint-specific auth logic is allowed in feature components.
 
 ## User-visible Auth Failure Contract
 
-- Any `401` / `403` must surface explicit state (not silent):
-  - banner/toast/inline error with endpoint-level message
-  - deterministic CTA (`Re-login`)
-- Mid-session auth failures must not leave partial “loading forever” states.
+### Mid-session `401` recovered by refresh
+
+- User sees nothing disruptive.
+- Original action completes normally after one internal retry.
+
+### Mid-session `401` not recoverable
+
+- User-visible line: `Your session expired. Please sign in again.`
+- Deterministic CTA: `Go to login`
+- App behavior:
+  - clear local access token
+  - transition to logged-out state
+  - redirect to login route
+
+### `403` authorization failure
+
+- User-visible line: `You do not have permission for this action.`
+- Deterministic CTA: `Back to dashboard`
+- App behavior:
+  - keep session (no forced logout)
+  - stop retry attempts
+
+### UX invariants
+
+1. No silent auth failures.
+2. No infinite spinners on auth errors.
+3. One visible state per failed request (no overlapping toasts with conflicting actions).
 
 ## Known Break Points (today)
 
