@@ -21,13 +21,13 @@ def main() -> int:
         print(
             json.dumps(
                 {
-                    "permission": "ask",
-                    "user_message": "Critical files staged. Confirm required checks (lint/build/tests + deploy checks if relevant).",
-                    "agent_message": "Pre-commit guard: critical scope detected.",
+                    "permission": "deny",
+                    "user_message": "Commit blocked: critical files are staged. Run required checks (lint/build/tests + deploy checks if relevant) before committing.",
+                    "agent_message": "Pre-commit guard: commit blocked for critical scope.",
                 }
             )
         )
-        return 0
+        return 1
 
     print(json.dumps({"permission": "allow"}))
     return 0

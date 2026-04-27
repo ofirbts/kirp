@@ -145,6 +145,8 @@ type ExecuteNextActionResult = {
   taskOutcome?: "created" | "failed" | "unavailable";
 };
 
+type FailureClarityState = "processing" | "success" | "failure" | "network_issue";
+
 const IDLE_ACTION: NextAction = {
   action: "Start your next focused move",
   outcome: "You create momentum in your work instead of waiting for urgency.",
@@ -659,21 +661,11 @@ async function fetchRunVisibilityOnce(
   return out;
 }
 
-function formatVerifiedResultLine(
-  kind: NextActionKind,
-  vis: RunVisibilityResponse,
-): string {
+function verifyStateFromVisibility(vis: RunVisibilityResponse): "processing" | "success" | "failure" {
   const s = (vis.state || "").toLowerCase();
-  if (kind === "failed") {
-    if (s === "processing" || s === "accepted") return "Unblocked — flow is now processing";
-    if (s === "completed") return "Completed — output ready";
-    return "Progress resumed";
-  }
-  if (s === "completed") return "Completed — output ready";
-  if (s === "processing" || s === "accepted") return "Progress resumed";
-  if (s === "partial") return "Almost there — finish the loose ends";
-  if (s === "failed") return "Still needs attention — details are in the panel";
-  return "Updated just now";
+  if (s === "completed") return "success";
+  if (s === "failed") return "failure";
+  return "processing";
 }
 
 function formatProofLine(vis: RunVisibilityResponse): string {
@@ -864,7 +856,8 @@ function MonitoringContent() {
     null,
   );
   const [actedRunIds, setActedRunIds] = useState<Set<string>>(new Set());
-  const [resultState, setResultState] = useState<string | null>(null);
+  const [failureClarityState, setFailureClarityState] = useState<FailureClarityState | null>(null);
+  const [resultMessage, setResultMessage] = useState<string | null>(null);
   const [progressFlash, setProgressFlash] = useState<string | null>(null);
   const [recentProgress, setRecentProgress] = useState<string[]>([]);
   const [resultProofLine, setResultProofLine] = useState<string | null>(null);
@@ -976,7 +969,8 @@ function MonitoringContent() {
       clearTimeout(clearNextActionFeedbackTimer.current);
     }
     clearNextActionFeedbackTimer.current = setTimeout(() => {
-      setResultState(null);
+      setFailureClarityState(null);
+      setResultMessage(null);
       setProgressFlash(null);
       setResultProofLine(null);
       setNextActionCardCue(null);
@@ -1070,13 +1064,15 @@ function MonitoringContent() {
   const verifyRunAfterAction = useCallback(async (rid: string) => {
     let vis = await fetchRunVisibilityOnce(rid, VERIFY_FETCH_TIMEOUT_MS);
     if (vis) return vis;
-    setResultProofLine("Still updating…");
-    setResultState("Checking latest status…");
+    setFailureClarityState("processing");
+    setResultMessage("Verifying action status...");
+    setResultProofLine("Fallback verify retry in progress");
     await new Promise((r) => setTimeout(r, 1500));
     vis = await fetchRunVisibilityOnce(rid, VERIFY_FETCH_TIMEOUT_MS);
     if (vis) return vis;
-    setResultProofLine("Update in progress");
-    setResultState("Update in progress");
+    setFailureClarityState("network_issue");
+    setResultMessage("Verification timed out");
+    setResultProofLine("Verify request timed out after fallback retry");
     return null;
   }, []);
 
@@ -1254,7 +1250,8 @@ function MonitoringContent() {
       setResultProofLine(null);
       const ba = beforeAfterLabel(action.kind);
       setProgressFlash(ba);
-      setResultState(action.resultLabel);
+      setFailureClarityState("processing");
+      setResultMessage(action.resultLabel);
       const memoryLine = `${ba} — ${action.resultLabel}`;
       setRecentProgress((prev) => [memoryLine, ...prev].slice(0, 3));
       scheduleClearNextActionFeedback(4500);
@@ -1316,7 +1313,8 @@ function MonitoringContent() {
       (action.kind === "failed" || action.kind === "partial") &&
       rid
     ) {
-      setResultState("Creating task…");
+      setFailureClarityState("processing");
+      setResultMessage("Creating task…");
       scheduleClearNextActionFeedback(12000);
     }
     void (async () => {
@@ -1328,12 +1326,15 @@ function MonitoringContent() {
           rid
         ) {
           if (execResult.taskOutcome === "created") {
-            setResultState("Task created — now tracked");
+            setFailureClarityState("success");
+            setResultMessage("Task created — now tracked");
             setNextActionCardCue("task_created");
           } else if (execResult.taskOutcome === "failed") {
-            setResultState("Could not create — try again");
+            setFailureClarityState("failure");
+            setResultMessage("Could not create — try again");
           } else if (execResult.taskOutcome === "unavailable") {
-            setResultState("Action not available yet — opening flow");
+            setFailureClarityState("network_issue");
+            setResultMessage("Action not available yet — opening flow");
           }
           scheduleClearNextActionFeedback(12000);
         }
@@ -1367,7 +1368,8 @@ function MonitoringContent() {
               setValueMemory(bumpKirpValueMemory(mem));
             }
             if (s === "completed") {
-              setResultState("Done — this is now resolved");
+              setFailureClarityState("success");
+              setResultMessage("Done — this is now resolved");
               const pb = formatProofLine(vis);
               setResultProofLine(
                 pb !== "Updated just now"
@@ -1394,7 +1396,14 @@ function MonitoringContent() {
               applyTaskCreatedLoop();
               scheduleClearNextActionFeedback(2800);
             } else {
-              setResultState(formatVerifiedResultLine(action.kind, vis));
+              setFailureClarityState(verifyStateFromVisibility(vis));
+              setResultMessage(
+                verifyStateFromVisibility(vis) === "success"
+                  ? "Verification succeeded"
+                  : verifyStateFromVisibility(vis) === "failure"
+                    ? "Verification found failure"
+                    : "Verification still processing",
+              );
               if (s === "processing" || s === "accepted") {
                 setResultProofLine("Flow is continuing");
               } else if (s === "failed") {
@@ -1410,7 +1419,8 @@ function MonitoringContent() {
         }
       } catch {
         if ((action.kind === "failed" || action.kind === "partial") && rid) {
-          setResultState("Could not create — try again");
+          setFailureClarityState("failure");
+          setResultMessage("Could not create — try again");
           scheduleClearNextActionFeedback(12000);
         }
       } finally {
@@ -1517,12 +1527,17 @@ function MonitoringContent() {
           </p>
         </CardHeader>
         <CardContent className="space-y-3">
-          {resultState ? (
+          {resultMessage ? (
             <div>
               {progressFlash ? (
                 <p className="text-sm font-medium text-textMain">{progressFlash}</p>
               ) : null}
-              <p className="text-lg font-semibold text-textMain">{resultState}</p>
+              <p
+                className="text-lg font-semibold text-textMain"
+                data-result-state={failureClarityState ?? undefined}
+              >
+                {resultMessage}
+              </p>
               {resultProofLine ? (
                 <p className="mt-1 text-xs leading-snug text-textSoft/80">{resultProofLine}</p>
               ) : null}
@@ -1581,13 +1596,13 @@ function MonitoringContent() {
             <button
               type="button"
               onClick={onNextActionClick}
-              disabled={Boolean(resultState)}
+              disabled={Boolean(resultMessage)}
               className="inline-flex items-center gap-2 rounded-xl border border-[color:var(--color-border-subtle)] bg-primary px-3 py-2 text-sm font-medium text-white hover:opacity-90"
             >
-              {resultState ? "Applying…" : ctaLabelForKind(nextAction.kind)}
+              {resultMessage ? "Applying…" : ctaLabelForKind(nextAction.kind)}
             </button>
           </div>
-          {!resultState ? (
+          {!resultMessage ? (
             <div className="space-y-1 border-t border-[color:var(--color-border-subtle)] pt-3">
               <p
                 className={`text-[11px] leading-snug ${
@@ -1603,10 +1618,10 @@ function MonitoringContent() {
               </p>
             </div>
           ) : null}
-          {!resultState ? (
+          {!resultMessage ? (
             <p className="text-[11px] leading-snug text-textSoft">{afterThisLine}</p>
           ) : null}
-          {recentProgress.length > 0 && !resultState ? (
+          {recentProgress.length > 0 && !resultMessage ? (
             <div className="border-t border-[color:var(--color-border-subtle)] pt-3">
               <p className="text-[10px] font-medium uppercase tracking-wide text-textSoft">
                 Recent progress

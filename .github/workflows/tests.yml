@@ -45,8 +45,15 @@ jobs:
     if: github.event_name == 'pull_request'
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
       - name: Dirty tree guard
         run: bash scripts/dirty_tree_guard.sh
+      - name: Version check gate
+        run: python scripts/version_check.py
+      - name: Auth consistency check gate
+        run: python scripts/auth_consistency_check.py
       - name: Validate required PR sections
         env:
           PR_BODY: ${{ github.event.pull_request.body }}
