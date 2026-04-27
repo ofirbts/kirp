@@ -1,0 +1,34 @@
+---
+description: Definition of Done and required checks
+alwaysApply: true
+---
+
+# Done Criteria
+
+Bug fix:
+- reproducible issue
+- confirmed fix
+- relevant tests pass
+- no unrelated behavior change
+
+Feature:
+- matches spec
+- includes necessary tests
+- does not break existing contracts
+- add short docs note if behavior changed
+
+Refactor:
+- no behavior change
+- better structure/readability
+- all tests pass
+- clear and focused diff
+
+Before merge:
+- lint
+- build
+- unit tests
+- integration tests for critical flows
+- reviewer or tester signoff
+
+Execution policy:
+- pre-defined test suites are safe-by-default and do not require manual approval gates

@@ -1,0 +1,14 @@
+---
+description: Mandatory concise reporting format per change
+alwaysApply: true
+---
+
+# Change Report Format
+
+Each substantive change must include:
+- What changed
+- Why
+- Risk
+- What to verify
+
+Keep reports concise and concrete.

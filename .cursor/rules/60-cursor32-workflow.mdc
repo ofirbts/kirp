@@ -1,0 +1,17 @@
+---
+description: Cursor 3.2+ feature usage policy
+alwaysApply: true
+---
+
+# Cursor 3.2+ Workflow Policy
+
+- For complex tasks, propose async subagent split with clear roles.
+- For significant changes, propose isolated worktree execution.
+- For multi-module tasks, propose multi-root workspace.
+- For large tasks, produce a canvas plan with scope, checklist, and risks.
+- Before major code changes, present expected file-level diffs.
+- On failures, run `/debug` and report evidence-based root cause.
+- For recurring failures, propose rule updates and Bugbot learned rules.
+- Use filtered search by path, type, and glob to reduce noise.
+- When model or tool behavior should change, propose `/config` explicitly.
+- Keep task status visible: branch, agent, model, and active task.
