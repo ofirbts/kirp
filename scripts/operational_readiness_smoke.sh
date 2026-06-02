@@ -7,6 +7,7 @@ cd "$ROOT_DIR"
 API="${KIRP_API_URL:-http://127.0.0.1:8002}"
 export KIRP_API_URL="$API"
 export SKIP_AUTH=0
+export STAGING_SMOKE_POLL_SEC="${STAGING_SMOKE_POLL_SEC:-120}"
 FAIL=0
 
 pass() { echo "PASS $1"; }
