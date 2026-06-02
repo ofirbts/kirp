@@ -1,0 +1,136 @@
+# Brand OS v3 — KIRP Workflow Mapping
+# Maps Brand OS agents and steps to KIRP event types, routing rules, audit fields, examples
+
+metadata:
+  name: brand_os_v3_workflow_mapping
+  description: Agent-to-KIRP-event mapping and routing for Brand OS v3
+  version: "3.0.0"
+
+version: "3.0.0"
+
+event_triggers:
+  - trigger: workflow_started
+    kirp_event: brand_os_v3.workflow.started
+    payload_fields:
+      - trace_id
+      - tenant_id
+      - platform
+      - topic_hint
+  - trigger: agent_step_complete
+    kirp_event: brand_os_v3.workflow.step
+    payload_fields:
+      - trace_id
+      - node_id
+      - approved_or_rejected
+      - revision_notes_if_any
+  - trigger: workflow_completed
+    kirp_event: brand_os_v3.workflow.completed
+    payload_fields:
+      - trace_id
+      - tenant_id
+      - platform
+      - status
+      - content_headline
+      - visual_spec_format
+  - trigger: identity_rejected
+    kirp_event: brand_os_v3.identity.rejected
+    payload_fields:
+      - trace_id
+      - identity_alignment
+      - tone_deviation
+      - revision_notes
+  - trigger: cto_rejected
+    kirp_event: brand_os_v3.cto.rejected
+    payload_fields:
+      - trace_id
+      - technical_accuracy
+      - overclaim_risk
+      - revision_notes
+
+routing_rules:
+  - condition: node_id == CONTEXT_SCANNER
+    emit: brand_os_v3.context_scanner.completed
+    route_to: STRATEGIC_PLANNER
+  - condition: node_id == STRATEGIC_PLANNER
+    emit: brand_os_v3.strategic_planner.completed
+    route_to: TECHNICAL_STORYTELLER
+  - condition: node_id == TECHNICAL_STORYTELLER
+    emit: brand_os_v3.technical_storyteller.completed
+    route_to: HUMAN_EDGE
+  - condition: node_id == HUMAN_EDGE
+    emit: brand_os_v3.human_edge.completed
+    route_to: IDENTITY_GUARDIAN
+  - condition: node_id == IDENTITY_GUARDIAN and approved == true
+    emit: brand_os_v3.identity_guardian.completed
+    route_to: SKEPTICAL_CTO
+  - condition: node_id == IDENTITY_GUARDIAN and approved == false
+    emit: brand_os_v3.identity.rejected
+    route_to: revision_identity
+  - condition: node_id == SKEPTICAL_CTO and approved == true
+    emit: brand_os_v3.skeptical_cto.completed
+    route_to: VISUAL_GENERATOR
+  - condition: node_id == SKEPTICAL_CTO and approved == false
+    emit: brand_os_v3.cto.rejected
+    route_to: revision_cto
+  - condition: node_id == VISUAL_GENERATOR
+    emit: brand_os_v3.visual_generator.completed
+    route_to: logging
+  - condition: node_id == GROWTH_ANALYST
+    emit: brand_os_v3.growth_analyst.completed
+    route_to: final_output
+
+agent_to_kirp_event:
+  CONTEXT_SCANNER: brand_os_v3.context_scanner.completed
+  STRATEGIC_PLANNER: brand_os_v3.strategic_planner.completed
+  TECHNICAL_STORYTELLER: brand_os_v3.technical_storyteller.completed
+  HUMAN_EDGE: brand_os_v3.human_edge.completed
+  IDENTITY_GUARDIAN: brand_os_v3.identity_guardian.completed
+  IDENTITY_GUARDIAN_REJECT: brand_os_v3.identity.rejected
+  SKEPTICAL_CTO: brand_os_v3.skeptical_cto.completed
+  SKEPTICAL_CTO_REJECT: brand_os_v3.cto.rejected
+  VISUAL_GENERATOR: brand_os_v3.visual_generator.completed
+  GROWTH_ANALYST: brand_os_v3.growth_analyst.completed
+
+audit_fields:
+  - trace_id
+  - tenant_id
+  - platform
+  - topic_hint
+  - node_id
+  - approved
+  - revision_count_identity
+  - revision_count_cto
+  - status
+  - timestamp
+
+examples:
+  workflow_started:
+    kirp_event: brand_os_v3.workflow.started
+    payload:
+      trace_id: trace-001
+      tenant_id: tenant-1
+      platform: linkedin
+      topic_hint: API release
+  step_identity_approved:
+    kirp_event: brand_os_v3.workflow.step
+    payload:
+      trace_id: trace-001
+      node_id: IDENTITY_GUARDIAN
+      approved_or_rejected: approved
+      revision_notes_if_any: ""
+  step_cto_rejected:
+    kirp_event: brand_os_v3.workflow.step
+    payload:
+      trace_id: trace-002
+      node_id: SKEPTICAL_CTO
+      approved_or_rejected: rejected
+      revision_notes_if_any: "Remove 'best in class'. Qualify speed claim."
+  workflow_completed:
+    kirp_event: brand_os_v3.workflow.completed
+    payload:
+      trace_id: trace-001
+      tenant_id: tenant-1
+      platform: linkedin
+      status: approved
+      content_headline: "Auth as one line of config"
+      visual_spec_format: png

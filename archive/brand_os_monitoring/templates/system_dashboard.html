@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>System Control — KIRP / Brand OS</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    body { font-family: system-ui, sans-serif; margin: 2rem; background: #f7f9fc; }
+    h1 { color: #0a2540; }
+    h2 { color: #425466; font-size: 1.1rem; margin-top: 1.5rem; }
+    a { color: #0a2540; }
+    table { border-collapse: collapse; width: 100%; max-width: 900px; background: #fff; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); overflow: hidden; }
+    th, td { padding: 0.5rem 0.75rem; text-align: left; border-bottom: 1px solid #eee; }
+    th { background: #0a2540; color: #fff; }
+    .ok { color: #00a878; font-weight: 600; }
+    .fail { color: #d32f2f; font-weight: 600; }
+    .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 1rem; margin: 1rem 0; }
+    .card { background: #fff; padding: 1rem; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+    .card h3 { margin: 0 0 0.5rem; font-size: 0.85rem; color: #425466; }
+    .card .value { font-size: 1.2rem; font-weight: 700; color: #0a2540; }
+    .cmd { font-family: monospace; font-size: 0.85rem; background: #f0f0f0; padding: 0.25rem 0.5rem; border-radius: 4px; margin-top: 0.5rem; }
+    .nav { margin-bottom: 1rem; }
+    .nav a { margin-right: 1rem; }
+  </style>
+</head>
+<body>
+  <div class="nav"><a href="/dashboard">Brand OS Dashboard</a> | <a href="/metrics">Metrics (JSON)</a></div>
+  <h1>System Control & Observability</h1>
+
+  <h2>Health</h2>
+  <div class="cards">
+    {% for h in data.health %}
+    <div class="card">
+      <h3>{{ h.name }}</h3>
+      <span class="{{ 'ok' if h.ok else 'fail' }}">{{ 'OK' if h.ok else 'FAIL' }}</span>
+      <div class="cmd">{{ h.url }}</div>
+    </div>
+    {% endfor %}
+  </div>
+
+  <h2>Listening ports</h2>
+  {% if data.lsof_available and data.ports %}
+  <table>
+    <thead><tr><th>Command</th><th>PID</th><th>User</th><th>Port</th><th>Action</th></tr></thead>
+    <tbody>
+      {% for p in data.ports %}
+      <tr>
+        <td>{{ p.command }}</td>
+        <td>{{ p.pid }}</td>
+        <td>{{ p.user }}</td>
+        <td>{{ p.port }}</td>
+        <td><span class="cmd">brandos system kill-port {{ p.port }}</span></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p>No port data (install <code>lsof</code> or no listening ports). Run <code>./scripts/ports.sh</code>.</p>
+  {% endif %}
+
+  <h2>Docker containers</h2>
+  {% if data.docker_available and data.containers %}
+  <table>
+    <thead><tr><th>Name</th><th>Status</th><th>Ports</th><th>Action</th></tr></thead>
+    <tbody>
+      {% for c in data.containers %}
+      <tr>
+        <td>{{ c.name }}</td>
+        <td>{{ c.status }}</td>
+        <td>{{ c.ports }}</td>
+        <td><span class="cmd">brandos system docker restart {{ c.name }}</span></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p>Docker not available or no containers. Run <code>./scripts/docker_status.sh</code>.</p>
+  {% endif %}
+
+  <h2>Processes (Python/Node/Uvicorn)</h2>
+  {% if data.processes %}
+  <table>
+    <thead><tr><th>User</th><th>PID</th><th>CPU %</th><th>Mem %</th><th>Command</th></tr></thead>
+    <tbody>
+      {% for p in data.processes %}
+      <tr>
+        <td>{{ p.user }}</td>
+        <td>{{ p.pid }}</td>
+        <td>{{ p.cpu }}</td>
+        <td>{{ p.mem }}</td>
+        <td>{{ p.command }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p>No matching processes found.</p>
+  {% endif %}
+
+  <h2>Quick actions (run in terminal)</h2>
+  <ul>
+    <li><code>brandos system status</code> — full status</li>
+    <li><code>brandos system ports</code> — list ports</li>
+    <li><code>brandos system docker restart CONTAINER</code> — restart container</li>
+    <li><code>brandos system kill-port PORT</code> — free port</li>
+    <li><code>brandos system health</code> — health checks</li>
+  </ul>
+  <p>See <code>docs/SYSTEM_CONTROL.md</code> in the repo for full docs.</p>
+</body>
+</html>

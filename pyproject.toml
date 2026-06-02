@@ -1,0 +1,24 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "kirp"
+version = "0.1.0"
+dependencies = [
+    "fastapi>=0.109.0",
+    "uvicorn[standard]>=0.27.0",
+    "pydantic>=2.0.0",
+    "pydantic-settings>=2.0.0",
+    "click>=8.0.0",
+    "requests>=2.28.0",
+    "apscheduler>=3.10.0",
+    "jinja2>=3.0.0",
+    "twilio>=8.0.0",
+]
+
+[project.scripts]
+brandos = "brand_os_cli.main:main"
+
+[tool.setuptools]
+packages = ["src", "app", "brand_os_sdk", "api", "brand_os_cli", "brand_os_scheduler", "brand_os_monitoring", "brand_os_integrations"]

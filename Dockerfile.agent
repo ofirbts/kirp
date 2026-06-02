@@ -1,0 +1,25 @@
+# kirp-agent-processor: consumes Kafka (kirp-events), runs pipeline → Mongo, Postgres, Qdrant, history
+FROM python:3.11-slim
+
+WORKDIR /app
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential curl \
+    libpq-dev libffi-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Prometheus multiprocess mode
+RUN mkdir -p /tmp/prometheus && chmod 777 /tmp/prometheus
+ENV PROMETHEUS_MULTIPROC_DIR=/tmp/prometheus
+
+# Install all Python deps (Kafka, Mongo, Postgres, Qdrant, Redis, etc.)
+COPY requirements.txt .
+RUN pip install --upgrade pip \
+    && pip install --no-cache-dir -r requirements.txt
+
+# Full app (src/ required for src.workers.kafka_processor and pipeline)
+COPY . .
+ENV PYTHONPATH=/app
+
+# Run the Kafka consumer (module path must match src/workers/kafka_processor.py)
+CMD ["python", "-m", "src.workers.kafka_processor"]

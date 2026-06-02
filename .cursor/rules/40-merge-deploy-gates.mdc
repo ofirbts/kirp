@@ -1,0 +1,23 @@
+---
+description: Merge and deploy release gates
+alwaysApply: true
+---
+
+# Merge And Deploy Gates
+
+Merge requires:
+- lint pass
+- build pass
+- unit pass
+- critical integration pass
+- no infra or DB change without explicit approval
+
+Deploy requires:
+- health check
+- version check
+- migration plan when needed
+- rollback plan
+
+For risky changes:
+- prefer stepwise rollout
+- define rollback trigger before deployment

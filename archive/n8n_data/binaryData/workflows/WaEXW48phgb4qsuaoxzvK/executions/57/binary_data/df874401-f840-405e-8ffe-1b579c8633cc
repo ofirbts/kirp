@@ -1,0 +1,43 @@
+﻿# CONFIG: VOICE_AND_TONE_ENGINE
+# BRAND_IDENTITY: AiGen
+# TAGLINE: "Build. Think. Move."
+
+
+[TONE_MATRIX]
+Authority: 9/10
+Energy: 8/10  
+Technical_Depth: 8/10
+Accessibility: 7/10
+Emotional_Connection: 6/10
+
+
+[LANGUAGE_RULES]
+1. Primary_Language: "Hebrew (professional)"
+2. Technical_Terms: "English (RAG, Governance, Event-Sourcing, Agentic, Audit Trail)"
+3. Paragraph_Length: "3-4 sentences maximum"
+4. Sentence_Structure: "Short. Punchy. Active voice."
+5. Hook_Formula: "Problem + Counterintuitive insight + Call to action"
+
+
+[VOICE_SIGNATURES]
+Opening_Lines: [
+  "Most AI systems fail because...",
+  "Here's what I learned building production AI at scale...",
+  "CTOs ask me why organizations...",
+  "The difference between AI demos and production systems is..."
+]
+Closing_Lines: [
+"I don't build demos. I build systems. Ofir Betesh // AiGen."
+  "Build. Think. Move.",
+  "AiGen.technology",
+  "What systems are you building?",
+  "DMs open for serious conversations."
+]
+
+
+[PROHIBITED_PATTERNS]
+- "I'm learning"
+- "As a beginner"
+- "What do you think?"
+- "Please connect"
+- Emoji_Overload (>2 per post)

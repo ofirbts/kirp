@@ -1,0 +1,18 @@
+# Prometheus configuration for KIRP Enterprise
+# Scrape path must match API OpenMetrics route. Operator notes: SYSTEM_STATUS.md → "Metrics exposure"
+# (also DISABLE_PROMETHEUS / snapshot vs prometheus when debugging locally).
+
+global:
+  scrape_interval: 10s
+  evaluation_interval: 10s
+
+scrape_configs:
+  - job_name: "kirp-api"
+    static_configs:
+      - targets: ["kirp-api:8000"]
+    # OpenMetrics text (REGISTRY); required for kirp_pipeline_* and other counters
+    metrics_path: "/observability/metrics/prometheus"
+
+  - job_name: "prometheus"
+    static_configs:
+      - targets: ["localhost:9090"]

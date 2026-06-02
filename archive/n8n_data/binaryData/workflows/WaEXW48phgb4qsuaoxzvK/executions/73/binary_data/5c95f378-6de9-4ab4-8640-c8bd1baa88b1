@@ -1,0 +1,32 @@
+﻿# VISUAL_IDENTITY_GUIDE
+# FOR LINKEDIN GRAPHICS & BRANDING
+
+
+[COLOR_PALETTE]
+Primary: #1E3A8A (Deep Tech Blue)
+Secondary: #0F172A (Slate)
+Accent: #3B82F6 (AiGen Blue)
+Text: #F8FAFC (Clean White)
+
+
+[TYPOGRAPHY]
+Headings: Inter Bold
+Body: Inter Regular
+Sizes: 48/32/24/18/16px
+
+
+[IMAGE_STYLES]
+Architecture Diagrams: Clean lines, minimal nodes
+Screenshots: Dark theme code + annotations
+Photos: Professional headshot, neutral backgrounds
+
+
+[AI_IMAGE_PROMPTS]
+Thumbnail_Template: "Minimalist tech architecture diagram, deep blue background, white lines, professional, AiGen branding, LinkedIn thumbnail format"
+
+
+STRICT_AVOID:
+• Text inside image
+• Human faces
+• Marketing illustrations
+• Over-detailed diagrams

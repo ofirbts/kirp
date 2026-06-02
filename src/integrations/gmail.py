@@ -1,0 +1,141 @@
+"""
+Gmail Integration — Inbound ingest via Gmail API.
+
+- OAuth2 tokens from ConnectorTokenStore (or env GOOGLE_CREDENTIALS_PATH for service account).
+- Pull-based sync: fetch recent messages → unified event payloads with external_id=message_id.
+- Uses refresh_token + client_id/client_secret (env) so tokens can refresh when expired.
+"""
+
+from __future__ import annotations
+
+import logging
+import os
+from typing import Any
+
+logger = logging.getLogger(__name__)
+
+GOOGLE_TOKEN_URI = "https://oauth2.googleapis.com/token"
+
+
+def _build_client(
+    credentials_path: str | None = None,
+    access_token: str | None = None,
+    refresh_token: str | None = None,
+) -> Any:
+    """Build Gmail API client. Prefer OAuth with refresh so expired tokens work."""
+    if access_token or refresh_token:
+        try:
+            from google.oauth2.credentials import Credentials
+            from googleapiclient.discovery import build
+            client_id = os.getenv("GOOGLE_CLIENT_ID")
+            client_secret = os.getenv("GOOGLE_CLIENT_SECRET")
+            if refresh_token and client_id and client_secret:
+                creds = Credentials(
+                    token=access_token or None,
+                    refresh_token=refresh_token,
+                    token_uri=GOOGLE_TOKEN_URI,
+                    client_id=client_id,
+                    client_secret=client_secret,
+                )
+            else:
+                creds = Credentials(token=access_token or "")
+            return build("gmail", "v1", credentials=creds)
+        except Exception as e:
+            logger.error("Gmail OAuth client failed: %s", e)
+            return None
+    if credentials_path:
+        try:
+            from google.oauth2 import service_account
+            from googleapiclient.discovery import build
+            creds = service_account.Credentials.from_service_account_file(credentials_path)
+            return build("gmail", "v1", credentials=creds)
+        except Exception as e:
+            logger.error("Gmail service account failed: %s", e)
+            return None
+    return None
+
+
+class GmailIntegration:
+    """Gmail API: list messages, return unified ingest payloads (idempotent by message id)."""
+
+    def __init__(
+        self,
+        credentials_path: str | None = None,
+        access_token: str | None = None,
+        token: dict[str, Any] | None = None,
+    ) -> None:
+        self._creds_path = credentials_path or os.getenv("GOOGLE_CREDENTIALS_PATH", "")
+        self._token = token  # full record from ConnectorTokenStore (access_token, refresh_token, ...)
+        self._access_token = access_token or (token.get("access_token") if token else None)
+        self._refresh_token = token.get("refresh_token") if token else None
+        self._client: Any = None
+
+    def connect(self, access_token: str | None = None, token: dict[str, Any] | None = None) -> None:
+        t = token or self._token
+        access = access_token or (t.get("access_token") if t else None) or self._access_token
+        refresh = (t.get("refresh_token") if t else None) or self._refresh_token
+        self._client = _build_client(
+            credentials_path=self._creds_path or None,
+            access_token=access,
+            refresh_token=refresh,
+        )
+        if self._client is not None:
+            logger.info("GmailIntegration connected")
+
+    async def list_messages(
+        self,
+        tenant_id: str,
+        space_id: str,
+        user_id: str,
+        max_results: int = 50,
+        label_ids: list[str] | None = None,
+        page_token: str | None = None,
+    ) -> tuple[list[dict[str, Any]], str | None]:
+        """
+        Fetch messages and return (unified event payloads, next_page_token).
+        Each payload has source=gmail, metadata.external_id=message_id (for idempotency).
+        Cursor per user: pass page_token from previous run; returns next_page_token for next run.
+        """
+        if self._client is None:
+            self.connect()
+        if self._client is None:
+            return [], None
+        import asyncio
+        events: list[dict[str, Any]] = []
+        try:
+            def _list() -> dict:
+                kwargs = {"userId": "me", "maxResults": max_results, "labelIds": label_ids or ["INBOX"]}
+                if page_token:
+                    kwargs["pageToken"] = page_token
+                return self._client.users().messages().list(**kwargs).execute()
+
+            r = await asyncio.to_thread(_list)
+            for msg_ref in r.get("messages", []):
+                msg_id = msg_ref.get("id")
+                if not msg_id:
+                    continue
+                def _get():
+                    return self._client.users().messages().get(userId="me", id=msg_id, format="metadata").execute()
+                msg = await asyncio.to_thread(_get)
+                headers = {h["name"].lower(): h["value"] for h in msg.get("payload", {}).get("headers", [])}
+                subject = headers.get("subject", "")
+                snippet = msg.get("snippet", "")
+                content = f"Subject: {subject}\n\n{snippet}"
+                events.append({
+                    "tenant_id": tenant_id,
+                    "space_id": space_id,
+                    "user_id": user_id,
+                    "source": "gmail",
+                    "content": content[:50000],
+                    "metadata": {
+                        "external_id": msg_id,
+                        "thread_id": msg.get("threadId"),
+                        "subject": subject,
+                        "from": headers.get("from"),
+                        "date": headers.get("date"),
+                    },
+                })
+        except Exception as e:
+            logger.error("Gmail list failed: %s", e)
+            return events, None
+        return events, r.get("nextPageToken")

@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 32" fill="none">
+  <rect width="120" height="32" rx="8" fill="#020617"/>
+  <rect x="8" y="4" width="24" height="24" rx="6" fill="#020617" stroke="#22d3ee" stroke-width="1.5"/>
+  <text x="20" y="22" font-family="system-ui,sans-serif" font-size="14" font-weight="bold" fill="#22d3ee" text-anchor="middle">K</text>
+  <text x="44" y="21" font-family="system-ui,sans-serif" font-size="12" font-weight="600" fill="#e5e7eb">
+    KIRP Intelligence OS
+  </text>
+</svg>
+

@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Brand OS v3 Monitoring</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    body { font-family: system-ui, sans-serif; margin: 2rem; background: #f7f9fc; }
+    h1 { color: #0a2540; }
+    .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 1rem; margin: 1.5rem 0; }
+    .card { background: #fff; padding: 1rem; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+    .card h3 { margin: 0 0 0.5rem; font-size: 0.9rem; color: #425466; }
+    .card .value { font-size: 1.5rem; font-weight: 700; color: #0a2540; }
+    .chart-container { max-width: 500px; margin: 2rem 0; }
+  </style>
+</head>
+<body>
+  <h1>Brand OS v3 Dashboard</h1>
+  <div class="cards">
+    <div class="card"><h3>Total runs</h3><div class="value">{{ metrics.total_runs }}</div></div>
+    <div class="card"><h3>Approved</h3><div class="value">{{ metrics.approved }}</div></div>
+    <div class="card"><h3>Rejected (Identity)</h3><div class="value">{{ metrics.rejected_identity }}</div></div>
+    <div class="card"><h3>Rejected (CTO)</h3><div class="value">{{ metrics.rejected_cto }}</div></div>
+  </div>
+  <div class="chart-container">
+    <h2>Status distribution</h2>
+    <canvas id="statusChart" width="400" height="200"></canvas>
+  </div>
+  <div class="chart-container">
+    <h2>Top topics</h2>
+    <canvas id="topicsChart" width="400" height="200"></canvas>
+  </div>
+  <script>
+    const statusData = {
+      labels: ['Approved', 'Rejected Identity', 'Rejected CTO'],
+      datasets: [{
+        data: [{{ metrics.approved }}, {{ metrics.rejected_identity }}, {{ metrics.rejected_cto }}],
+        backgroundColor: ['#00D4AA', '#FF6B35', '#425466']
+      }]
+    };
+    new Chart(document.getElementById('statusChart'), {
+      type: 'doughnut',
+      data: statusData
+    });
+    const topics = [{% for h in metrics.top_hooks %}{"topic": "{{ h.topic | e }}", "count": {{ h.count }}}{% if not loop.last %}, {% endif %}{% endfor %}];
+    new Chart(document.getElementById('topicsChart'), {
+      type: 'bar',
+      data: {
+        labels: topics.map(t => t.topic || '(empty)'),
+        datasets: [{ label: 'Runs', data: topics.map(t => t.count), backgroundColor: '#0A2540' }]
+      },
+      options: { scales: { y: { beginAtZero: true } } }
+    });
+  </script>
+</body>
+</html>

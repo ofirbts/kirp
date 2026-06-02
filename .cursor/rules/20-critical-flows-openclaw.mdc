@@ -1,0 +1,24 @@
+---
+description: Protect critical OpenClaw flows and contracts
+alwaysApply: true
+---
+
+# Critical Flows
+
+Priority order:
+1. Authentication and authorization
+2. Core data flow and business logic
+3. Error handling and logging
+4. Deployment and rollback
+5. Testing pipeline
+
+Never break:
+- auth
+- data integrity
+- API contracts
+- logging and error flow
+- deployment pipeline
+
+When touching critical flows:
+- call out risk before editing
+- run focused validation after editing

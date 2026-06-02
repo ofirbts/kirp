@@ -1,0 +1,404 @@
+# KIRP Enterprise — Full Stack
+
+networks:
+  kirp-net:
+    driver: bridge
+
+volumes:
+  mongo_data:
+  postgres_data:
+  cassandra_data:
+  qdrant_data:
+  prometheus_data:
+  grafana_data:
+  opa_data:
+  zookeeper_data:
+  zookeeper_logs:
+  kafka_data:
+
+services:
+  # === MongoDB ===
+  mongodb:
+    image: mongo:7
+    container_name: kirp-mongodb
+    restart: always
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: root
+      MONGO_INITDB_ROOT_PASSWORD: example
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+    networks:
+      - kirp-net
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  mongo-express:
+    image: mongo-express:latest
+    container_name: kirp-mongo-express
+    restart: always
+    environment:
+      ME_CONFIG_MONGODB_ADMINUSERNAME: root
+      ME_CONFIG_MONGODB_ADMINPASSWORD: example
+      ME_CONFIG_MONGODB_SERVER: mongodb
+    ports:
+      - "8081:8081"
+    depends_on:
+      - mongodb
+    networks:
+      - kirp-net
+
+  # === PostgreSQL ===
+  postgres:
+    image: postgres:16-alpine
+    container_name: kirp-postgres
+    restart: always
+    environment:
+      POSTGRES_DB: kirp
+      POSTGRES_USER: kirp_user
+      POSTGRES_PASSWORD: kirp_password
+      POSTGRES_INITDB_ARGS: "-E UTF8"
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./deploy/postgres-init:/docker-entrypoint-initdb.d:ro
+    networks:
+      - kirp-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U kirp_user -d kirp && psql -U kirp_user -d kirp -c 'SELECT 1'"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  # === Redis ===
+  redis:
+    image: redis:7-alpine
+    container_name: kirp-redis
+    restart: always
+    command: redis-server --maxmemory 512mb --maxmemory-policy allkeys-lru
+    ports:
+      - "6379:6379"
+    networks:
+      - kirp-net
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # === Qdrant ===
+  qdrant:
+    build:
+      context: .
+      dockerfile: deploy/Dockerfile.qdrant
+    image: kirp-qdrant:local
+    container_name: kirp-qdrant
+    restart: always
+    ports:
+      - "6333:6333"
+      - "6334:6334"
+    volumes:
+      - qdrant_data:/qdrant/storage
+    networks:
+      - kirp-net
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:6333/healthz || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  # === Zookeeper ===
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.5.0
+    container_name: kirp-zookeeper
+    restart: always
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+      ZOO_4LW_COMMANDS_WHITELIST: "ruok,stat,conf,isro,mntr,srvr"
+      ZOO_CFG_EXTRA: |
+        4lw.commands.whitelist=ruok,stat,conf,isro,mntr,srvr
+    ports:
+      - "2181:2181"
+    volumes:
+      - zookeeper_data:/var/lib/zookeeper/data
+      - zookeeper_logs:/var/lib/zookeeper/log
+    networks:
+      - kirp-net
+    healthcheck:
+      # Confluent image only enables 4lw "srvr"; use it and check response contains Mode
+      test: ["CMD-SHELL", "bash -c 'exec 3<>/dev/tcp/localhost/2181 && echo srvr >&3 && cat <&3 | grep -q Mode'"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  # === Kafka ===
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    container_name: kirp-kafka
+    restart: always
+    depends_on:
+      zookeeper:
+        condition: service_healthy
+    ports:
+      - "9092:9092"
+      - "9093:9093"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+
+      # FIXED — REQUIRED
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,PLAINTEXT_HOST://0.0.0.0:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:9093
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      KAFKA_LOG_DIRS: /var/lib/kafka/data
+    volumes:
+      - kafka_data:/var/lib/kafka/data
+    networks:
+      - kirp-net
+    healthcheck:
+      test: ["CMD-SHELL", "kafka-broker-api-versions --bootstrap-server localhost:9092 || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 90s
+
+  # === Cassandra ===
+  cassandra:
+    image: cassandra:4.1
+    container_name: kirp-cassandra
+    restart: always
+    environment:
+      CASSANDRA_CLUSTER_NAME: "KIRPCluster"
+      CASSANDRA_DC: datacenter1
+      CASSANDRA_RACK: rack1
+      CASSANDRA_ENDPOINT_SNITCH: GossipingPropertyFileSnitch
+    ports:
+      - "9042:9042"
+    volumes:
+      - cassandra_data:/var/lib/cassandra
+    networks:
+      - kirp-net
+    healthcheck:
+      test: ["CMD-SHELL", "nodetool status | grep -E '^UN' || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+  # === Elasticsearch ===
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.10.2
+    container_name: kirp-elasticsearch
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - ES_JAVA_OPTS=-Xms512m -Xmx512m
+    ports:
+      - "9200:9200"
+    networks:
+      - kirp-net
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:9200/_cluster/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+  # === Prometheus ===
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: kirp-prometheus
+    volumes:
+      - ./deploy/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    ports:
+      - "9090:9090"
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+    networks:
+      - kirp-net
+
+  # === Grafana ===
+  grafana:
+    image: grafana/grafana:latest
+    container_name: kirp-grafana
+    ports:
+      - "3001:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    networks:
+      - kirp-net
+
+  # === OPA ===
+  opa:
+    image: openpolicyagent/opa:latest
+    container_name: kirp-opa
+    restart: always
+    command:
+      - "run"
+      - "--server"
+      - "--addr=0.0.0.0:8181"
+      - "--log-level=info"
+      - "--set=decision_logs.console=true"
+      - "/policies"
+    volumes:
+      - ./deploy/opa/policies:/policies
+      - opa_data:/data
+    ports:
+      - "8181:8181"
+    networks:
+      - kirp-net
+
+  # === Brand OS API (port 8002 for UI) ===
+  brand-os-api:
+    build:
+      context: .
+      dockerfile: Dockerfile.brand_os_api
+    image: kirp-brand-os-api:local
+    container_name: kirp-brand-os-api
+    restart: unless-stopped
+    ports:
+      - "8002:8000"
+    environment:
+      BRAND_OS_V3_PATH: /app/brand_os_v3
+      PYTHONPATH: /app
+    command: uvicorn api.main:app --host 0.0.0.0 --port 8000
+    networks:
+      - kirp-net
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8000/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  # === API ===
+  kirp-api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    container_name: kirp-api
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    env_file: .env
+    environment:
+      ENV: development
+      SKIP_AUTH: "1"
+      DEV_TOKEN: dev-local-token
+      MONGO_URI: mongodb://root:example@mongodb:27017/kirp?authSource=admin
+      POSTGRES_URI: postgresql+asyncpg://kirp_user:kirp_password@postgres:5432/kirp
+      QDRANT_URL: http://qdrant:6333
+      REDIS_URL: redis://redis:6379/0
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      EVENT_BUS_PROVIDER: kafka
+      ELASTICSEARCH_HOST: elasticsearch
+      ELASTICSEARCH_PORT: 9200
+      CASSANDRA_HOST: cassandra
+      CASSANDRA_PORT: 9042
+      OPA_URL: http://opa:8181
+      PYTHONPATH: /app
+    depends_on:
+      mongodb: { condition: service_healthy }
+      postgres: { condition: service_healthy }
+      qdrant: { condition: service_healthy }
+      redis: { condition: service_healthy }
+      kafka: { condition: service_healthy }
+      opa: { condition: service_started }
+    command: sh -c "echo 'Waiting for PostgreSQL...' && sleep 2 && alembic upgrade head && echo 'Migrations complete, starting API...' && uvicorn src.main:app --host 0.0.0.0 --port 8000"
+    networks:
+      - kirp-net
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8000/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 120s
+
+  # === Celery Worker ===
+  kirp-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+    container_name: kirp-worker
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      MONGO_URI: mongodb://root:example@mongodb:27017/kirp?authSource=admin
+      POSTGRES_URI: postgresql+asyncpg://kirp_user:kirp_password@postgres:5432/kirp
+      QDRANT_URL: http://qdrant:6333
+      REDIS_URL: redis://redis:6379/0
+      CELERY_BROKER_URL: redis://redis:6379/1
+      CELERY_RESULT_BACKEND: redis://redis:6379/1
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      OPA_URL: http://opa:8181
+      PYTHONPATH: /app
+    depends_on:
+      kirp-api: { condition: service_healthy }
+      redis: { condition: service_healthy }
+      kafka: { condition: service_healthy }
+      opa: { condition: service_started }
+    command: celery -A src.workers.celery_app worker -l info -c 4
+    networks:
+      - kirp-net
+
+  # === Agent Processor ===
+  kirp-agent-processor:
+    build:
+      context: .
+      dockerfile: Dockerfile.agent
+    container_name: kirp-agent-processor
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      MONGO_URI: mongodb://root:example@mongodb:27017/kirp?authSource=admin
+      POSTGRES_URI: postgresql+asyncpg://kirp_user:kirp_password@postgres:5432/kirp
+      QDRANT_URL: http://qdrant:6333
+      REDIS_URL: redis://redis:6379/0
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      OPA_URL: http://opa:8181
+      PYTHONPATH: /app
+    depends_on:
+      kirp-api: { condition: service_healthy }
+      kafka: { condition: service_healthy }
+    command: python -m src.workers.kafka_processor
+    networks:
+      - kirp-net
+
+  # === Dashboard ===
+  kirp-dashboard:
+    build:
+      context: .
+      dockerfile: Dockerfile.dashboard
+    container_name: kirp-dashboard
+    restart: unless-stopped
+    ports:
+      - "8501:8501"
+    env_file: .env
+    environment:
+      API_URL: http://kirp-api:8000
+      NEXT_PUBLIC_API_URL: http://kirp-api:8000
+      EXTERNAL_URL: http://localhost:8501
+      PYTHONPATH: /app
+    depends_on:
+      kirp-api:
+        condition: service_healthy
+    command: streamlit run src/ui/master_dashboard.py --server.port 8501 --server.address 0.0.0.0
+    networks:
+      - kirp-net

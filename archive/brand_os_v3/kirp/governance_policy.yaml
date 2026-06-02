@@ -1,0 +1,151 @@
+# Brand OS v3 — KIRP Governance Policy
+# OPA-style policy bundle: metadata, version, rules, identity/agent constraints, audit, events, examples
+
+metadata:
+  name: brand_os_v3_governance
+  description: Governance rules for Brand OS v3 pipeline (identity, agents, audit)
+  owner: brand_os
+  version: "3.0.0"
+
+version: "3.0.0"
+
+rules:
+  - id: identity_must_align
+    name: Identity Alignment
+    description: Content must align with Master Identity Core (mission, values, tone, constraints).
+    condition: identity_alignment >= 0.85 and tone_deviation <= 0.15
+    action: allow
+    on_fail: reject_with_revision_notes
+
+  - id: no_forbidden_topics
+    name: No Forbidden Topics
+    description: Content must not reference forbidden_topics from Master Identity.
+    condition: no_forbidden_topic_in_content
+    action: allow
+    on_fail: reject
+
+  - id: no_forbidden_claims
+    name: No Forbidden Claims
+    description: Content must not contain forbidden_claims from Master Identity.
+    condition: no_forbidden_claim_in_content
+    action: allow
+    on_fail: reject
+
+  - id: technical_accuracy
+    name: Technical Accuracy
+    description: Content must pass SKEPTICAL_CTO (technical_accuracy >= 0.85, overclaim_risk <= 0.2).
+    condition: technical_accuracy >= 0.85 and overclaim_risk <= 0.2
+    action: allow
+    on_fail: reject_with_revision_notes
+
+  - id: agent_order
+    name: Agent Invocation Order
+    description: Agents must be invoked in flow_order (CONTEXT_SCANNER to GROWTH_ANALYST).
+    condition: invocation_sequence_matches_flow_order
+    action: allow
+    on_fail: log_warning
+
+  - id: revision_loop_max
+    name: Revision Loop Limit
+    description: Max one revision per gatekeeper (IDENTITY_GUARDIAN, SKEPTICAL_CTO).
+    condition: revision_count_identity <= 1 and revision_count_cto <= 1
+    action: allow
+    on_fail: stop_and_emit_status
+
+identity_constraints:
+  source: config/00_Master_Identity_Core.json
+  fields:
+    - brand_name
+    - mission
+    - values
+    - tone_profile
+    - constraints
+    - audience_archetypes
+  checks:
+    - name: mission_alignment
+      description: Draft must support brand mission.
+    - name: values_no_contradiction
+      description: Draft must not contradict any value.
+    - name: tone_match
+      description: Tone must match primary_tone; avoid list must not appear.
+    - name: constraints_respected
+      description: No forbidden_topics, forbidden_claims; required_disclaimers when applicable.
+
+agent_constraints:
+  - agent_id: CONTEXT_SCANNER
+    allowed_input: trace_id, tenant_id, platform, topic_hint, signals, memory_entries
+    required_output: world_context, trends, signals_used, memory_summary
+  - agent_id: STRATEGIC_PLANNER
+    allowed_input: trace_id, tenant_id, platform, topic_hint, world_context, trends, memory_summary, brand_mission, audience_archetypes, hook_library
+    required_output: strategy_brief
+  - agent_id: TECHNICAL_STORYTELLER
+    allowed_input: trace_id, tenant_id, platform, strategy_brief, voice_rules, platform_limits, hook_text, cta_text
+    required_output: draft
+  - agent_id: HUMAN_EDGE
+    allowed_input: trace_id, tenant_id, platform, draft, voice_rules, revision_notes
+    required_output: polished_draft
+  - agent_id: IDENTITY_GUARDIAN
+    allowed_input: trace_id, tenant_id, platform, polished_draft, master_identity
+    required_output: approved, identity_alignment, tone_deviation, revision_notes
+  - agent_id: SKEPTICAL_CTO
+    allowed_input: trace_id, tenant_id, platform, polished_draft, strategy_brief, world_context
+    required_output: approved, technical_accuracy, overclaim_risk, revision_notes
+  - agent_id: VISUAL_GENERATOR
+    allowed_input: trace_id, tenant_id, platform, polished_draft, visual_identity
+    required_output: visual_spec
+  - agent_id: GROWTH_ANALYST
+    allowed_input: trace_id, tenant_id, platform, final_content, performance_history
+    required_output: recommendations
+
+audit_fields:
+  - trace_id
+  - tenant_id
+  - platform
+  - topic_hint
+  - status
+  - identity_approved
+  - cto_approved
+  - revision_count_identity
+  - revision_count_cto
+  - timestamp
+  - agent_invocations
+
+event_triggers:
+  - event: brand_os_v3.workflow.started
+    when: trigger fired
+    payload: trace_id, tenant_id, platform, topic_hint
+  - event: brand_os_v3.workflow.step
+    when: after each agent step
+    payload: trace_id, node_id, approved_or_rejected, revision_notes_if_any
+  - event: brand_os_v3.workflow.completed
+    when: final output set
+    payload: trace_id, tenant_id, platform, status, content_headline, visual_spec_format
+  - event: brand_os_v3.identity.rejected
+    when: IDENTITY_GUARDIAN returns approved false
+    payload: trace_id, identity_alignment, tone_deviation, revision_notes
+  - event: brand_os_v3.cto.rejected
+    when: SKEPTICAL_CTO returns approved false
+    payload: trace_id, technical_accuracy, overclaim_risk, revision_notes
+
+examples:
+  allow:
+    trace_id: trace-001
+    tenant_id: tenant-1
+    platform: linkedin
+    identity_alignment: 0.92
+    tone_deviation: 0.08
+    technical_accuracy: 0.9
+    overclaim_risk: 0.1
+    status: approved
+  reject_identity:
+    trace_id: trace-002
+    identity_alignment: 0.72
+    tone_deviation: 0.35
+    revision_notes: "Remove hype word revolutionary. Align closing with value Integrity."
+    status: rejected_identity
+  reject_cto:
+    trace_id: trace-003
+    technical_accuracy: 0.8
+    overclaim_risk: 0.45
+    revision_notes: "Remove best in class. Qualify speed claim with in our tests."
+    status: rejected_cto

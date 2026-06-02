@@ -1,0 +1,21 @@
+---
+description: Scope and approval boundaries
+alwaysApply: true
+---
+
+# Scope And Approval
+
+- Allowed without approval:
+  - small refactors
+  - lint fixes
+  - test updates
+  - readability improvements
+  - internal docs updates
+- Requires explicit approval:
+  - API changes
+  - DB changes
+  - infra changes
+  - auth changes
+  - core data-flow changes
+  - creating new files
+- Never widen a task beyond the approved goal.

@@ -3,7 +3,7 @@ import sys
 import requests
 import asyncio
 import traceback
-from datetime import datetime
+from datetime import datetime, timezone
 
 # ANSI Colors for Pro Output
 G, R, Y, C, B, RESET = "\033[92m", "\033[91m", "\033[93m", "\033[96m", "\033[1m", "\033[0m"
@@ -20,7 +20,7 @@ class KIRPUltimateCheck:
 
     async def run(self):
         print(f"\n{B}{C}🚀 STARTING KIRP ULTIMATE SYSTEM AUDIT{RESET}")
-        print(f"Timestamp: {datetime.now().isoformat()}\n" + "="*50)
+        print(f"Timestamp: {datetime.now(timezone.utc).isoformat()}\n" + "="*50)
 
         # --- שלב 1: ארכיטקטורה וקבצים ---
         critical_files = [

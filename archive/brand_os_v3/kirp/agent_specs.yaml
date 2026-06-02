@@ -1,0 +1,136 @@
+# Brand OS v3 — KIRP Agent Specs
+# YAML definitions for all Brand OS agents: name, version, role, input/output schema refs, governance tags
+
+metadata:
+  name: brand_os_v3_agent_specs
+  description: Agent definitions for Brand OS v3 aligned to KIRP
+  version: "3.0.0"
+
+version: "3.0.0"
+
+agents:
+  - id: CONTEXT_SCANNER
+    name: Context Scanner
+    version: "3.0.0"
+    role: Scan and synthesize world context (signals, trends, memory) for the rest of the pipeline.
+    phase: context
+    input_schema_ref: brand_os_v3/agents/CONTEXT_SCANNER.json#input_schema
+    output_schema_ref: brand_os_v3/agents/CONTEXT_SCANNER.json#output_schema
+    governance_tags:
+      - context
+      - non_gatekeeper
+    kirp_event_on_complete: brand_os_v3.context_scanner.completed
+
+  - id: STRATEGIC_PLANNER
+    name: Strategic Planner
+    version: "3.0.0"
+    role: Turn world context into a strategy brief (angle, key points, hook, CTA).
+    phase: strategy
+    input_schema_ref: brand_os_v3/agents/STRATEGIC_PLANNER.json#input_schema
+    output_schema_ref: brand_os_v3/agents/STRATEGIC_PLANNER.json#output_schema
+    governance_tags:
+      - strategy
+      - non_gatekeeper
+    kirp_event_on_complete: brand_os_v3.strategic_planner.completed
+
+  - id: TECHNICAL_STORYTELLER
+    name: Technical Storyteller
+    version: "3.0.0"
+    role: Draft the first version of the content (headline, body, hook, CTA).
+    phase: creation
+    input_schema_ref: brand_os_v3/agents/TECHNICAL_STORYTELLER.json#input_schema
+    output_schema_ref: brand_os_v3/agents/TECHNICAL_STORYTELLER.json#output_schema
+    governance_tags:
+      - creation
+      - non_gatekeeper
+    kirp_event_on_complete: brand_os_v3.technical_storyteller.completed
+
+  - id: HUMAN_EDGE
+    name: Human Edge
+    version: "3.0.0"
+    role: Add human polish (clarity, warmth, platform-native feel) without changing the message.
+    phase: creation
+    input_schema_ref: brand_os_v3/agents/HUMAN_EDGE.json#input_schema
+    output_schema_ref: brand_os_v3/agents/HUMAN_EDGE.json#output_schema
+    governance_tags:
+      - creation
+      - non_gatekeeper
+      - revision_target
+    kirp_event_on_complete: brand_os_v3.human_edge.completed
+
+  - id: IDENTITY_GUARDIAN
+    name: Identity Guardian
+    version: "3.0.0"
+    role: Gatekeeper — verify draft aligns with Master Identity; reject with revision_notes if not.
+    phase: quality
+    input_schema_ref: brand_os_v3/agents/IDENTITY_GUARDIAN.json#input_schema
+    output_schema_ref: brand_os_v3/agents/IDENTITY_GUARDIAN.json#output_schema
+    governance_tags:
+      - gatekeeper
+      - identity
+    kirp_event_on_complete: brand_os_v3.identity_guardian.completed
+    kirp_event_on_reject: brand_os_v3.identity.rejected
+
+  - id: SKEPTICAL_CTO
+    name: Skeptical CTO
+    version: "3.0.0"
+    role: Gatekeeper — verify draft is technically accurate and not overclaimed; reject with revision_notes if not.
+    phase: quality
+    input_schema_ref: brand_os_v3/agents/SKEPTICAL_CTO.json#input_schema
+    output_schema_ref: brand_os_v3/agents/SKEPTICAL_CTO.json#output_schema
+    governance_tags:
+      - gatekeeper
+      - technical
+    kirp_event_on_complete: brand_os_v3.skeptical_cto.completed
+    kirp_event_on_reject: brand_os_v3.cto.rejected
+
+  - id: VISUAL_GENERATOR
+    name: Visual Generator
+    version: "3.0.0"
+    role: Produce visual spec (image_prompt, aspect_ratio, format, alt_text) for approved content.
+    phase: distribution
+    input_schema_ref: brand_os_v3/agents/VISUAL_GENERATOR.json#input_schema
+    output_schema_ref: brand_os_v3/agents/VISUAL_GENERATOR.json#output_schema
+    governance_tags:
+      - distribution
+      - non_gatekeeper
+    kirp_event_on_complete: brand_os_v3.visual_generator.completed
+
+  - id: GROWTH_ANALYST
+    name: Growth Analyst
+    version: "3.0.0"
+    role: Suggest optimizations (timing, hook, CTA, next topics) for future runs; advisory only.
+    phase: distribution
+    input_schema_ref: brand_os_v3/agents/GROWTH_ANALYST.json#input_schema
+    output_schema_ref: brand_os_v3/agents/GROWTH_ANALYST.json#output_schema
+    governance_tags:
+      - distribution
+      - advisory
+    kirp_event_on_complete: brand_os_v3.growth_analyst.completed
+
+audit_fields:
+  - agent_id
+  - trace_id
+  - tenant_id
+  - phase
+  - completed_at
+  - approved_or_rejected
+  - revision_notes_if_any
+
+examples:
+  context_scanner_output:
+    trace_id: trace-001
+    world_context: "API and auth are in focus; a new release is simplifying developer experience."
+    trends: ["API-first auth", "DevEx"]
+    signals_used: ["sig-1"]
+    memory_summary: "No recent content."
+  identity_guardian_approved:
+    approved: true
+    identity_alignment: 0.92
+    tone_deviation: 0.08
+    revision_notes: ""
+  identity_guardian_rejected:
+    approved: false
+    identity_alignment: 0.72
+    tone_deviation: 0.35
+    revision_notes: "Remove hype word 'revolutionary'. Align closing with value Integrity."

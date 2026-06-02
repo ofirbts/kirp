@@ -1,0 +1,253 @@
+{
+  "tenants": [
+    {
+      "id": "kirp-internal",
+      "displayName": "KIRP Internal",
+      "industry": "saas",
+      "size": "mid",
+      "spaces": [
+        { "id": "development", "displayName": "Development", "purpose": "Internal development and testing" },
+        { "id": "demo", "displayName": "Demo Data", "purpose": "Demo environment for presentations" }
+      ]
+    },
+    {
+      "id": "acme-corp",
+      "displayName": "Acme Corp",
+      "industry": "ecommerce",
+      "size": "enterprise",
+      "spaces": [
+        { "id": "prod", "displayName": "Production", "purpose": "Live customer operations" },
+        { "id": "marketing", "displayName": "Marketing", "purpose": "Campaign analytics and automation" },
+        { "id": "ml", "displayName": "ML Experiments", "purpose": "Model training and experimentation" }
+      ]
+    },
+    {
+      "id": "stark-industries",
+      "displayName": "Stark Industries",
+      "industry": "defense",
+      "size": "enterprise",
+      "spaces": [
+        { "id": "security", "displayName": "Security", "purpose": "Threat detection and incident response" },
+        { "id": "iot", "displayName": "IoT Devices", "purpose": "Telemetry from connected devices" }
+      ]
+    },
+    {
+      "id": "growthlab",
+      "displayName": "GrowthLab",
+      "industry": "marketing",
+      "size": "mid",
+      "spaces": [
+        { "id": "content", "displayName": "Content AI", "purpose": "AI content generation and optimization" },
+        { "id": "social", "displayName": "Social Media", "purpose": "Automation of social posting and insights" }
+      ]
+    }
+  ],
+  "roles": [
+    {
+      "id": "admin",
+      "description": "Full access to tenant resources",
+      "permissions": [
+        { "resource": "agents", "action": "admin", "scope": "tenant" },
+        { "resource": "events", "action": "read", "scope": "tenant" },
+        { "resource": "governance", "action": "approve", "scope": "tenant" }
+      ]
+    },
+    {
+      "id": "operator",
+      "description": "Runs agents and workflows",
+      "permissions": [
+        { "resource": "agents", "action": "execute", "scope": "space" },
+        { "resource": "workflows", "action": "execute", "scope": "space" }
+      ]
+    },
+    {
+      "id": "engineer",
+      "description": "Builds workflows and agents",
+      "permissions": [
+        { "resource": "agents", "action": "write", "scope": "tenant" },
+        { "resource": "workflows", "action": "write", "scope": "tenant" }
+      ]
+    },
+    {
+      "id": "analyst",
+      "description": "Reads dashboards and insights",
+      "permissions": [
+        { "resource": "events", "action": "read", "scope": "space" },
+        { "resource": "analytics", "action": "read", "scope": "space" }
+      ]
+    }
+  ],
+  "usersConfig": {
+    "users_per_tenant": {
+      "min": 8,
+      "max": 15
+    },
+    "persona_examples": [
+      "DevOps engineer maintaining CI/CD",
+      "Security analyst reviewing alerts",
+      "ML engineer training models",
+      "Growth marketer analyzing campaigns",
+      "Content creator using AI tools"
+    ]
+  },
+  "agents": [
+    {
+      "id": "pipeline-monitor",
+      "name": "Pipeline Monitor",
+      "type": "executor",
+      "description": "Detects CI/CD failures and suggests rollbacks",
+      "successRate": [0.92, 0.98],
+      "latencyMs": [150, 400],
+      "failureModes": ["external API failure", "missing artifact"]
+    },
+    {
+      "id": "anomaly-hunter",
+      "name": "Anomaly Hunter",
+      "type": "retrieval",
+      "description": "Detects anomalies across logs and metrics",
+      "successRate": [0.85, 0.95],
+      "latencyMs": [200, 600],
+      "failureModes": ["insufficient data", "governance denied"]
+    },
+    {
+      "id": "growth-writer",
+      "name": "Growth Writer",
+      "type": "executor",
+      "description": "Generates marketing content and insights",
+      "successRate": [0.90, 0.99],
+      "latencyMs": [300, 900],
+      "failureModes": ["content policy violation"]
+    },
+    {
+      "id": "social-insights",
+      "name": "Social Insights Agent",
+      "type": "retrieval",
+      "description": "Analyzes social media performance",
+      "successRate": [0.88, 0.96],
+      "latencyMs": [250, 700],
+      "failureModes": ["rate limit", "missing data"]
+    }
+  ],
+  "workflows": [
+    {
+      "id": "ci-failure-response",
+      "name": "CI Failure Response",
+      "status": "active",
+      "triggers": ["event:pipeline.build.failed"],
+      "connectedAgents": ["pipeline-monitor"],
+      "dailyRuns": 40,
+      "durationMs": [2000, 8000],
+      "statusDistribution": { "success": 0.85, "failed": 0.10, "cancelled": 0.05 }
+    },
+    {
+      "id": "social-reporting",
+      "name": "Social Reporting",
+      "status": "active",
+      "triggers": ["schedule:0 8 * * *"],
+      "connectedAgents": ["social-insights"],
+      "dailyRuns": 1,
+      "durationMs": [5000, 15000],
+      "statusDistribution": { "success": 0.95, "failed": 0.05 }
+    }
+  ],
+  "taskTypes": [
+    {
+      "id": "refresh_embeddings",
+      "queue": "rag",
+      "payload": ["doc_id", "tenant_id"],
+      "maxAttempts": 3
+    },
+    {
+      "id": "notify_slack",
+      "queue": "notifications",
+      "payload": ["channel", "message"],
+      "maxAttempts": 5
+    }
+  ],
+  "topics": [
+    {
+      "topic": "pipeline.events",
+      "volumePerDay": 300,
+      "severity": { "info": 0.7, "warning": 0.2, "error": 0.1 }
+    },
+    {
+      "topic": "security.alerts",
+      "volumePerDay": 120,
+      "severity": { "info": 0.4, "warning": 0.3, "error": 0.2, "critical": 0.1 }
+    },
+    {
+      "topic": "growth.campaigns",
+      "volumePerDay": 200,
+      "severity": { "info": 0.9, "warning": 0.1 }
+    }
+  ],
+  "eventTypes": [
+    {
+      "eventType": "rag.query.executed",
+      "topic": "rag.events",
+      "sensitivity": "internal",
+      "payload": ["query", "latency", "results_count"],
+      "frequency": "high"
+    },
+    {
+      "eventType": "security.alert.raised",
+      "topic": "security.alerts",
+      "sensitivity": "confidential",
+      "payload": ["alert_type", "severity", "source"],
+      "frequency": "medium"
+    }
+  ],
+  "timeHorizon": {
+    "days": 30,
+    "spikes": [
+      { "day": 12, "type": "security_incident", "topic": "security.alerts" },
+      { "day": 21, "type": "marketing_campaign_launch", "topic": "growth.campaigns" }
+    ]
+  },
+  "policies": [
+    {
+      "id": "rag-high-risk",
+      "name": "High-Risk RAG Query Policy",
+      "resource": "rag_query",
+      "action": "execute",
+      "decisionPattern": { "allow": 0.7, "deny": 0.1, "requireApproval": 0.2 },
+      "approvers": ["admin", "security-lead"],
+      "latencyMs": [5000, 20000]
+    }
+  ],
+  "auditScenarios": [
+    { "action": "agent.run", "actor": "agent", "result": ["success", "failure"] },
+    { "action": "policy.update", "actor": "user", "result": ["success"] },
+    { "action": "rag_query_denied", "actor": "system", "result": ["failure"] }
+  ],
+  "ragFeedback": [
+    { "label": "great_answer", "ratio": 0.6 },
+    { "label": "not_relevant", "ratio": 0.2 },
+    { "label": "outdated", "ratio": 0.1 },
+    { "label": "hallucination", "ratio": 0.1 }
+  ],
+  "slos": {
+    "ingest_latency_ms": 500,
+    "rag_latency_ms": 800,
+    "agent_error_rate": 0.05
+  },
+  "kpis": [
+    "events_per_hour",
+    "active_agents",
+    "approval_backlog",
+    "rag_quality_score",
+    "workflow_success_rate"
+  ],
+  "volumeTargets": {
+    "perTenant": {
+      "spaces": [2, 4],
+      "users": [8, 15],
+      "agents": [4, 10],
+      "workflows": [3, 8],
+      "events_30_days": [5000, 20000],
+      "audit_entries": [300, 1500],
+      "rag_feedback": [200, 800]
+    }
+  }
+}
+

@@ -1,0 +1,14 @@
+{
+  "env": "local-docker",
+  "thresholds": {
+    "dashboard_load_p95_ms_max": 60,
+    "ask_p95_ms_max": 2600,
+    "next_action_proxy_p95_ms_max": 500
+  },
+  "regression_ratio_max": 1.2,
+  "baseline_p95_ms": {
+    "dashboard_load": 35.0,
+    "ask": 2109.8,
+    "next_action_proxy": 345.5
+  }
+}

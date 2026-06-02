@@ -1,0 +1,36 @@
+# KIRP — Cursor rules (short)
+
+**Full architecture & diagrams:** `UNIFIED_ARCHITECTURE.md`  
+**Run prod stack locally:** `deploy/README.md`  
+**Doc map:** `docs/README.md`
+
+## Non‑negotiables
+
+- **Multi-tenant:** Never leak or mix tenants. `tenant_id` explicit through API → service → events; filter every read/write.
+- **Event-sourcing:** No ad-hoc DB mutations for domain state; events append-only; preserve replay/audit story unless the task explicitly changes that contract (then flag it).
+- **Governance:** External side effects go through the governance layer, not random modules.
+- **Agents / LLM:** No direct LLM calls outside the agent framework; RAG context explicit when required; register new agents properly.
+- **Run lifecycle / pipeline:** Do not change core run or pipeline semantics without explicit approval; prefer fail-fast and clear logs.
+
+## Before you change code
+
+- **Verify** (read callers, tests, env) → **then** edit. Do not widen scope beyond the task.
+- **No secrets** in code, commits, or pasted logs. Do not edit `.env*` or credential files unless the user explicitly asks.
+
+## Where you may work
+
+- **Yes:** `src/`, `app/`, `components/`, `lib/`, `services/`, `public/`, `scripts/`, `tests/`, `tests_e2e/`, `deploy/` (when the task is deploy/smoke/docs there), `docs/`, plus root config files already in use (`package.json`, `requirements.txt`, `Dockerfile.api`, etc.).
+- **Read-only:** `archive/**` — analyze only; never modify, move, or delete.
+- **Avoid / legacy (do not touch unless explicitly asked):** `api/` (old API), `brand_os_*`, `KIRP_old/`, `backup_pre_runmydocker/`, `tools/archive/`, and other junk paths listed in older commits if still present.
+
+## Repo hygiene
+
+- **Do not** create new top-level folders unless the user explicitly requests it.
+- **Do not** change root `docker-compose.yml`, Dockerfiles, or `.env*` unless the user explicitly asks.
+- **Do not** add new architectural layers or frameworks; extend what exists.
+- **Frontend:** No duplicate pages/components; do not touch `app/layout.tsx` unless asked.
+- **Backend:** No new API versions; no duplicate routers; no new workers or Alembic migrations unless asked.
+
+## Quality bar
+
+- Python: typed, PEP8-style; TS: strict. Prefer small, focused diffs; add/update tests for new behavior (especially tenant + governance paths).
