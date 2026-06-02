@@ -14,6 +14,7 @@ def test_operational_readiness_script_exists() -> None:
     assert "tenant_isolation_gate.py" in text
     assert "shadow_pilot_smoke.sh" in text
     assert "staging_tenant_smoke.sh" in text
+    assert "SKIP_AUTH=0" in text
 
 
 def test_shadow_pilot_smoke_live() -> None:
