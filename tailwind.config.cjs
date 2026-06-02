@@ -8,6 +8,9 @@ module.exports = {
   darkMode: "class",
   theme: {
     extend: {
+      fontFamily: {
+        sans: ["Gilroy", "Outfit", "Plus Jakarta Sans", "system-ui", "sans-serif"],
+      },
       colors: {
         bg: 'var(--color-bg)',
         surface1: 'var(--color-surface-1)',
@@ -24,6 +27,10 @@ module.exports = {
         accent: {
           DEFAULT: 'var(--color-accent)',
           foreground: '#050509',
+        },
+        coral: {
+          DEFAULT: 'var(--color-coral)',
+          foreground: '#ffffff',
         },
         textMain: 'var(--color-text-main)',
         textMuted: 'var(--color-text-muted)',

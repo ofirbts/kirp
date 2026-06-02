@@ -1,0 +1,24 @@
+---
+description: Auto-learned drift and incident rules
+alwaysApply: false
+---
+
+# Auto-learned rules (generated 2026-04-27T15:35:42Z)
+
+These rules are generated from repeated incidents.
+
+No repeated incident pattern reached threshold.
+
+## Trend detection
+- timeout trend up: False
+- auth_failure trend up: False
+- fallback_usage trend up: False
+
+## Enforced Constraints (machine-readable)
+```json
+{
+  "generated_at": "2026-04-27T15:35:42Z",
+  "rules": []
+}
+```
+

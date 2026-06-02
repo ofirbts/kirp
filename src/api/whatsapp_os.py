@@ -117,9 +117,22 @@ Bottlenecks: {len(forecast.get('bottlenecks', []))}
     out: dict[str, Any] = {"ok": True, "message_sent": False, "preview": message[:200]}
     if to_number:
         try:
-            result = await wa.send_message(to_number, message, user_id=user_id)
-            out["message_sent"] = True
-            out["whatsapp_result"] = result if isinstance(result, dict) else {"raw": str(result)}
+            from src.core.whatsapp_outbound import enqueue_whatsapp_outbound
+
+            day_key = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+            result = await enqueue_whatsapp_outbound(
+                tenant_id=tenant_id,
+                user_id=user_id,
+                space_id=space_id,
+                to=to_number,
+                text=message,
+                idempotency_key=f"daily-intelligence:{tenant_id}:{user_id}:{day_key}",
+                source="whatsapp_os_daily_intelligence",
+            )
+            out["queued"] = result.get("queued", False)
+            out["pending_id"] = result.get("pending_id")
+            out["duplicate"] = result.get("duplicate", False)
+            out["message_sent"] = False
         except Exception as e:
             out["ok"] = False
             out["error"] = str(e)

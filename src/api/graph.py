@@ -41,15 +41,21 @@ async def get_graph(
 
 
 @router.get("/nodes/{node_id}", response_model=GraphResponse)
-async def get_graph_node(node_id: str) -> GraphResponse:
-    """Get a single graph node (read-only, backed by service layer)."""
-    nodes, edges = await graph_service.get_node(node_id)
+async def get_graph_node(
+    node_id: str,
+    ctx: TenantContext = Depends(get_effective_tenant_context),
+) -> GraphResponse:
+    """Get a single graph node (read-only). Scoped to authenticated tenant."""
+    nodes, edges = await graph_service.get_node(node_id, ctx.tenant_id)
     return GraphResponse(data=GraphData(nodes=nodes, edges=edges), meta={})
 
 
 @router.get("/nodes/{node_id}/neighbors", response_model=GraphResponse)
-async def get_graph_node_neighbors(node_id: str) -> GraphResponse:
-    """Get neighbors for a node (read-only, backed by service layer)."""
-    nodes, edges = await graph_service.get_neighbors(node_id)
+async def get_graph_node_neighbors(
+    node_id: str,
+    ctx: TenantContext = Depends(get_effective_tenant_context),
+) -> GraphResponse:
+    """Get neighbors for a node (read-only). Scoped to authenticated tenant."""
+    nodes, edges = await graph_service.get_neighbors(node_id, ctx.tenant_id)
     return GraphResponse(data=GraphData(nodes=nodes, edges=edges), meta={})
 

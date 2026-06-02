@@ -70,13 +70,17 @@ async def get_graph(
         await session.close()
 
 
-async def get_node(node_id: str) -> Tuple[List[GraphNodeSchema], List[GraphEdgeSchema]]:
+async def get_node(node_id: str, tenant_id: str) -> Tuple[List[GraphNodeSchema], List[GraphEdgeSchema]]:
+    if not tenant_id or tenant_id == "*":
+        return [], []
     engine = await get_schema_engine()
     session = await engine.get_session()
     try:
         from uuid import UUID
         nid = UUID(node_id)
-        result = await session.execute(select(GraphNode).where(GraphNode.id == nid))
+        result = await session.execute(
+            select(GraphNode).where(GraphNode.id == nid).where(GraphNode.tenant_id == tenant_id)
+        )
         node = result.scalar_one_or_none()
         if not node:
             return [], []
@@ -89,7 +93,9 @@ async def get_node(node_id: str) -> Tuple[List[GraphNodeSchema], List[GraphEdgeS
         await session.close()
 
 
-async def get_neighbors(node_id: str) -> Tuple[List[GraphNodeSchema], List[GraphEdgeSchema]]:
+async def get_neighbors(node_id: str, tenant_id: str) -> Tuple[List[GraphNodeSchema], List[GraphEdgeSchema]]:
+    if not tenant_id or tenant_id == "*":
+        return [], []
     engine = await get_schema_engine()
     session = await engine.get_session()
     try:
@@ -107,7 +113,9 @@ async def get_neighbors(node_id: str) -> Tuple[List[GraphNodeSchema], List[Graph
                 neighbor_ids.add(e.to_id)
         if not neighbor_ids:
             return [], [_edge_to_schema(e) for e in edges]
-        nres = await session.execute(select(GraphNode).where(GraphNode.id.in_(neighbor_ids)))
+        nres = await session.execute(
+            select(GraphNode).where(GraphNode.id.in_(neighbor_ids)).where(GraphNode.tenant_id == tenant_id)
+        )
         nodes = nres.scalars().all()
         return [_node_to_schema(n) for n in nodes], [_edge_to_schema(e) for e in edges]
     finally:

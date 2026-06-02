@@ -157,10 +157,18 @@ class EventStore:
         return event.id
 
     async def get_by_id(self, event_id: UUID) -> Event | None:
-        """Fetch single event by ID."""
+        """Internal fetch by ID only. External callers must use get_by_id_for_tenant."""
         if self._db is None:
             await self.connect()
         doc = await self._db.events.find_one({"_id": str(event_id)})
+        return Event.from_doc(doc) if doc else None
+
+    async def get_by_id_for_tenant(self, event_id: UUID, tenant_id: str) -> Event | None:
+        if not tenant_id or not str(tenant_id).strip() or tenant_id == "*":
+            raise ValueError("tenant_id is required for scoped event fetch")
+        if self._db is None:
+            await self.connect()
+        doc = await self._db.events.find_one({"_id": str(event_id), "tenant_id": tenant_id})
         return Event.from_doc(doc) if doc else None
 
     async def find_latest_by_run_id(self, tenant_id: str, run_id: str) -> Event | None:
@@ -200,12 +208,11 @@ class EventStore:
         metadata: dict[str, Any] | None = None,
     ) -> bool:
         """
-        Update an existing event's content and metadata by external_id (e.g. Notion page_id).
-        Used by bi-directional sync when Notion webhook reports a page change.
-        Returns True if a document was updated.
+        Update projection document by external_id and append event.corrected for audit/replay.
         """
         if self._db is None:
             await self.connect()
+        existing = await self.find_by_external_id(tenant_id, source, external_id)
         update: dict[str, Any] = {"$set": {"content": content, "timestamp": datetime.now(timezone.utc)}}
         if metadata is not None:
             update["$set"]["metadata"] = metadata
@@ -219,6 +226,26 @@ class EventStore:
         )
         if res.modified_count:
             logger.info("EventStore updated by external_id: %s source=%s", external_id, source)
+            if existing:
+                merged_meta = dict(existing.metadata or {})
+                if metadata:
+                    merged_meta.update(metadata)
+                merged_meta["corrects_event_id"] = str(existing.id)
+                merged_meta["external_id"] = external_id
+                correction = Event(
+                    id=uuid4(),
+                    tenant_id=tenant_id,
+                    space_id=existing.space_id,
+                    user_id=existing.user_id,
+                    source=source,
+                    content=content,
+                    metadata=merged_meta,
+                    event_type="event.corrected",
+                    parent_event_id=existing.id,
+                    trace_id=existing.trace_id,
+                    correlation_id=existing.correlation_id,
+                )
+                await self.ingest(correction)
         return res.modified_count > 0
 
     async def list(
@@ -258,9 +285,9 @@ class EventStore:
         docs = await cursor.to_list(length=limit)
         return [Event.from_doc(d) for d in docs]
 
-    async def replay(self, event_id: UUID) -> dict[str, Any]:
+    async def replay(self, event_id: UUID, tenant_id: str) -> dict[str, Any]:
         """Replay: fetch event and return JSON payload for re-ingest (e.g. Kafka). No mutation."""
-        ev = await self.get_by_id(event_id)
+        ev = await self.get_by_id_for_tenant(event_id, tenant_id)
         if not ev:
             raise ValueError(f"Event not found: {event_id}")
         return ev.to_json_payload()
@@ -293,14 +320,17 @@ class EventStore:
         docs = await cursor.to_list(length=limit)
         return [Event.from_doc(d) for d in docs]
 
-    async def retry_dlq(self, event_id: UUID) -> dict[str, Any]:
-        """Return DLQ event payload for retry (caller re-ingests). Removes from DLQ on success if desired."""
+    async def retry_dlq(self, event_id: UUID, tenant_id: str) -> dict[str, Any]:
+        if not tenant_id or not str(tenant_id).strip():
+            raise ValueError("tenant_id is required for DLQ retry")
         if self._db is None:
             await self.connect()
         doc = await self._db.dlq_events.find_one({"_id": str(event_id)})
         if not doc:
             raise ValueError(f"DLQ event not found: {event_id}")
         ev = Event.from_doc(doc)
+        if ev.tenant_id != tenant_id:
+            raise ValueError("DLQ event tenant mismatch")
         return ev.to_json_payload()
 
     async def delete_older_than(self, tenant_id: str, before: datetime) -> int:
@@ -312,21 +342,37 @@ class EventStore:
 
     async def count_events(
         self,
-        tenant_id: str | None = None,
+        tenant_id: str,
         space_id: str | None = None,
         since: datetime | None = None,
     ) -> int:
-        """Count events, optionally filtered by tenant, space, and time."""
+        """Count events for a tenant (tenant_id required)."""
+        if not tenant_id or not str(tenant_id).strip() or tenant_id == "*":
+            raise ValueError("tenant_id is required for count_events")
         if self._db is None:
             await self.connect()
-        q: dict[str, Any] = {}
-        if tenant_id:
-            q["tenant_id"] = tenant_id
+        q: dict[str, Any] = {"tenant_id": tenant_id}
         if space_id:
             q["space_id"] = space_id
         if since:
             q["timestamp"] = {"$gte": since}
         return await self._db.events.count_documents(q)
+
+    async def write_to_outbox(self, event_id: UUID, tenant_id: str, projection_type: str, error: str) -> None:
+        """Write a failed projection task to the outbox table for eventual reconciliation."""
+        if self._db is None:
+            await self.connect()
+        doc = {
+            "event_id": str(event_id),
+            "tenant_id": tenant_id,
+            "projection_type": projection_type,
+            "error": error,
+            "status": "pending",
+            "created_at": datetime.now(timezone.utc),
+            "retries": 0
+        }
+        await self._db.projection_outbox.insert_one(doc)
+        logger.info("Outbox task created: event_id=%s projection=%s error=%s", event_id, projection_type, error)
 
     async def close(self) -> None:
         if self._client is not None:

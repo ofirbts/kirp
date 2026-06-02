@@ -160,7 +160,7 @@
 - **Status:** ✅ Complete
 
 #### 3.2.7 EventBus
-- **Providers:** Kafka (prod), Redis Streams (dev)
+- **Providers:** Kafka (`confluent-kafka` in `src/core/integrations.py`). **Redis Streams as a bus is not implemented in `src/`** — see `docs/RUNTIME_REALITY_MATRIX.md`.
 - **Operations:** connect, publish, close
 - **Status:** ✅ Complete
 

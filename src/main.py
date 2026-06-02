@@ -29,6 +29,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, EmailStr, Field
 from src.api import governance, observability, whatsapp_os, brand
+from src.api import v1_trace
 import src.api.command as command
 from src.core.auth import get_current_user, User
 from src.core.jwt_utils import require_auth
@@ -93,79 +94,39 @@ def _check_onboarding_rate_limit(request: Request) -> None:
     hits.append(now)
 
 
-# --- Globals (lazy init) ---
-_event_store: Any = None
-_rag_engine: Any = None
-_schema_engine: Any = None
-_governance: Any = None
-_agent_framework: Any = None
-_pipeline: Any = None
+# --- Service Registry ---
+from src.core.registry import get_registry
 
 
 async def get_event_store() -> Any:
-    global _event_store
-    if _event_store is None:
-        from src.core.event_store import EventStore
-        _event_store = EventStore(os.getenv("MONGO_URI", "mongodb://root:example@localhost:27017/kirp?authSource=admin"))
-        try:
-            await _event_store.connect()
-        except Exception as e:
-            _event_store = None
-            logger.warning("EventStore connection failed (will retry on next request): %s", e)
-            raise
-    return _event_store
+    return await get_registry().get_event_store()
 
 
 async def get_rag_engine() -> Any:
-    global _rag_engine
-    if _rag_engine is None:
-        from src.core.rag_engine import get_shared_rag_engine
-        try:
-            _rag_engine = await get_shared_rag_engine()
-        except Exception as e:
-            logger.warning("RAGEngine connection failed (will retry on next request): %s", e)
-            raise
-    return _rag_engine
+    return await get_registry().get_rag_engine()
 
 
 async def get_schema_engine() -> Any:
-    from src.core.schema_engine import get_schema_engine as _get
-    return await _get()
+    return await get_registry().get_schema_engine()
 
 
 async def get_governance() -> Any:
-    global _governance
-    if _governance is None:
-        from src.core.governance import GovernanceEngine
-        _governance = GovernanceEngine(os.getenv("OPA_URL"))
-    return _governance
+    return get_registry().get_governance()
 
 
 async def get_agent_framework() -> Any:
-    global _agent_framework
-    if _agent_framework is None:
-        from src.core.agent_framework import AgentFramework
-        from src.core.agent_registry import register_all_agents
-        _agent_framework = AgentFramework()
-        register_all_agents(_agent_framework)
-    return _agent_framework
+    return get_registry().get_agent_framework()
 
 
 async def get_pipeline() -> Any:
-    global _pipeline
-    if _pipeline is None:
-        from src.core.pipeline import EventPipeline
-        store = await get_event_store()
-        rag = await get_rag_engine()
-        schema = await get_schema_engine()
-        gov = await get_governance()
-        agents = await get_agent_framework()
-        _pipeline = EventPipeline(store, rag, schema, gov, agents)
-    return _pipeline
+    return await get_registry().get_pipeline()
 
 
 async def _seed_dev_user_if_needed() -> None:
     """Create dev@localhost with password 'devdevdev' if no users exist (demo user for first run)."""
+    env = (os.getenv("ENV") or "").strip().lower()
+    if env in ("production", "prod"):
+        return
     try:
         from src.core.auth import get_user_store
         from src.api.v1_auth import _make_password_hash, DEV_EMAIL, DEV_PASSWORD
@@ -183,7 +144,7 @@ async def _seed_dev_user_if_needed() -> None:
             tenant_id="default",
             roles=["admin"],
         )
-        logger.info("Seeded dev user: %s (password: %s)", DEV_EMAIL, DEV_PASSWORD)
+        logger.info("Seeded dev user: %s (password in v1_auth DEV_PASSWORD)", DEV_EMAIL)
     except Exception as e:
         logger.warning("Dev user seed failed (non-fatal): %s", e)
 
@@ -195,6 +156,13 @@ async def validate_prod_env() -> None:
     env = (os.getenv("ENV") or "").strip().lower()
     if env not in ("production", "prod"):
         return
+    if os.getenv("SKIP_AUTH", "").lower() in ("1", "true", "yes"):
+        raise RuntimeError("SKIP_AUTH must not be enabled in production")
+    if not (os.getenv("OPA_URL") or "").strip():
+        raise RuntimeError("OPA_URL is required in production")
+    policy = (os.getenv("PIPELINE_RUN_POLICY") or "warn").strip().lower()
+    if policy != "strict":
+        raise RuntimeError("PIPELINE_RUN_POLICY must be strict in production")
     required = ["STRIPE_SECRET_KEY", "DATABASE_URL", "REDIS_URL"]
     missing = [k for k in required if not (os.getenv(k) or "").strip()]
     if missing:
@@ -354,22 +322,36 @@ async def version_header_middleware(request: Request, call_next):
 @app.get("/health")
 async def health() -> dict[str, Any]:
     """Health check for Docker/K8s."""
+    from src.telemetry.trace_health import probe_trace_health, trace_health_to_dict
+
+    version_block = {
+        "sha": APP_GIT_SHA,
+        "short": APP_GIT_SHA[:7] if APP_GIT_SHA != "unknown" else "unknown",
+        "build_time": APP_BUILD_TIME,
+        "environment": APP_ENVIRONMENT,
+        "source": "env:APP_GIT_SHA",
+    }
+    telemetry = trace_health_to_dict(probe_trace_health())
+    base: dict[str, Any] = {"version": version_block, "telemetry": telemetry}
+    env = (os.getenv("ENV") or "").strip().lower()
     try:
         store = await get_event_store()
         rag = await get_rag_engine()
         return {
+            **base,
             "status": "healthy",
             "event_store": "ok",
             "rag_engine": "ok",
-            "version": {
-                "sha": APP_GIT_SHA,
-                "short": APP_GIT_SHA[:7] if APP_GIT_SHA != "unknown" else "unknown",
-                "build_time": APP_BUILD_TIME,
-                "environment": APP_ENVIRONMENT,
-                "source": "env:APP_GIT_SHA",
-            },
         }
     except Exception as e:
+        if env in ("development", "dev", "local"):
+            return {
+                **base,
+                "status": "degraded",
+                "event_store": "error",
+                "rag_engine": "skipped",
+                "detail": str(e),
+            }
         raise HTTPException(status_code=503, detail=str(e))
 
 
@@ -918,7 +900,14 @@ async def ask(
         raise
     except Exception as e:
         logger.exception("Ask failed")
-        raise HTTPException(status_code=500, detail=str(e))
+        return {
+            "answer": (
+                "I could not complete this insight because the reasoning pipeline failed. "
+                "Your data was not lost; please retry in a moment."
+            ),
+            "sources": [],
+            "needs_external_info": True,
+        }
 
 
 @app.get("/api/v1/agents")
@@ -1220,6 +1209,7 @@ app.include_router(v1_scenarios.router)
 app.include_router(v1_m3.router)
 app.include_router(v1_notifications.router)
 app.include_router(llm_usage_router, prefix="/api/v1")
+app.include_router(v1_trace.router)
 
 if __name__ == "__main__":
     import uvicorn

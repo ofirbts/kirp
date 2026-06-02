@@ -27,6 +27,8 @@ Goal: remove ambiguity between click intent, mutation behavior, and visible outc
 
 - After every non-idle click with `targetRunId`, `verifyRunAfterAction(runId)` is attempted.
 - If visibility fetch does not return in the window, UI shows:
-  - `Checking latest status…`
-  - then `Update in progress`
+  - `Verifying action status...`
+  - proof line `Fallback verify retry in progress`
+  - then `Verification timed out`
+  - proof line `Verify request timed out after fallback retry`
 - Verification never silently mutates user-visible headlines for `taskOutcome=created`; headline remains task-specific.

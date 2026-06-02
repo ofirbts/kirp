@@ -9,14 +9,6 @@ from src.core.jwt_utils import create_access_token
 from src.core.rag_engine import RAGResponse
 
 
-@pytest.fixture
-def client_no_skip(monkeypatch: pytest.MonkeyPatch) -> TestClient:
-    monkeypatch.setenv("SKIP_AUTH", "0")
-    from src.main import app
-
-    return TestClient(app)
-
-
 def test_rag_search_403_when_body_tenant_differs_from_jwt(
     client_no_skip: TestClient,
     monkeypatch: pytest.MonkeyPatch,

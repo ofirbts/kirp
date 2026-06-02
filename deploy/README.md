@@ -76,10 +76,12 @@ VERIFY_EMAIL='you@example.com' VERIFY_PASSWORD='YourPassw0rd!' VERIFY_NAME='You'
 
 Then sign in at `http://localhost:3100/login` with the same email/password.
 
-## 4c. One-shot ingest → Kafka → pipeline (full stack only)
+## 4c. One-shot ingest → Kafka → pipeline
 
-Requires **repo root** `docker compose up` (Kafka + `kirp-agent-processor`), API typically **`http://localhost:8000`**.  
-The minimal `deploy/docker-compose.prod.yml` stack has **no Kafka** — ingest will return **503**; the script explains that.
+Requires a stack where **Kafka is reachable from the API** and the **`kirp-agent-processor`** consumer is running.
+
+- **`deploy/docker-compose.prod.yml`** includes **Kafka**, **Zookeeper**, and **`kirp-agent-processor`** (see that file). Use it with a correct `KAFKA_BOOTSTRAP_SERVERS` / broker hostname for where the API runs (e.g. `kafka:9092` inside Compose, or host port mapping from the host).
+- If the API process has **no working producer** (wrong bootstrap, broker down, missing `confluent-kafka`), `POST /api/v1/ingest` returns **503** — the verify script treats that as exit **3** (“no event bus”).
 
 ```bash
 ./deploy/verify-ingest-e2e.sh

@@ -11,6 +11,7 @@ RAG Engine — Hybrid search, multi-hop retrieval, context builder.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import os
 import re
@@ -20,6 +21,14 @@ from datetime import datetime, timezone
 from typing import Any
 
 logger = logging.getLogger(__name__)
+
+
+def _qdrant_timeout_sec() -> float:
+    raw = (os.getenv("KIRP_QDRANT_TIMEOUT_SEC") or "15").strip()
+    try:
+        return max(1.0, float(raw))
+    except ValueError:
+        return 15.0
 
 # BM25 implementation (lightweight, no external dependency)
 try:
@@ -83,100 +92,93 @@ class RAGEngine:
         self._embedder: Any = None
         self._bm25_index: dict[str, Any] = {}  # tenant_id -> BM25 index
         self._text_cache: dict[str, list[dict[str, Any]]] = {}  # tenant_id -> [documents]
+        self._payload_indexes_requested = False
         from src.observability.metrics import MetricsCollector
         self._metrics = MetricsCollector("kirp_rag")
 
     async def connect(self) -> None:
-        """Initialize Qdrant client and embedder."""
+        if self._client is not None and self._embedder is not None:
+            return
         try:
-            from qdrant_client import QdrantClient
-            from qdrant_client.http import models
-            client_kw: dict[str, Any] = {"url": self._qdrant_url}
-            if self._qdrant_api_key:
-                client_kw["api_key"] = self._qdrant_api_key
-            self._client = QdrantClient(**client_kw)
-            embedding_dim = int(os.environ.get("EMBEDDING_DIMENSION", "1536"))
-            collections = self._client.get_collections().collections
-            if not any(c.name == self._collection for c in collections):
-                try:
-                    self._client.create_collection(
-                        collection_name=self._collection,
-                        vectors_config=models.VectorParams(
-                            size=embedding_dim,
-                            distance=models.Distance.COSINE,
-                        ),
-                    )
-                    logger.info("RAGEngine created Qdrant collection: %s", self._collection)
-                except Exception as create_err:
-                    err_text = str(create_err).lower()
-                    if "already exists" in err_text or "409" in err_text or "conflict" in err_text:
-                        logger.info("Qdrant collection already exists: %s", self._collection)
-                    else:
-                        raise
-            # Ensure payload indexes for filter (tenant_id, space_id, user_id) — required by Qdrant Cloud
+            await asyncio.wait_for(
+                asyncio.to_thread(self._connect_sync),
+                timeout=_qdrant_timeout_sec() * 2,
+            )
+        except asyncio.TimeoutError as e:
+            logger.error("RAGEngine connection timed out")
+            raise TimeoutError("timed out") from e
+        except Exception as e:
+            logger.error("RAGEngine connection failed: %s", e)
+            raise
+
+    def _connect_sync(self) -> None:
+        from qdrant_client import QdrantClient
+        from qdrant_client.http import models
+
+        client_kw: dict[str, Any] = {
+            "url": self._qdrant_url,
+            "timeout": _qdrant_timeout_sec(),
+        }
+        if self._qdrant_api_key:
+            client_kw["api_key"] = self._qdrant_api_key
+        self._client = QdrantClient(**client_kw)
+        embedding_dim = int(os.environ.get("EMBEDDING_DIMENSION", "1536"))
+        collections = self._client.get_collections().collections
+        if not any(c.name == self._collection for c in collections):
+            try:
+                self._client.create_collection(
+                    collection_name=self._collection,
+                    vectors_config=models.VectorParams(
+                        size=embedding_dim,
+                        distance=models.Distance.COSINE,
+                    ),
+                )
+                logger.info("RAGEngine created Qdrant collection: %s", self._collection)
+            except Exception as create_err:
+                err_text = str(create_err).lower()
+                if "already exists" in err_text or "409" in err_text or "conflict" in err_text:
+                    logger.info("Qdrant collection already exists: %s", self._collection)
+                else:
+                    raise
+        if not self._payload_indexes_requested:
+            self._payload_indexes_requested = True
             for field in ("tenant_id", "space_id", "user_id"):
                 try:
                     self._client.create_payload_index(
                         collection_name=self._collection,
                         field_name=field,
                         field_schema=models.PayloadSchemaType.KEYWORD,
+                        wait=False,
                     )
-                    logger.info("RAGEngine created payload index: %s", field)
+                    logger.info("RAGEngine requested payload index: %s", field)
                 except Exception as idx_err:
                     if "already exists" in str(idx_err).lower() or "exist" in str(idx_err).lower():
                         logger.debug("Payload index %s already exists", field)
                     else:
                         logger.warning("Payload index %s: %s", field, idx_err)
 
-            if self._embedding_provider == "openai":
-                try:
-                    from langchain_openai import OpenAIEmbeddings
-                    if os.environ.get("OPENAI_API_KEY"):
-                        self._embedder = OpenAIEmbeddings(model=self._embedding_model)
-                    else:
-                        self._embedder = None
-                        logger.warning("OPENAI_API_KEY not set; embeddings disabled")
-                except Exception as e:
-                    self._embedder = None
-                    logger.warning("OpenAI embedder init failed (%s); embeddings disabled", e)
-            elif self._embedding_provider == "gemini":
-                try:
-                    from langchain_google_genai import GoogleGenerativeAIEmbeddings
-                    api_key = os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY", "")
-                    if api_key:
-                        self._embedder = GoogleGenerativeAIEmbeddings(
-                            model=self._embedding_model or "models/text-embedding-004",
-                            google_api_key=api_key,
-                        )
-                    else:
-                        self._embedder = None
-                        logger.warning("GEMINI_API_KEY not set; embeddings disabled")
-                except Exception as e:
-                    self._embedder = None
-                    logger.warning("Gemini embedder init failed (%s); embeddings disabled", e)
-            else:
-                self._embedder = None
-            logger.info("RAGEngine connected to Qdrant at %s", self._qdrant_url)
-        except Exception as e:
-            logger.error("RAGEngine connection failed: %s", e)
-            raise
+        from src.core.embedding_provider import get_embedder
+
+        self._embedder = get_embedder(
+            provider=self._embedding_provider,
+            model=self._embedding_model,
+        )
+        if self._embedder is None:
+            logger.warning("Embedding provider %s not configured", self._embedding_provider)
+        logger.info("RAGEngine connected to Qdrant at %s", self._qdrant_url)
 
     async def embed(self, text: str) -> list[float]:
         """Generate embedding for text."""
-        if self._embedder is None:
-            # Try to initialize embedder
-            await self.connect()
-            if self._embedder is None:
-                raise ValueError(
-                    "Embedder not initialized. Check OPENAI_API_KEY or embedding provider configuration. "
-                    "Cannot generate embeddings without a valid embedder."
-                )
         try:
             from datetime import datetime, timezone
+            from src.core.embedding_provider import embed_text
+
             start = datetime.now(timezone.utc)
-            emb = await self._embedder.aembed_query(text)
-            if not emb or len(emb) == 0:
-                raise ValueError("Embedding generation returned empty result")
+            emb = await embed_text(
+                text,
+                provider=self._embedding_provider,
+                model=self._embedding_model,
+            )
             latency = (datetime.now(timezone.utc) - start).total_seconds()
             self._metrics.observe("embedding_latency_seconds", latency, labels={})
             return emb
@@ -197,11 +199,10 @@ class RAGEngine:
         if self._client is None:
             await self.connect()
         from qdrant_client.http import models
-        
-        # Enforce multi-tenant isolation
+
         if not tenant_id or tenant_id == "*":
             raise ValueError("tenant_id is required for upsert (multi-tenant isolation)")
-        
+
         ids = [p.get("id", str(i)) for i, p in enumerate(points)]
         vectors = [p["embedding"] for p in points]
         payloads = [
@@ -212,14 +213,17 @@ class RAGEngine:
             }
             for p in points
         ]
-        self._client.upsert(
-            collection_name=self._collection,
-            points=[
-                models.PointStruct(id=id_, vector=v, payload=pl)
-                for id_, v, pl in zip(ids, vectors, payloads)
-            ],
-            wait=True,
-        )
+        point_structs = [
+            models.PointStruct(id=id_, vector=v, payload=pl)
+            for id_, v, pl in zip(ids, vectors, payloads)
+        ]
+        try:
+            await asyncio.wait_for(
+                asyncio.to_thread(self._upsert_sync, point_structs),
+                timeout=_qdrant_timeout_sec(),
+            )
+        except asyncio.TimeoutError as e:
+            raise TimeoutError("timed out") from e
         
         # Update BM25 index
         if self._enable_bm25:
@@ -255,6 +259,13 @@ class RAGEngine:
         
         logger.info("RAGEngine upserted %d points tenant=%s space=%s", len(points), tenant_id, space_id)
         return len(points)
+
+    def _upsert_sync(self, point_structs: list[Any]) -> None:
+        self._client.upsert(
+            collection_name=self._collection,
+            points=point_structs,
+            wait=False,
+        )
 
     def _tokenize(self, text: str) -> list[str]:
         """Simple tokenization for BM25."""

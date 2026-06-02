@@ -178,17 +178,15 @@ KAFKA_BOOTSTRAP_DEFAULT = "kafka:9092"
 
 
 def _kafka_bootstrap(use_bootcamp: bool = False) -> str:
-    """Resolve Kafka bootstrap servers. Prefer Docker hostname kafka:9092 over localhost."""
     if use_bootcamp:
         return os.getenv("BOOTCAMP_KAFKA_BOOTSTRAP", "node128.codingbc.com:9092")
     raw_env = os.getenv("KAFKA_BOOTSTRAP_SERVERS")
-    raw = raw_env or KAFKA_BOOTSTRAP_DEFAULT
-    # Respect explicit runtime override (useful for local diagnostics / verification).
     if raw_env is not None:
-        return raw
-    if raw in ("localhost:9092", "127.0.0.1:9092"):
-        return KAFKA_BOOTSTRAP_DEFAULT
-    return raw
+        host_port = raw_env.strip()
+        if host_port in ("localhost:9092", "127.0.0.1:9092"):
+            return "localhost:9093"
+        return host_port
+    return KAFKA_BOOTSTRAP_DEFAULT
 
 
 @lru_cache

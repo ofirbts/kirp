@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState, Suspense } from "react";
+import React, { useEffect, useRef, useState, Suspense } from "react";
 import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PageSkeleton } from "@/components/dashboard/PageSkeleton";
@@ -11,6 +11,7 @@ import { RadialChart } from "@/components/charts/RadialChart";
 import { EventRateChart } from "@/components/data/EventRateChart";
 import {
   apiClient,
+  getRecentAuthFailureCount,
   getRuntimeVersionHint,
   type AskResponse,
   type InsightV1,
@@ -22,6 +23,24 @@ import { DEFAULT_TENANT_ID } from "@/lib/constants";
 import { useTenantContextStore } from "@/lib/stores/tenantContextStore";
 import { useAuthStore } from "@/lib/stores/authStore";
 import type { TaskV1 } from "@/lib/apiClient";
+
+function formatUtcDate(iso: string | null | undefined): string {
+  if (!iso) return "";
+  try {
+    return new Date(iso).toISOString().slice(0, 10);
+  } catch {
+    return String(iso);
+  }
+}
+
+function formatUtcDateTime(iso: string | null | undefined): string {
+  if (!iso) return "—";
+  try {
+    return new Date(iso).toISOString().replace("T", " ").slice(0, 19) + " UTC";
+  } catch {
+    return String(iso);
+  }
+}
 
 // Legacy dashboard (kept for reference; not rendered anymore)
 function DashboardContent() {
@@ -66,7 +85,7 @@ function DashboardContent() {
     } finally {
       setLoading(false);
     }
-  }, [tenantId, spaceId]);
+  }, [spaceId]);
 
   useEffect(() => {
     load();
@@ -367,18 +386,35 @@ function RealDashboardContent() {
   const [apiHeaderVersionSha, setApiHeaderVersionSha] = useState<string>("unknown");
   const [runtimeBuildTime, setRuntimeBuildTime] = useState<string>("unknown");
   const [runtimeEnvironment, setRuntimeEnvironment] = useState<string>("unknown");
+  const [authFailureSpike, setAuthFailureSpike] = useState(false);
+  const [trustScore, setTrustScore] = useState<number>(100);
+  const [trustReasons, setTrustReasons] = useState<string[]>([]);
+  const [activeAutoRules, setActiveAutoRules] = useState<string[]>([]);
+  const [currentBlockers, setCurrentBlockers] = useState<string[]>([]);
+  const [unknownStates, setUnknownStates] = useState<string[]>([]);
+  const [mounted, setMounted] = useState(false);
+  const [hasHistory, setHasHistory] = useState(false);
+  const mountedRef = useRef(true);
 
   const skipAuth = process.env.NEXT_PUBLIC_SKIP_AUTH === "1";
+
+  useEffect(() => {
+    setMounted(true);
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
 
   const load = React.useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const [tasksRes, eventsRes, healthRes, usageRes, runtimeHealth] = await Promise.all([
+      const [tasksRes, eventsRes, healthRes, usageRes, runtimeHealth, historyRes] = await Promise.all([
         apiClient
           .listTasksV1({
             tenant_id: tenantId,
-            space_id: spaceId ?? "default",
+            space_id: spaceId ?? "all",
             status: undefined,
             limit: 50,
           })
@@ -386,18 +422,27 @@ function RealDashboardContent() {
         apiClient
           .listEvents({
             tenantId: tenantId,
-            spaceId: spaceId ?? "default",
+            spaceId: spaceId ?? "all",
           })
           .then((r) => r.data ?? [])
           .catch(() => []),
         apiClient.getObservabilityHealth().catch(() => null),
         apiClient.getTenantUsageDetailsV1(tenantId).catch(() => null),
         apiClient.getRuntimeHealthV1().catch(() => null),
+        apiClient
+          .listHistoryV1({
+            tenant_id: tenantId,
+            user_id: userId ?? undefined,
+            limit: 1,
+          })
+          .catch(() => []),
       ]);
+      if (!mountedRef.current) return;
       setTasks((tasksRes as { data?: TaskV1[] }).data ?? []);
       setEvents(eventsRes as Event[]);
       setHealth(healthRes as Record<string, unknown> | null);
       setUsage(usageRes as TenantUsageDetailsV1 | null);
+      setHasHistory(Array.isArray(historyRes) && historyRes.length > 0);
       const fromHealth = runtimeHealth?.version?.sha?.trim();
       const fromHeader = getRuntimeVersionHint();
       const fromBuild = process.env.NEXT_PUBLIC_APP_GIT_SHA?.trim() || null;
@@ -411,12 +456,50 @@ function RealDashboardContent() {
         (fromBuild && fromBuild !== "unknown" ? fromBuild : null) ||
         "unknown";
       setRuntimeVersionSha(resolved);
+      setAuthFailureSpike(getRecentAuthFailureCount() >= 5);
+      const reasons: string[] = [];
+      let score = 100;
+      const hasUnknownVersion =
+        resolved === "unknown" ||
+        (runtimeHealth?.version?.sha?.trim() || "unknown") === "unknown" ||
+        (fromHeader || "unknown") === "unknown";
+      const hasMismatch = [fromHealth, fromHeader, fromBuild]
+        .filter((v): v is string => Boolean(v && v !== "unknown"))
+        .filter((v, i, arr) => arr.indexOf(v) !== i).length > 0;
+      if (hasUnknownVersion) {
+        score -= 40;
+        reasons.push("runtime-version-unknown");
+      }
+      if (hasMismatch) {
+        score -= 20;
+        reasons.push("runtime-version-mismatch");
+      }
+      if (getRecentAuthFailureCount() >= 5) {
+        score -= 20;
+        reasons.push("auth-failure-spike");
+      }
+      const autoRules: string[] = [];
+      if (getRecentAuthFailureCount() >= 5) {
+        autoRules.push("auto-auth_failure-threshold");
+      }
+      const unknowns: string[] = [];
+      if (hasUnknownVersion) unknowns.push("runtime-version-unknown");
+      const blockers: string[] = [];
+      if (score < 80) blockers.push("trust-score-below-threshold");
+      if (unknowns.length > 0) blockers.push("unknown-state-detected");
+      setActiveAutoRules(autoRules);
+      setUnknownStates(unknowns);
+      setCurrentBlockers(blockers);
+      setTrustScore(Math.max(0, Math.min(100, score)));
+      setTrustReasons(reasons);
     } catch (e) {
+      if (!mountedRef.current) return;
       setError(e instanceof Error ? e.message : "Failed to load dashboard");
     } finally {
+      if (!mountedRef.current) return;
       setLoading(false);
     }
-  }, [spaceId, tenantId]);
+  }, [spaceId, tenantId, userId]);
 
   useEffect(() => {
     if (loaded && (user || skipAuth)) load();
@@ -471,7 +554,7 @@ function RealDashboardContent() {
     return Promise.race([poll, timer]);
   }
 
-  if (!loaded) {
+  if (!mounted || !loaded) {
     return <PageSkeleton title subtitle cards={4} tableRows={5} />;
   }
   if (loaded && !user && !skipAuth) {
@@ -500,62 +583,82 @@ function RealDashboardContent() {
         const first = await waitForRunCompletion(ingestRes.run_id, 8000);
         if (first.kind === "network_error") {
           setVerifyState("network_issue");
-          setIngestError("Network issue while checking status");
-          setVerifyProof("Could not reach the server");
+          setIngestError("Could not verify result because the status endpoint was unreachable");
+          setVerifyProof("Source: run visibility endpoint not reachable");
           return;
         }
         if (first.kind === "timeout") {
           setVerifyState("processing");
-          setIngestSuccess("Still processing — this can take a bit longer");
-          setVerifyProof("Still processing in backend");
+          setIngestSuccess("Your content was accepted; backend processing is still running");
+          setVerifyProof("Source: run state remained processing during first check");
           await new Promise((r) => setTimeout(r, 1500));
           const second = await waitForRunCompletion(ingestRes.run_id, 8000);
           if (second.kind === "network_error") {
             setVerifyState("network_issue");
-            setIngestError("Network issue while checking status");
-            setVerifyProof("Could not reach the server");
+            setIngestError("Could not verify result because the status endpoint was unreachable");
+            setVerifyProof("Source: fallback verify check could not reach server");
             return;
           }
           if (second.kind === "timeout") {
             setVerifyState("processing");
-            setIngestSuccess("Still processing — this can take a bit longer");
-            setVerifyProof("Run is still processing");
+            setIngestSuccess("Processing is still active after retry; no final outcome yet");
+            setVerifyProof("Source: run state still processing after fallback retry");
             return;
           }
           const retryState = ((second.vis?.state || "").toLowerCase());
           if (retryState === "failed") {
             setVerifyState("failure");
-            setIngestError("Still needs attention — details are in the panel");
-            setVerifyProof("Still blocked — needs attention");
+            setIngestError("Processing completed with a blocked state that needs intervention");
+            setVerifyProof("Source: run visibility returned failed");
             return;
           }
           setVerifyState("success");
           setIngestSuccess(
             retryState === "completed"
-              ? "Done — this is now resolved"
-              : "Progress resumed",
+              ? "Ingest flow completed successfully and was persisted"
+              : "Run resumed successfully and continues in background",
           );
           setVerifyProof(
             retryState === "completed"
-              ? "Flow completed successfully"
-              : "Flow is continuing",
+              ? "Source: run visibility returned completed"
+              : "Source: run visibility returned processing",
           );
           await load();
           return;
         }
         const state = (first.vis?.state || "").toLowerCase();
+        if (state === "accepted" || state === "processing") {
+          setVerifyState("processing");
+          setIngestSuccess("Content was accepted; indexing is still in progress");
+          setVerifyProof("Source: run visibility returned accepted/processing");
+          return;
+        }
         if (state === "failed") {
           setVerifyState("failure");
-          setIngestError("Still needs attention — details are in the panel");
-          setVerifyProof("Still blocked — needs attention");
+          let failureCause = "run visibility returned failed";
+          try {
+            const runStatus = await apiClient.getRunStatusV1(ingestRes.run_id);
+            const lastError = [...(runStatus.timeline ?? [])]
+              .reverse()
+              .find((step) => step.error)?.error;
+            if (lastError) failureCause = lastError;
+          } catch {
+            // best-effort only
+          }
+          setIngestError(`Processing failed: ${failureCause}`);
+          setVerifyProof(`Source: ${failureCause}`);
           return;
         }
         setVerifyState("success");
         setIngestSuccess(
-          state === "completed" ? "Done — this is now resolved" : "Progress resumed",
+          state === "completed"
+            ? "Ingest flow completed successfully and was persisted"
+            : "Run resumed successfully and continues in background",
         );
         setVerifyProof(
-          state === "completed" ? "Flow completed successfully" : "Flow is continuing",
+          state === "completed"
+            ? "Source: run visibility returned completed"
+            : "Source: run visibility returned processing",
         );
       }
       await load();
@@ -568,7 +671,8 @@ function RealDashboardContent() {
       }
       setTimeout(() => setIngestSuccess(null), 4000);
     } catch (e) {
-      setIngestError(e instanceof Error ? e.message : "הכנסה נכשלה. בדוק API פעיל.");
+      const msg = e instanceof Error ? e.message : "Ingest failed";
+      setIngestError(`Ingest failed with exact cause: ${msg}`);
     } finally {
       setIngestLoading(false);
     }
@@ -602,7 +706,15 @@ function RealDashboardContent() {
   }
 
   if (loading) {
-    return <PageSkeleton title subtitle cards={4} tableRows={5} />;
+    return (
+      <div className="space-y-3">
+        <PageSkeleton title subtitle cards={4} tableRows={5} />
+        <div className="rounded-xl border border-[color:var(--color-border-subtle)] bg-surface2 px-4 py-3 text-xs text-textSoft">
+          Loading dashboard data from API and event streams. If this takes more than a few seconds, the
+          most likely cause is backend latency or unavailable runtime dependencies.
+        </div>
+      </div>
+    );
   }
 
   if (error) {
@@ -645,7 +757,7 @@ function RealDashboardContent() {
       <div suppressHydrationWarning>
         <h1 className="text-2xl font-bold tracking-tight text-textMain">Dashboard</h1>
         <p className="text-sm text-textSoft mt-1">
-          Live view of your tasks, activity, and system health.
+          Live view of your tasks, activity, and system health, with causal feedback for each state transition.
         </p>
       </div>
 
@@ -695,7 +807,9 @@ function RealDashboardContent() {
           <CardHeader className="pb-2">
             <CardTitle className="text-base text-textMain">No events yet</CardTitle>
             <p className="text-xs text-textSoft mt-0.5">
-              Ingest creates your first event (Kafka → pipeline). Use the button below or type your own text in the next card.
+              {tasks.length > 0
+                ? "No ingest events are visible yet, but tasks already exist. This usually means task/history data is present while event indexing is still catching up."
+                : "Ingest creates your first event (Kafka → pipeline). Use the button below or type your own text in the next card."}
             </p>
           </CardHeader>
           <CardContent>
@@ -776,7 +890,7 @@ function RealDashboardContent() {
                 <li key={t.id} className="flex justify-between gap-2">
                   <span className="truncate">{t.title}</span>
                   <span className="text-[11px] text-textSoft">
-                    {t.due_date ? new Date(t.due_date).toLocaleDateString() : ""}
+                    {t.due_date ? formatUtcDate(t.due_date) : ""}
                   </span>
                 </li>
               ))}
@@ -803,12 +917,16 @@ function RealDashboardContent() {
                     {e.topic || e.source || "Event"}
                   </span>
                   <span className="text-[11px] text-textSoft">
-                    {new Date(e.timestamp).toLocaleString()} • {e.source}
+                    {formatUtcDateTime(e.timestamp)} • {e.source}
                   </span>
                 </li>
               ))}
               {recentEvents.length === 0 && (
-                <li className="text-sm text-textSoft">No recent events.</li>
+                <li className="text-sm text-textSoft">
+                  {tasks.length > 0 || hasHistory
+                    ? "No ingest events are visible in this feed yet. Activity exists in Tasks/History, so this is likely indexing delay or event feed filtering."
+                    : "No recent events."}
+                </li>
               )}
             </ul>
           </CardContent>
@@ -838,6 +956,34 @@ function RealDashboardContent() {
               </span>
             </p>
             <p className="text-xs text-textSoft mb-3">
+              Trust score:{" "}
+              <span className="font-mono text-textMain">{trustScore}/100</span>
+              {trustReasons.length > 0 ? (
+                <span className="text-amber-400">
+                  {" "}
+                  · {trustReasons.join(", ")}
+                </span>
+              ) : null}
+            </p>
+            <p className="text-xs text-textSoft mb-3">
+              Active auto-rules:{" "}
+              <span className="font-mono text-textMain">
+                {activeAutoRules.length > 0 ? activeAutoRules.join(", ") : "none"}
+              </span>
+            </p>
+            <p className="text-xs text-textSoft mb-3">
+              Current blockers:{" "}
+              <span className="font-mono text-textMain">
+                {currentBlockers.length > 0 ? currentBlockers.join(", ") : "none"}
+              </span>
+            </p>
+            <p className="text-xs text-textSoft mb-3">
+              Unknown states:{" "}
+              <span className="font-mono text-textMain">
+                {unknownStates.length > 0 ? unknownStates.join(", ") : "none"}
+              </span>
+            </p>
+            <p className="text-xs text-textSoft mb-3">
               Build time: <span className="font-mono text-textMain">{runtimeBuildTime}</span> ·
               Environment: <span className="font-mono text-textMain"> {runtimeEnvironment}</span>
             </p>
@@ -850,8 +996,13 @@ function RealDashboardContent() {
               <p className="text-xs text-amber-400 mb-3">
                 Runtime warning:{" "}
                 {unknownRuntimeVersion
-                  ? "runtime version is unknown in at least one source."
+                  ? "runtime version is missing in at least one source. Fix: set APP_GIT_SHA in API/container and NEXT_PUBLIC_APP_GIT_SHA in dashboard build env."
                   : "version mismatch detected between health, API header, and UI build."}
+              </p>
+            ) : null}
+            {authFailureSpike ? (
+              <p className="text-xs text-amber-400 mb-3">
+                Runtime warning: repeated auth failures detected in the recent window.
               </p>
             ) : null}
             <ul className="space-y-1 text-sm max-h-40 overflow-auto">
@@ -890,7 +1041,8 @@ function RealDashboardContent() {
               </div>
             ) : (
               <p className="text-sm text-textSoft">
-                No insight available yet. Try adding more knowledge or tasks.
+                No insight was generated because recent evidence is still too sparse. Add knowledge or tasks to
+                trigger a grounded recommendation with explicit source context.
               </p>
             )}
           </CardContent>

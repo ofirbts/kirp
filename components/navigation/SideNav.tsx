@@ -41,6 +41,11 @@ const NAV_ITEMS: NavItem[] = [
     icon: <Radio className="h-4 w-4" />,
   },
   {
+    label: "Traces",
+    href: "/traces",
+    icon: <Radio className="h-4 w-4" />,
+  },
+  {
     label: "Activity",
     href: "/notifications",
     icon: <Bell className="h-4 w-4" />,

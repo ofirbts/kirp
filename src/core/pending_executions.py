@@ -38,6 +38,35 @@ class PendingExecutionsStore:
             raise RuntimeError("PendingExecutionsStore not connected")
         return self._db.pending_executions
 
+    async def find_pending_by_idempotency_key(
+        self,
+        tenant_id: str,
+        idempotency_key: str,
+    ) -> dict[str, Any] | None:
+        if not tenant_id or not idempotency_key:
+            return None
+        doc = await self._coll().find_one({
+            "tenant_id": tenant_id,
+            "status": "pending",
+            "payload.idempotency_key": idempotency_key,
+        })
+        if not doc:
+            return None
+        return {
+            "id": doc["_id"],
+            "tenant_id": doc["tenant_id"],
+            "user_id": doc["user_id"],
+            "space_id": doc["space_id"],
+            "command_type": doc["command_type"],
+            "payload": doc["payload"],
+            "status": doc["status"],
+        }
+
+    async def count_pending(self, tenant_id: str) -> int:
+        if not tenant_id:
+            return 0
+        return await self._coll().count_documents({"tenant_id": tenant_id, "status": "pending"})
+
     async def add(
         self,
         tenant_id: str,
@@ -61,8 +90,34 @@ class PendingExecutionsStore:
         })
         return pending_id
 
-    async def get(self, pending_id: str) -> dict[str, Any] | None:
-        doc = await self._coll().find_one({"_id": pending_id})
+    async def add_or_get_pending(
+        self,
+        tenant_id: str,
+        user_id: str,
+        space_id: str,
+        command_type: str,
+        payload: dict[str, Any],
+        *,
+        idempotency_key: str | None = None,
+    ) -> tuple[str, bool]:
+        if idempotency_key:
+            existing = await self.find_pending_by_idempotency_key(tenant_id, idempotency_key)
+            if existing:
+                return str(existing["id"]), True
+            payload = {**payload, "idempotency_key": idempotency_key}
+        pending_id = await self.add(
+            tenant_id=tenant_id,
+            user_id=user_id,
+            space_id=space_id,
+            command_type=command_type,
+            payload=payload,
+        )
+        return pending_id, False
+
+    async def get(self, pending_id: str, tenant_id: str) -> dict[str, Any] | None:
+        if not tenant_id or not str(tenant_id).strip():
+            raise ValueError("tenant_id is required for scoped pending fetch")
+        doc = await self._coll().find_one({"_id": pending_id, "tenant_id": tenant_id})
         if not doc:
             return None
         return {

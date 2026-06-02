@@ -1,30 +1,51 @@
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
-  
-@import url('https://fonts.googleapis.com/css2?family=Roboto:ital,wght@0,100..900;1,100..900&display=swap');
+
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@100..900&family=Plus+Jakarta+Sans:ital,wght@0,200..800;1,200..800&display=swap');
 
 :root {
-  --color-bg: #050509;
-  --color-surface-1: #0B0B12;
-  --color-surface-2: #12121B;
-  --color-surface-3: #191925;
+  --color-bg: hsl(210, 20%, 98%); /* Soft off-white / light cream */
+  --color-surface-1: rgba(255, 255, 255, 0.7);
+  --color-surface-2: rgba(255, 255, 255, 0.55);
+  --color-surface-3: rgba(255, 255, 255, 0.4);
 
-  --color-border-subtle: rgba(255, 255, 255, 0.04);
-  --color-border-strong: rgba(255, 255, 255, 0.12);
+  --color-border-subtle: rgba(0, 0, 0, 0.05);
+  --color-border-strong: rgba(0, 0, 0, 0.1);
 
-  --color-primary: #98FFD2;   /* Mint */
-  --color-secondary: #D0BFFF; /* Lavender */
-  --color-accent: #FFD29D;    /* Peach */
+  --color-primary: hsl(165, 55%, 65%);  /* Secondary / Teal (Mint) */
+  --color-secondary: hsl(260, 60%, 75%); /* Accent / Purple (Lilac) */
+  --color-accent: hsl(30, 95%, 72%);    /* Primary / Peach (Soft Warm Peach) */
+  --color-coral: hsl(355, 80%, 75%);     /* Warm Coral (Salmon Coral) */
 
-  --color-text-main: #F9FAFB;
-  --color-text-muted: #9CA3AF;
-  --color-text-soft: #6B7280;
+  --color-text-main: hsl(222, 47%, 11%);
+  --color-text-muted: hsl(220, 9%, 46%);
+  --color-text-soft: hsl(220, 9%, 60%);
 
   --radius-lg: 16px;
   --radius-xl: 20px;
   --radius-2xl: 24px;
+
+  --shadow-soft: 0px 8px 30px rgba(0, 0, 0, 0.03);
+}
+
+.dark {
+  --color-bg: #050509; /* Preserve dark background */
+  --color-surface-1: rgba(11, 11, 18, 0.8);
+  --color-surface-2: rgba(18, 18, 27, 0.7);
+  --color-surface-3: rgba(25, 25, 37, 0.55);
+
+  --color-border-subtle: rgba(255, 255, 255, 0.04);
+  --color-border-strong: rgba(255, 255, 255, 0.12);
+
+  --color-primary: hsl(165, 55%, 65%);
+  --color-secondary: hsl(260, 60%, 75%);
+  --color-accent: hsl(30, 95%, 72%);
+  --color-coral: hsl(355, 80%, 75%);
+
+  --color-text-main: #F9FAFB;
+  --color-text-muted: #9CA3AF;
+  --color-text-soft: #6B7280;
 
   --shadow-soft: 0 18px 45px rgba(0, 0, 0, 0.55);
 }
@@ -32,13 +53,17 @@
 @layer base {
   body {
     @apply bg-bg text-textMain antialiased;
+    font-family: "Gilroy", "Outfit", "Plus Jakarta Sans", system-ui, sans-serif;
   }
 }
 
 @layer components {
   .glass-card {
-    background-color: rgba(11, 11, 18, 0.8);
-    @apply backdrop-blur-xl border border-[color:var(--color-border-subtle)] shadow-soft;
+    background: var(--color-surface-1);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid var(--color-border-subtle);
+    box-shadow: var(--shadow-soft);
   }
 
   .bento-grid {

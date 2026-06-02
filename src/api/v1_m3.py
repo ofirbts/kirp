@@ -112,8 +112,8 @@ async def m3_reflect(
     """
     idempotency_key = (request.headers.get("Idempotency-Key") or request.headers.get("idempotency-key") or "").strip()
     if idempotency_key:
-        store = get_m3_memory_store()
-        existing = await store.get_idempotency_event_id(ctx.tenant_id, ctx.user_id, idempotency_key)
+        from src.core.idempotency import get_idempotency_provider
+        existing = await get_idempotency_provider().get(ctx.tenant_id, f"m3_reflect:{ctx.user_id}:{idempotency_key}")
         if existing:
             return JSONResponse(status_code=200, content={"ok": True, "event_id": existing})
 
@@ -152,8 +152,8 @@ async def m3_reflect(
     registry = get_event_registry()
     event_id = await registry.dispatch(event)
     if idempotency_key:
-        store = get_m3_memory_store()
-        await store.record_idempotency(ctx.tenant_id, ctx.user_id, idempotency_key, str(event_id))
+        from src.core.idempotency import get_idempotency_provider
+        await get_idempotency_provider().record(ctx.tenant_id, f"m3_reflect:{ctx.user_id}:{idempotency_key}", str(event_id))
     return {"ok": True, "event_id": str(event_id), "run_id": run_id, "trace_id": trace_id}
 
 

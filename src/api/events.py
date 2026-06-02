@@ -21,7 +21,11 @@ from src.schemas.api_models import EventsListResponse
 from src.services import events_service
 
 
-router = APIRouter(prefix="/api/events", tags=["Events"])
+router = APIRouter(
+    prefix="/api/events",
+    tags=["Events (deprecated — use /api/v1/events)"],
+    deprecated=True,
+)
 
 
 @router.get("", response_model=EventsListResponse)

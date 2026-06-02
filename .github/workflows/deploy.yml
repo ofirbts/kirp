@@ -46,6 +46,15 @@ jobs:
         run: |
           python -m src.cli show-contracts > /tmp/contracts-current.json
 
+      - name: Drift immunity preflight
+        run: |
+          python scripts/version_check.py
+          python scripts/auth_consistency_check.py
+          python scripts/contract_drift_check.py
+          python scripts/incident_memory.py analyze
+          python scripts/trust_score.py --min-score 80
+          python scripts/self_protection_gate.py --mode deploy
+
       - name: Download previous API contracts artifact
         uses: actions/download-artifact@v4
         with:

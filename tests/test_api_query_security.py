@@ -8,29 +8,13 @@ from fastapi.testclient import TestClient
 from src.core.rag_engine import RAGResponse
 
 
-@pytest.fixture
-def client_skip_auth(monkeypatch: pytest.MonkeyPatch) -> TestClient:
-    monkeypatch.setenv("SKIP_AUTH", "1")
-    from src.main import app
-
-    return TestClient(app)
-
-
-@pytest.fixture
-def client_no_skip(monkeypatch: pytest.MonkeyPatch) -> TestClient:
-    monkeypatch.setenv("SKIP_AUTH", "0")
-    from src.main import app
-
-    return TestClient(app)
-
-
 def test_query_401_without_auth_when_skip_auth_off(client_no_skip: TestClient) -> None:
     r = client_no_skip.post("/api/v1/query", json={"query": "hello", "k": 3})
     assert r.status_code == 401
 
 
 def test_query_uses_context_tenant_not_body_tenant(
-    client_skip_auth: TestClient,
+    client_skip: TestClient,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     captured: list[dict[str, object]] = []
@@ -49,7 +33,7 @@ def test_query_uses_context_tenant_not_body_tenant(
         return _RAG()
 
     monkeypatch.setattr("src.main.get_rag_engine", fake_get_rag_engine)
-    r = client_skip_auth.post(
+    r = client_skip.post(
         "/api/v1/query",
         json={
             "query": "x",

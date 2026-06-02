@@ -49,6 +49,40 @@ def _doc_to_reflection(doc: dict[str, Any]) -> ReflectionEntry:
 class MongoM3MemoryStore(M3MemoryStore):
     """M3 memory persisted in MongoDB. Same interface as M3MemoryStore."""
 
+    async def _emit_profile_materialized_event(
+        self,
+        *,
+        tenant_id: str,
+        user_id: str,
+        space_id: str,
+        source_event_id: str | None,
+    ) -> None:
+        try:
+            import os
+            from uuid import uuid4
+
+            from src.core.event_store import Event, EventStore
+
+            uri = os.getenv(
+                "MONGO_URI",
+                "mongodb://root:example@localhost:27017/kirp?authSource=admin",
+            )
+            store = EventStore(uri)
+            await store.connect()
+            ev = Event(
+                id=uuid4(),
+                tenant_id=tenant_id,
+                space_id=space_id,
+                user_id=user_id,
+                source="m3_memory",
+                content="m3.identity_profile.materialized",
+                metadata={"source_event_id": source_event_id},
+                event_type="m3.identity_profile.materialized",
+            )
+            await store.ingest(ev)
+        except Exception as exc:
+            logger.warning("m3_profile_materialized_event_failed: %s", exc)
+
     def __init__(self, mongo_uri: str, db_name: str = "kirp") -> None:
         super().__init__()
         self._mongo_uri = mongo_uri
@@ -115,6 +149,12 @@ class MongoM3MemoryStore(M3MemoryStore):
                 "source_event_id": source_event_id,
             }},
             upsert=True,
+        )
+        await self._emit_profile_materialized_event(
+            tenant_id=tenant_id,
+            user_id=user_id,
+            space_id=space_id,
+            source_event_id=source_event_id,
         )
 
     async def list_reflections(

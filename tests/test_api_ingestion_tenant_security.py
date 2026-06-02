@@ -6,22 +6,6 @@ import pytest
 from fastapi.testclient import TestClient
 
 
-@pytest.fixture
-def client_skip(monkeypatch: pytest.MonkeyPatch) -> TestClient:
-    monkeypatch.setenv("SKIP_AUTH", "1")
-    from src.main import app
-
-    return TestClient(app)
-
-
-@pytest.fixture
-def client_no_skip(monkeypatch: pytest.MonkeyPatch) -> TestClient:
-    monkeypatch.setenv("SKIP_AUTH", "0")
-    from src.main import app
-
-    return TestClient(app)
-
-
 def test_gmail_sync_401_without_auth(client_no_skip: TestClient) -> None:
     r = client_no_skip.post("/api/v1/gmail/sync")
     assert r.status_code == 401

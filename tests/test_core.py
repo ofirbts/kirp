@@ -53,7 +53,9 @@ def test_agent_framework_register_list() -> None:
     assert len(af.list_all()) == 1
 
 
-def test_governance_disabled() -> None:
+def test_governance_disabled(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("ENV", "development")
+
     async def _check() -> GovernanceCheck:
         gov = GovernanceEngine(opa_url="")  # disabled when no OPA URL
         return await gov.check("t1", "s1", "u1", "read", "event")

@@ -6,22 +6,6 @@ import pytest
 from fastapi.testclient import TestClient
 
 
-@pytest.fixture
-def client_skip(monkeypatch: pytest.MonkeyPatch) -> TestClient:
-    monkeypatch.setenv("SKIP_AUTH", "1")
-    from src.main import app
-
-    return TestClient(app)
-
-
-@pytest.fixture
-def client_no_skip(monkeypatch: pytest.MonkeyPatch) -> TestClient:
-    monkeypatch.setenv("SKIP_AUTH", "0")
-    from src.main import app
-
-    return TestClient(app)
-
-
 def test_context_accessible_spaces_401_without_auth(client_no_skip: TestClient) -> None:
     r = client_no_skip.get("/api/v1/context/accessible-spaces")
     assert r.status_code == 401

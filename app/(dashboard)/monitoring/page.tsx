@@ -834,6 +834,16 @@ function computeNextAction(
 }
 
 function MonitoringContent() {
+  const traceNextAction = useCallback(
+    (
+      phase: "input" | "decision" | "output" | "visible_result",
+      payload: Record<string, unknown>,
+    ) => {
+      console.info("[NextActionTrace]", { phase, ...payload });
+    },
+    [],
+  );
+
   const searchParams = useSearchParams();
   const urlTenant = searchParams.get("tenant")?.trim();
   const { tenantId: storeTenant } = useTenantContextStore();
@@ -1290,18 +1300,36 @@ function MonitoringContent() {
   const alertCount = alertsPayload?.count ?? 0;
 
   if (loading && !payload) {
-    return <PageSkeleton title subtitle cards={2} tableRows={6} />;
+    return (
+      <div className="space-y-3">
+        <PageSkeleton title subtitle cards={2} tableRows={6} />
+        <div className="rounded-xl border border-[color:var(--color-border-subtle)] bg-surface2 px-4 py-3 text-xs text-textSoft">
+          Loading monitoring context from tenant runs and alert streams. If this stays visible, data did not
+          complete loading from API/SSE yet.
+        </div>
+      </div>
+    );
   }
 
   const onNextActionClick = () => {
     const action = nextAction;
     const rid = action.targetRunId;
+    traceNextAction("input", {
+      action_kind: action.kind,
+      action_label: action.action,
+      target_run_id: rid,
+    });
     const now = Date.now();
     if (
       rid &&
       lastNextActionGuardRef.current.runId === rid &&
       now - lastNextActionGuardRef.current.t < 1500
     ) {
+      traceNextAction("decision", {
+        action_kind: action.kind,
+        target_run_id: rid,
+        decision: "debounced_click_ignored",
+      });
       return;
     }
     lastNextActionGuardRef.current = { runId: rid, t: now };
@@ -1314,27 +1342,48 @@ function MonitoringContent() {
       rid
     ) {
       setFailureClarityState("processing");
-      setResultMessage("Creating task…");
+      setResultMessage("Creating a tracked task from this recommendation...");
       scheduleClearNextActionFeedback(12000);
     }
     void (async () => {
       let execResult: ExecuteNextActionResult = { runId: null };
       try {
         execResult = await executeNextAction(action);
+        traceNextAction("output", {
+          action_kind: action.kind,
+          target_run_id: rid,
+          task_outcome: execResult.taskOutcome ?? null,
+          run_id: execResult.runId,
+        });
         if (
           (action.kind === "failed" || action.kind === "partial") &&
           rid
         ) {
           if (execResult.taskOutcome === "created") {
             setFailureClarityState("success");
-            setResultMessage("Task created — now tracked");
+            setResultMessage("Task created from your click; progress is now tracked in Tasks");
             setNextActionCardCue("task_created");
+            traceNextAction("visible_result", {
+              state: "success",
+              message: "Task created from your click; progress is now tracked in Tasks",
+              target_run_id: rid,
+            });
           } else if (execResult.taskOutcome === "failed") {
             setFailureClarityState("failure");
-            setResultMessage("Could not create — try again");
+            setResultMessage("Task creation failed, so progress was not recorded");
+            traceNextAction("visible_result", {
+              state: "failure",
+              message: "Task creation failed, so progress was not recorded",
+              target_run_id: rid,
+            });
           } else if (execResult.taskOutcome === "unavailable") {
             setFailureClarityState("network_issue");
             setResultMessage("Action not available yet — opening flow");
+            traceNextAction("visible_result", {
+              state: "network_issue",
+              message: "Task API unavailable, so the run context was opened instead",
+              target_run_id: rid,
+            });
           }
           scheduleClearNextActionFeedback(12000);
         }
@@ -1369,7 +1418,12 @@ function MonitoringContent() {
             }
             if (s === "completed") {
               setFailureClarityState("success");
-              setResultMessage("Done — this is now resolved");
+              setResultMessage("Run reached completed state after your action");
+              traceNextAction("visible_result", {
+                state: "success",
+                message: "Run reached completed state after your action",
+                target_run_id: rid,
+              });
               const pb = formatProofLine(vis);
               setResultProofLine(
                 pb !== "Updated just now"
@@ -1396,14 +1450,25 @@ function MonitoringContent() {
               applyTaskCreatedLoop();
               scheduleClearNextActionFeedback(2800);
             } else {
-              setFailureClarityState(verifyStateFromVisibility(vis));
+              const nextState = verifyStateFromVisibility(vis);
+              setFailureClarityState(nextState);
               setResultMessage(
-                verifyStateFromVisibility(vis) === "success"
-                  ? "Verification succeeded"
-                  : verifyStateFromVisibility(vis) === "failure"
-                    ? "Verification found failure"
-                    : "Verification still processing",
+                nextState === "success"
+                  ? "Verification confirms the action reached a successful state"
+                  : nextState === "failure"
+                    ? "Verification confirms the run is still blocked"
+                    : "Verification confirms the run is still processing",
               );
+              traceNextAction("visible_result", {
+                state: nextState,
+                message:
+                  nextState === "success"
+                    ? "Verification confirms the action reached a successful state"
+                    : nextState === "failure"
+                      ? "Verification confirms the run is still blocked"
+                      : "Verification confirms the run is still processing",
+                target_run_id: rid,
+              });
               if (s === "processing" || s === "accepted") {
                 setResultProofLine("Flow is continuing");
               } else if (s === "failed") {
@@ -1420,7 +1485,12 @@ function MonitoringContent() {
       } catch {
         if ((action.kind === "failed" || action.kind === "partial") && rid) {
           setFailureClarityState("failure");
-          setResultMessage("Could not create — try again");
+          setResultMessage("Task creation failed, so progress was not recorded");
+          traceNextAction("visible_result", {
+            state: "failure",
+            message: "Task creation failed, so progress was not recorded",
+            target_run_id: rid,
+          });
           scheduleClearNextActionFeedback(12000);
         }
       } finally {
@@ -1523,7 +1593,7 @@ function MonitoringContent() {
         <CardHeader>
           <CardTitle className="text-base text-textMain">Next Action</CardTitle>
           <p className="text-xs text-textSoft">
-            One recommended move to keep progress clear and continuous.
+            One recommended move, including why it was triggered and what happens if you ignore it.
           </p>
         </CardHeader>
         <CardContent className="space-y-3">
@@ -1566,7 +1636,7 @@ function MonitoringContent() {
                 </p>
               ) : (
                 <p className="mt-2 text-sm text-textSoft">
-                  Preparing your next best move…
+                  Computing the next move from updated run evidence...
                 </p>
               )}
             </div>
@@ -1590,6 +1660,29 @@ function MonitoringContent() {
               {clickIntent ? (
                 <p className={clickIntent.accentClass}>{clickIntent.line}</p>
               ) : null}
+              <p className="text-[11px] leading-snug text-textSoft">
+                Trigger source: <span className="text-textMain">{nextAction.confidence}</span>
+              </p>
+              <p className="text-[11px] leading-snug text-textSoft">
+                Confidence: <span className="text-textMain">high for current run state</span>
+              </p>
+              <p className="text-[11px] leading-snug text-textSoft">
+                If ignored:{" "}
+                <span className="text-textMain">
+                  {nextAction.kind === "failed"
+                    ? "blocked work remains blocked and queue risk increases"
+                    : nextAction.kind === "partial"
+                      ? "partial progress remains open and completion is delayed"
+                      : nextAction.kind === "processing"
+                        ? "you lose visibility on an in-flight run"
+                        : nextAction.kind === "completed"
+                          ? "completed output is not converted into the next step"
+                          : "momentum is delayed until a new trigger appears"}
+                </span>
+              </p>
+              <p className="text-[11px] leading-snug text-textSoft">
+                Next if executed: <span className="text-textMain">{afterThisLine.replace("This unlocks: ", "")}</span>
+              </p>
             </>
           )}
           <div>
@@ -1599,7 +1692,7 @@ function MonitoringContent() {
               disabled={Boolean(resultMessage)}
               className="inline-flex items-center gap-2 rounded-xl border border-[color:var(--color-border-subtle)] bg-primary px-3 py-2 text-sm font-medium text-white hover:opacity-90"
             >
-              {resultMessage ? "Applying…" : ctaLabelForKind(nextAction.kind)}
+              {resultMessage ? "Applying action..." : ctaLabelForKind(nextAction.kind)}
             </button>
           </div>
           {!resultMessage ? (

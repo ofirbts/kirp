@@ -17,6 +17,7 @@ from uuid import uuid4
 from fastapi import APIRouter, Body, HTTPException, Request
 
 from src.auth.tenant_context import get_tenant_context
+from src.core.structured_logging import log_json
 
 logger = logging.getLogger(__name__)
 
@@ -24,40 +25,43 @@ router = APIRouter(prefix="/api/v1", tags=["ingestion"])
 
 
 async def _ingest_one(tenant_id: str, space_id: str, user_id: str, payload: dict[str, Any]) -> dict[str, Any]:
-    """Publish one unified payload to Kafka only. Processor runs pipeline and stores."""
     from src.agents.kafka_event_agent import KafkaEventAgent, EventEnvelope
 
     run_id = payload.get("run_id") or f"run_{uuid4().hex}"
     trace_id = payload.get("trace_id") or f"tr_{uuid4().hex[:12]}"
     workflow_type = payload.get("workflow_type") or "ingest_event"
     idempotency_key = payload.get("idempotency_key")
-    KafkaEventAgent().emit(EventEnvelope(
-        type="ingest",
-        payload={
-            "tenant_id": tenant_id,
-            "space_id": space_id,
-            "user_id": user_id,
-            "content": payload.get("content", ""),
-            "trace_id": trace_id,
-            "run_id": run_id,
-            "workflow_type": workflow_type,
-            "idempotency_key": idempotency_key,
-            "metadata": {
-                **(payload.get("metadata") or {}),
+    ok = KafkaEventAgent().emit(
+        EventEnvelope(
+            type="ingest",
+            payload={
+                "tenant_id": tenant_id,
+                "space_id": space_id,
+                "user_id": user_id,
+                "content": payload.get("content", ""),
                 "trace_id": trace_id,
                 "run_id": run_id,
                 "workflow_type": workflow_type,
+                "idempotency_key": idempotency_key,
+                "metadata": {
+                    **(payload.get("metadata") or {}),
+                    "trace_id": trace_id,
+                    "run_id": run_id,
+                    "workflow_type": workflow_type,
+                },
+                "source": payload.get("source", "webhook"),
             },
-            "source": payload.get("source", "webhook"),
-        },
-        tenant_id=tenant_id,
-        space_id=space_id,
-        user_id=user_id,
-        run_id=run_id,
-        workflow_type=workflow_type,
-        trace_id=trace_id,
-        idempotency_key=idempotency_key,
-    ))
+            tenant_id=tenant_id,
+            space_id=space_id,
+            user_id=user_id,
+            run_id=run_id,
+            workflow_type=workflow_type,
+            trace_id=trace_id,
+            idempotency_key=idempotency_key,
+        )
+    )
+    if not ok:
+        raise HTTPException(status_code=503, detail="Event bus unavailable; webhook publish failed")
     return {"ok": True, "run_id": run_id, "trace_id": trace_id}
 
 
@@ -83,6 +87,8 @@ async def webhook_slack(body: dict[str, Any] = Body(...)) -> dict[str, Any]:
         try:
             r = await _ingest_one(tenant_id, space_id, user_id, ev)
             results.append(r)
+        except HTTPException:
+            raise
         except Exception as e:
             logger.warning("Slack webhook ingest failed: %s", e)
             results.append({"ok": False, "error": str(e)})
@@ -157,7 +163,7 @@ async def webhook_notion(request: Request) -> dict[str, Any]:
                 continue
             meta = payload.get("metadata") or {}
             meta["external_id"] = page_id
-            KafkaEventAgent().emit(EventEnvelope(
+            env = EventEnvelope(
                 type="ingest",
                 payload={
                     "tenant_id": tenant_id,
@@ -173,8 +179,12 @@ async def webhook_notion(request: Request) -> dict[str, Any]:
                 tenant_id=tenant_id,
                 space_id=space_id,
                 user_id=user_id,
-            ))
+            )
+            if not KafkaEventAgent().emit(env):
+                raise HTTPException(status_code=503, detail="Event bus unavailable; webhook publish failed")
             processed += 1
+        except HTTPException:
+            raise
         except Exception as e:
             logger.exception("Notion webhook process page %s: %s", page_id, e)
 
@@ -235,17 +245,21 @@ async def webhook_whatsapp(request: Request) -> dict[str, Any]:
     except Exception as e:  # pragma: no cover
         logger.warning("WhatsApp webhook signature validation skipped: %s", e)
 
-    tenant_id = os.getenv("WHATSAPP_WEBHOOK_TENANT_ID", "default").strip() or "default"
-    space_id = os.getenv("WHATSAPP_WEBHOOK_SPACE_ID", "all").strip() or "all"
-    user_id = os.getenv("WHATSAPP_WEBHOOK_USER_ID", "system").strip() or "system"
-
     wa = WhatsAppIntegration()
     events = wa.parse_webhook_payload(body)
+    first_from = ""
+    if events and isinstance(events[0], dict):
+        first_from = str(events[0].get("from") or events[0].get("from_number") or "")
+    from src.core.webhook_tenant import resolve_whatsapp_webhook_tenant
+
+    tenant_id, space_id, user_id = resolve_whatsapp_webhook_tenant(first_from or None)
     results = []
     for ev in events:
         try:
             r = await _ingest_one(tenant_id, space_id, user_id, ev)
             results.append(r)
+        except HTTPException:
+            raise
         except Exception as e:
             logger.warning("WhatsApp webhook ingest failed: %s", e)
             results.append({"ok": False, "error": str(e)})
@@ -265,6 +279,14 @@ async def webhook_whatsapp(request: Request) -> dict[str, Any]:
             )
         except Exception as e:
             logger.warning("WhatsApp notification failed: %s", e)
+    log_json(
+        logger,
+        "info",
+        "whatsapp_webhook_ingest",
+        tenant_id=tenant_id,
+        processed=len(results),
+        event_count=len(events),
+    )
     return {"ok": True, "processed": len(results), "results": results}
 
 

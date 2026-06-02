@@ -33,6 +33,7 @@ const SECTIONS: SectionMeta[] = [
   { prefix: "/dashboard", title: "Dashboard", subtitle: "System health, KPIs, and overview." },
   { prefix: "/notifications", title: "Activity Center", subtitle: "Notifications and activity." },
   { prefix: "/observability", title: "Observability", subtitle: "Health, metrics, and monitoring." },
+  { prefix: "/traces", title: "Execution traces", subtitle: "Replay, drift, orchestration, governed runtime." },
   { prefix: "/agents", title: "Agents", subtitle: "Manage and inspect intelligence agents." },
   { prefix: "/tasks", title: "Tasks", subtitle: "Life-object tasks from ingest and Notion." },
   { prefix: "/insights", title: "Insights", subtitle: "Workload, patterns, commitments, and recommendations." },
@@ -148,7 +149,7 @@ export const TopBar: React.FC = () => {
     return () => {
       cancelled = true;
     };
-  }, [tenantId]);
+  }, [tenantId, spaceId, setSpace, show]);
 
   return (
     <div className="flex h-14 w-full items-center justify-between gap-3" suppressHydrationWarning>

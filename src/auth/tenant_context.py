@@ -38,10 +38,7 @@ DEFAULT_LOCAL_CONTEXT = TenantContext(
 
 
 def is_local_or_skip_auth() -> bool:
-    """True when ENV is local/development or SKIP_AUTH=1. In this mode, never 403 on tenant mismatch."""
-    skip = os.getenv("SKIP_AUTH", "").lower() in ("1", "true", "yes")
-    env = os.getenv("ENV", "").lower()
-    return skip or env in ("local", "development")
+    return os.getenv("SKIP_AUTH", "").lower() in ("1", "true", "yes")
 
 
 def get_tenant_context(request: Request) -> TenantContext:

@@ -14,8 +14,10 @@ from datetime import datetime, timezone
 from typing import Any
 
 from src.core.governance import GovernanceEngine, GovernanceCheck
+from src.observability.metrics import MetricsCollector
 
 logger = logging.getLogger(__name__)
+_governance_metrics = MetricsCollector("kirp_governance")
 
 
 @dataclass
@@ -87,4 +89,9 @@ class GovernanceEnforcement:
                 "requires_approval": check.requires_approval,
             },
         )
+        if not check.allowed:
+            _governance_metrics.inc(
+                "deny_total",
+                labels={"tenant_id": tenant_id, "action": action, "resource": resource},
+            )
         return check

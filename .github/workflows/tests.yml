@@ -25,6 +25,17 @@ jobs:
       - name: Run pytest
         run: python -m pytest tests/ -q --tb=short
 
+      - name: Embedding provider init gate
+        env:
+          OPENAI_API_KEY: ci-smoke-key
+        run: |
+          python - <<'PY'
+          from src.core.embedding_provider import get_embedder
+          e = get_embedder(provider="openai")
+          assert e is not None, "OpenAI embedder must initialize without proxies error"
+          print("embedding_provider: ok")
+          PY
+
   dashboard-build-lint:
     runs-on: ubuntu-latest
     steps:
@@ -54,6 +65,10 @@ jobs:
         run: python scripts/version_check.py
       - name: Auth consistency check gate
         run: python scripts/auth_consistency_check.py
+      - name: Tenant isolation gate
+        run: python scripts/tenant_isolation_gate.py
+      - name: Contract drift check gate
+        run: python scripts/contract_drift_check.py
       - name: Validate required PR sections
         env:
           PR_BODY: ${{ github.event.pull_request.body }}
@@ -92,3 +107,27 @@ jobs:
         run: docker compose up -d --build kirp-api kirp-dashboard
       - name: Run perf gate
         run: python scripts/perf_check.py --baseline docs/perf-baseline.json
+      - name: Install browser runtime for UX gate
+        run: |
+          python -m pip install playwright
+          python -m playwright install --with-deps chromium
+      - name: Validate Playwright runtime
+        run: |
+          python - <<'PY'
+          from playwright.sync_api import sync_playwright
+          try:
+              with sync_playwright() as p:
+                  browser = p.chromium.launch(headless=True)
+                  browser.close()
+              print("Playwright runtime ready.")
+          except Exception as e:
+              raise SystemExit(f"Playwright runtime setup failed; UX gate cannot run. {e}")
+          PY
+      - name: Run user-perceived reality gate
+        run: python scripts/ux_reality_check.py --baseline docs/user-perceived-baseline.json --commit-sha "${{ github.sha }}"
+      - name: Analyze incident memory
+        run: python scripts/incident_memory.py analyze
+      - name: Compute trust score
+        run: python scripts/trust_score.py --min-score 80
+      - name: Self-protection gate
+        run: python scripts/self_protection_gate.py --mode deploy

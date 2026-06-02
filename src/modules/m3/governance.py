@@ -1,16 +1,69 @@
-"""
-M3 IdentityOS — Human governance: WhatsApp escalation when requires_approval (score >= 0.6).
-
-Per spec 8: identity_entropy_score ≥ 0.6 or resource_type m3.monthly_evolution →
-WhatsApp prompt to tenant/user for approval. Per-tenant isolation.
-"""
-
 from __future__ import annotations
 
 import logging
+import os
 from typing import Any
 
+from src.core.structured_logging import log_json
+
 logger = logging.getLogger(__name__)
+
+
+async def enqueue_m3_whatsapp_escalation(
+    tenant_id: str,
+    space_id: str,
+    user_id: str,
+    event_type: str,
+    reason: str,
+    identity_entropy_score: float | None,
+    resource_type: str | None = None,
+    *,
+    trace_id: str | None = None,
+) -> dict[str, Any]:
+    to_phone = _resolve_m3_escalation_phone(tenant_id, user_id)
+    if not to_phone:
+        logger.info(
+            "M3 escalation (no phone): tenant=%s user=%s event_type=%s score=%s reason=%s",
+            tenant_id,
+            user_id,
+            event_type,
+            identity_entropy_score,
+            reason,
+        )
+        return {"ok": False, "reason": "no_phone_configured"}
+
+    text = _m3_escalation_message(event_type, reason, identity_entropy_score, resource_type)
+    idem = (trace_id or "").strip() or f"m3:{tenant_id}:{user_id}:{event_type}"
+    from src.core.whatsapp_outbound import enqueue_whatsapp_outbound
+
+    result = await enqueue_whatsapp_outbound(
+        tenant_id=tenant_id,
+        user_id=user_id,
+        space_id=space_id,
+        to=to_phone,
+        text=text,
+        idempotency_key=idem,
+        source="m3_escalation",
+        extra_payload={
+            "m3_escalation": True,
+            "event_type": event_type,
+            "reason": reason,
+            "identity_entropy_score": identity_entropy_score,
+            "resource_type": resource_type,
+            "trace_id": trace_id,
+        },
+    )
+    log_json(
+        logger,
+        "info",
+        "m3_whatsapp_escalation_queued",
+        tenant_id=tenant_id,
+        user_id=user_id,
+        pending_id=result.get("pending_id"),
+        event_type=event_type,
+        duplicate=result.get("duplicate"),
+    )
+    return result
 
 
 async def send_m3_whatsapp_escalation(
@@ -22,35 +75,18 @@ async def send_m3_whatsapp_escalation(
     identity_entropy_score: float | None,
     resource_type: str | None = None,
 ) -> dict[str, Any]:
-    """
-    Send WhatsApp prompt for M3 human approval. Uses tenant_id + user_id for routing.
-    Phone number resolved from env (M3_ESCALATION_PHONE_<tenant_id>_<user_id>) or
-    M3_ESCALATION_PHONE for single-tenant dev; otherwise logs and returns (no-op).
-    """
-    to_phone = _resolve_m3_escalation_phone(tenant_id, user_id)
-    if not to_phone:
-        logger.info(
-            "M3 escalation (no phone): tenant=%s user=%s event_type=%s score=%s reason=%s",
-            tenant_id, user_id, event_type, identity_entropy_score, reason,
-        )
-        return {"ok": False, "reason": "no_phone_configured"}
-
-    text = _m3_escalation_message(event_type, reason, identity_entropy_score, resource_type)
-    try:
-        from src.integrations.whatsapp import WhatsAppIntegration
-        wa = WhatsAppIntegration()
-        wa.connect()
-        result = await wa.send_message(to=to_phone, text=text, user_id=user_id)
-        logger.info("M3 WhatsApp escalation sent to %s tenant=%s user=%s", to_phone, tenant_id, user_id)
-        return result
-    except Exception as e:
-        logger.warning("M3 WhatsApp escalation send failed: %s", e)
-        return {"ok": False, "error": str(e)}
+    return await enqueue_m3_whatsapp_escalation(
+        tenant_id=tenant_id,
+        space_id=space_id,
+        user_id=user_id,
+        event_type=event_type,
+        reason=reason,
+        identity_entropy_score=identity_entropy_score,
+        resource_type=resource_type,
+    )
 
 
 def _resolve_m3_escalation_phone(tenant_id: str, user_id: str) -> str | None:
-    """Resolve WhatsApp destination for tenant/user. Env: M3_ESCALATION_PHONE or M3_ESCALATION_PHONE_<tenant_id>_<user_id>."""
-    import os
     key = f"M3_ESCALATION_PHONE_{tenant_id}_{user_id}".upper().replace("-", "_")
     phone = os.getenv(key, "").strip()
     if phone:
@@ -64,7 +100,6 @@ def _m3_escalation_message(
     identity_entropy_score: float | None,
     resource_type: str | None,
 ) -> str:
-    """Template message per spec 8."""
     if "monthly_evolution" in (event_type or "") or resource_type == "m3.monthly_evolution":
         return (
             "M3 Identity: Monthly evolution suggests new goals or direction. "

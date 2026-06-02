@@ -10,7 +10,7 @@ Output format:
 5. Validation steps
 6. Approval checkpoints if needed
 7. Cursor 3.2+ execution plan:
-   - Subagent split proposal (Builder / Reviewer-Tester / Integrator / Release Guard)
+   - Subagent split proposal (KIRP-Examiner / Builder / Reviewer-Tester / Integrator / Release Guard)
    - Worktree recommendation for significant changes
    - Multi-root recommendation when multiple modules are touched
    - Canvas requirement for large tasks (plan + checklist + risks)

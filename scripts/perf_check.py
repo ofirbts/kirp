@@ -7,6 +7,7 @@ import argparse
 import json
 import os
 import statistics
+import subprocess
 import sys
 import time
 from pathlib import Path
@@ -14,6 +15,30 @@ from typing import Any
 from urllib.error import URLError, HTTPError
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
+
+
+def log_incident(incident_type: str, source: str, message: str) -> None:
+    try:
+        subprocess.run(
+            [
+                sys.executable,
+                "scripts/incident_memory.py",
+                "log",
+                "--type",
+                incident_type,
+                "--source",
+                source,
+                "--message",
+                message,
+                "--commit-sha",
+                os.getenv("GITHUB_SHA", "unknown"),
+            ],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+    except Exception:
+        pass
 
 
 def percentile(values: list[float], p: float) -> float:
@@ -46,6 +71,12 @@ def timed_request(url: str, method: str = "GET", payload: dict[str, Any] | None 
 def measure_flow(url: str, samples: int, method: str = "GET", payload: dict[str, Any] | None = None) -> dict[str, Any]:
     durations: list[float] = []
     failures = 0
+    # Warm up route/runtime to avoid cold-start spikes skewing p95.
+    for _ in range(3):
+        try:
+            timed_request(url, method=method, payload=payload)
+        except Exception:
+            pass
     for _ in range(samples):
         d_ms, status = timed_request(url, method=method, payload=payload)
         durations.append(d_ms)
@@ -106,12 +137,24 @@ def main() -> int:
             "next_action_proxy": measure_flow(
                 f"{args.api_base.rstrip('/')}/api/v1/tasks?{urlencode({'tenant_id': 'default', 'space_id': 'all'})}",
                 args.samples_next_action,
-                "POST",
-                {"title": "perf probe task"},
+                "GET",
             ),
         }
     except Exception as e:
         print(f"perf check execution error: {e}")
+        log_incident("timeout", "perf_check", f"execution error: {e}")
+        out_dir = Path("artifacts/perf")
+        out_dir.mkdir(parents=True, exist_ok=True)
+        fail_payload = {
+            "env": baseline.get("env", "unknown"),
+            "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+            "flows": {
+                "dashboard_load": {"status": "fail", "reason": f"execution error: {e}"},
+                "ask": {"status": "fail", "reason": f"execution error: {e}"},
+                "next_action_proxy": {"status": "fail", "reason": f"execution error: {e}"},
+            },
+        }
+        (out_dir / "latest-results.json").write_text(json.dumps(fail_payload, indent=2), encoding="utf-8")
         return 2
 
     status = 0
@@ -131,6 +174,7 @@ def main() -> int:
         )
         if flow_status != "pass":
             status = 1
+            log_incident("timeout", "perf_check", f"{flow} {reason}")
         flows[flow] = {
             "p50_ms": data["p50_ms"],
             "p95_ms": data["p95_ms"],

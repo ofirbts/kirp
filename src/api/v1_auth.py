@@ -4,6 +4,7 @@ V1 Auth API — signup, login, me.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import os
 from typing import Any
@@ -20,6 +21,7 @@ from src.services import tenants_service
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/v1/auth", tags=["V1 Auth"])
+AUTH_IO_TIMEOUT_SECONDS = 8
 
 
 class SignupBody(BaseModel):
@@ -124,7 +126,16 @@ async def login(body: LoginBody) -> AuthResponse:
   Real auth: user must exist in DB and password must match.
   """
   store = get_user_store()
-  user = await store.get_user_by_email(str(body.email))
+  try:
+    user = await asyncio.wait_for(
+      store.get_user_by_email(str(body.email)),
+      timeout=AUTH_IO_TIMEOUT_SECONDS,
+    )
+  except asyncio.TimeoutError as e:
+    raise HTTPException(
+      status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+      detail=f"Auth lookup timed out after {AUTH_IO_TIMEOUT_SECONDS}s",
+    ) from e
   if not user or not _verify_password(body.password, user.password_hash):
     raise HTTPException(
       status_code=status.HTTP_401_UNAUTHORIZED,
@@ -137,7 +148,16 @@ async def login(body: LoginBody) -> AuthResponse:
     roles=user.roles,
     expires_in_seconds=int(os.getenv("JWT_EXPIRES_IN", "3600")),
   )
-  await store.update_last_login(user.id)
+  try:
+    await asyncio.wait_for(
+      store.update_last_login(user.id),
+      timeout=AUTH_IO_TIMEOUT_SECONDS,
+    )
+  except asyncio.TimeoutError as e:
+    raise HTTPException(
+      status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+      detail=f"Auth update timed out after {AUTH_IO_TIMEOUT_SECONDS}s",
+    ) from e
   return AuthResponse(
     access_token=token,
     user=AuthUser(

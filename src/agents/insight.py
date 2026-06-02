@@ -32,6 +32,44 @@ class InsightAgent:
     def __init__(self, rag: RAGEngine) -> None:
         self._rag = rag
 
+    async def _fallback_from_recent_events(
+        self,
+        tenant_id: str,
+        space_id: str,
+        user_id: str | None,
+    ) -> list[dict[str, Any]]:
+        """Fallback context when vector index is empty but raw events exist."""
+        try:
+            from src.main import get_event_store
+
+            store = await get_event_store()
+            recent = await store.list(
+                tenant_id=tenant_id,
+                space_id=space_id,
+                user_id=user_id,
+                limit=8,
+            )
+        except Exception as e:
+            logger.warning("InsightAgent.ask fallback event-store lookup failed: %s", e)
+            return []
+
+        out: list[dict[str, Any]] = []
+        for ev in recent:
+            text = (getattr(ev, "content", "") or "").strip()
+            if not text:
+                continue
+            out.append(
+                {
+                    "text": text,
+                    "score": None,
+                    "source": getattr(ev, "source", "event_store"),
+                    "metadata": getattr(ev, "metadata", {}) or {},
+                    "explanation": "fallback_from_event_store",
+                    "confidence": 0.55,
+                }
+            )
+        return out
+
     async def ask(
         self,
         tenant_id: str,
@@ -62,6 +100,22 @@ class InsightAgent:
             # Returning a graceful fallback avoids surfacing intermittent infra
             # timeouts as 500s in the UI.
             logger.warning("InsightAgent.ask RAG search failed: %s", e)
+            fallback_sources = await self._fallback_from_recent_events(
+                tenant_id=tenant_id,
+                space_id=space_id,
+                user_id=user_id,
+            )
+            if fallback_sources:
+                bullets = "\n".join(f"- {s['text'][:220]}" for s in fallback_sources[:3])
+                return InsightAnswer(
+                    answer=(
+                        "Based on recent activity (not yet indexed), I can already see:\n"
+                        f"{bullets}\n\n"
+                        "Indexed semantic search is temporarily unavailable."
+                    ),
+                    sources=fallback_sources,
+                    needs_external_info=False,
+                )
             return InsightAnswer(
                 answer=(
                     "I could not reach your indexed knowledge right now. "
@@ -92,8 +146,26 @@ class InsightAgent:
                 }
             )
 
-        # If no internal sources at all, fall back immediately.
+        # If vector index has no hits, try recent raw events before giving up.
         if not resp.results:
+            fallback_sources = await self._fallback_from_recent_events(
+                tenant_id=tenant_id,
+                space_id=space_id,
+                user_id=user_id,
+            )
+            if fallback_sources:
+                bullets = "\n".join(f"- {s['text'][:220]}" for s in fallback_sources[:3])
+                answer = (
+                    "I could not find indexed matches yet, but I can see recent activity in your data:\n"
+                    f"{bullets}\n\n"
+                    "This means ingestion likely arrived, but semantic indexing is still catching up."
+                )
+                return InsightAnswer(
+                    answer=answer,
+                    sources=fallback_sources,
+                    needs_external_info=False,
+                )
+
             answer = (
                 "I could not find anything in your current data that directly answers this. "
                 "Try adding more knowledge or syncing Notion."

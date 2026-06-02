@@ -255,15 +255,29 @@ def refresh_missing_embeddings_task(
 
 
 @celery_app.task(bind=True, name="whatsapp_send_task")
-def whatsapp_send_task(self: Any, to: str, text: str, user_id: str = "system") -> dict[str, Any]:
-    """Send WhatsApp message via integration."""
+def whatsapp_send_task(
+    self: Any,
+    to: str,
+    text: str,
+    user_id: str = "system",
+    tenant_id: str = "default",
+    space_id: str = "all",
+    idempotency_key: str | None = None,
+) -> dict[str, Any]:
+    """Queue WhatsApp send via pending executions (governed path)."""
     import asyncio
-    from src.integrations.whatsapp import WhatsAppIntegration
-    wa = WhatsAppIntegration()
-    wa.connect()
+    from src.core.whatsapp_outbound import enqueue_whatsapp_outbound
 
     async def _send() -> dict[str, Any]:
-        return await wa.send_message(to=to, text=text, user_id=user_id)
+        return await enqueue_whatsapp_outbound(
+            tenant_id=tenant_id,
+            user_id=user_id,
+            space_id=space_id,
+            to=to,
+            text=text,
+            idempotency_key=idempotency_key,
+            source="celery_whatsapp_send_task",
+        )
 
     try:
         loop = asyncio.new_event_loop()
@@ -568,5 +582,31 @@ def reconcile_partial_runs_task(self: Any, max_runs: int = 50) -> dict[str, Any]
 
         w = await ReconciliationWorker.create()
         return await w.reconcile_partial_runs(max_runs=max_runs)
+
+    return _run_async_sync(_run())
+
+
+@celery_app.task(bind=True, name="run_m3_stages_task")
+def run_m3_stages_task(
+    self: Any,
+    event_type: str,
+    tenant_id: str,
+    space_id: str,
+    user_id: str,
+    metadata: dict[str, Any],
+    content: str = "",
+) -> dict[str, Any]:
+    """Asynchronous background execution of M3 reflection classifier and gap analysis stages."""
+    async def _run() -> dict[str, Any]:
+        from src.modules.m3.stages import run_m3_stages
+        await run_m3_stages(
+            event_type=event_type,
+            tenant_id=tenant_id,
+            space_id=space_id,
+            user_id=user_id,
+            metadata=metadata,
+            content=content,
+        )
+        return {"ok": True}
 
     return _run_async_sync(_run())

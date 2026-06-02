@@ -138,7 +138,7 @@ export default function TasksPage() {
     } finally {
       setLoading(false);
     }
-  }, [tenantId, spaceId, tenant_id]);
+  }, [tenant_id, spaceId]);
 
   useEffect(() => {
     if (loaded && (user || skipAuth)) load();
@@ -159,7 +159,7 @@ export default function TasksPage() {
     } finally {
       setAdding(false);
     }
-  }, [quickAdd, tenant_id, spaceId, load]);
+  }, [quickAdd, tenant_id, spaceId, load, user?.id]);
 
   const openEdit = useCallback(
     async (id: string) => {
@@ -205,7 +205,7 @@ export default function TasksPage() {
     } finally {
       setSaving(false);
     }
-  }, [editId, editForm, tenant_id, load]);
+  }, [editId, editForm, tenant_id, load, user?.id]);
 
   const markComplete = useCallback(
     async (id: string) => {
@@ -216,7 +216,7 @@ export default function TasksPage() {
         setError(e instanceof Error ? e.message : "Failed to update");
       }
     },
-    [tenant_id, load]
+    [tenant_id, load, user?.id]
   );
 
   const snooze = useCallback(
@@ -230,7 +230,7 @@ export default function TasksPage() {
         setError(e instanceof Error ? e.message : "Failed to snooze");
       }
     },
-    [tasks, tenant_id, load]
+    [tasks, tenant_id, load, user?.id]
   );
 
   const convertToProject = useCallback(
@@ -251,7 +251,7 @@ export default function TasksPage() {
         setError(e instanceof Error ? e.message : "Convert failed");
       }
     },
-    [tasks, tenant_id, spaceId, load]
+    [tasks, tenant_id, spaceId, load, user?.id]
   );
 
   const convertToCommitment = useCallback(
@@ -274,7 +274,7 @@ export default function TasksPage() {
         setError(e instanceof Error ? e.message : "Convert failed");
       }
     },
-    [tasks, tenant_id, spaceId, load]
+    [tasks, tenant_id, spaceId, load, user?.id]
   );
 
   const filteredTasks = useMemo(() => {
@@ -298,6 +298,10 @@ export default function TasksPage() {
     }
     return list;
   }, [tasks, taskOrder, view]);
+  const openWithoutDueDateCount = useMemo(
+    () => tasks.filter((t) => t.status !== "completed" && !t.due_date).length,
+    [tasks]
+  );
 
   const tasksByProject = useMemo(
     () =>
@@ -482,7 +486,11 @@ export default function TasksPage() {
               ))}
             </ul>
             {filteredTasks.length === 0 && (
-              <p className="py-8 text-center text-sm text-textSoft">No tasks in this view.</p>
+              <p className="py-8 text-center text-sm text-textSoft">
+                {view === "today" && openWithoutDueDateCount > 0
+                  ? `No tasks are due today. You still have ${openWithoutDueDateCount} open task(s) without a due date.`
+                  : "No tasks in this view."}
+              </p>
             )}
           </CardContent>
         </Card>

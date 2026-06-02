@@ -8,29 +8,13 @@ import pytest
 from fastapi.testclient import TestClient
 
 
-@pytest.fixture
-def client_skip_auth(monkeypatch: pytest.MonkeyPatch) -> TestClient:
-    monkeypatch.setenv("SKIP_AUTH", "1")
-    from src.main import app
-
-    return TestClient(app)
-
-
-@pytest.fixture
-def client_no_skip(monkeypatch: pytest.MonkeyPatch) -> TestClient:
-    monkeypatch.setenv("SKIP_AUTH", "0")
-    from src.main import app
-
-    return TestClient(app)
-
-
 def test_notion_sync_401_without_auth_when_skip_auth_off(client_no_skip: TestClient) -> None:
     r = client_no_skip.post("/api/v1/notion/sync")
     assert r.status_code == 401
 
 
 def test_notion_sync_uses_context_tenant(
-    client_skip_auth: TestClient,
+    client_skip: TestClient,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     captured: dict[str, str] = {}
@@ -62,7 +46,7 @@ def test_notion_sync_uses_context_tenant(
     monkeypatch.setattr("src.workers.notion_sync.run_notion_sync", fake_run)
     monkeypatch.setattr("src.integrations.notion.NotionIntegration", mock_cls)
 
-    r = client_skip_auth.post("/api/v1/notion/sync")
+    r = client_skip.post("/api/v1/notion/sync")
     assert r.status_code == 200
     body = r.json()
     assert body.get("ok") is True

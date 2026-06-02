@@ -13,6 +13,7 @@ import type {
   ListAuditResponse,
 } from "@/lib/types";
 import { DEFAULT_TENANT_ID, DEFAULT_USER_ID } from "@/lib/constants";
+import { resolveTenantForApi } from "@/lib/effectiveTenant";
 
 /** Backend API base URL. Must be set for UI → API requests. */
 const BASE =
@@ -24,6 +25,9 @@ const DEV_TOKEN =
     ? process.env?.NEXT_PUBLIC_DEV_TOKEN ?? ""
     : "";
 const RUNTIME_VERSION_STORAGE_KEY = "kirp_runtime_version_sha";
+const AUTH_FAILURE_LOG_STORAGE_KEY = "kirp_auth_failure_log_v1";
+const AUTH_FAILURE_WINDOW_MS = 10 * 60 * 1000;
+const REQUEST_TIMEOUT_MS = 12000;
 
 function getRuntimeToken(): string | null {
   if (typeof window === "undefined") return DEV_TOKEN || null;
@@ -51,6 +55,35 @@ function rememberRuntimeVersion(response: Response): void {
   const version = response.headers.get("X-KIRP-Version")?.trim();
   if (!version || typeof window === "undefined") return;
   window.localStorage.setItem(RUNTIME_VERSION_STORAGE_KEY, version);
+}
+
+function rememberAuthFailure(status: number, path: string): void {
+  if (typeof window === "undefined") return;
+  try {
+    const now = Date.now();
+    const raw = window.localStorage.getItem(AUTH_FAILURE_LOG_STORAGE_KEY);
+    const items = raw ? (JSON.parse(raw) as Array<{ ts: number; status: number; path: string }>) : [];
+    const next = [
+      ...items.filter((item) => now - Number(item.ts) <= AUTH_FAILURE_WINDOW_MS),
+      { ts: now, status, path },
+    ].slice(-50);
+    window.localStorage.setItem(AUTH_FAILURE_LOG_STORAGE_KEY, JSON.stringify(next));
+  } catch {
+    // best-effort telemetry only
+  }
+}
+
+export function getRecentAuthFailureCount(): number {
+  if (typeof window === "undefined") return 0;
+  try {
+    const now = Date.now();
+    const raw = window.localStorage.getItem(AUTH_FAILURE_LOG_STORAGE_KEY);
+    if (!raw) return 0;
+    const items = JSON.parse(raw) as Array<{ ts: number }>;
+    return items.filter((item) => now - Number(item.ts) <= AUTH_FAILURE_WINDOW_MS).length;
+  } catch {
+    return 0;
+  }
 }
 
 export function getRuntimeVersionHint(): string | null {
@@ -94,15 +127,30 @@ async function fetchWithAuthRetry(
 ): Promise<Response> {
   const url = buildUrl(path, params);
   const hasBody = body !== undefined;
-  const res = await fetch(url, {
-    method,
-    headers: {
-      ...(hasBody ? { "Content-Type": "application/json" } : {}),
-      ...authHeaders(),
-    },
-    body: hasBody ? JSON.stringify(body) : undefined,
-    credentials: "include",
-  });
+  let res: Response;
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+    try {
+      res = await fetch(url, {
+        method,
+        headers: {
+          ...(hasBody ? { "Content-Type": "application/json" } : {}),
+          ...authHeaders(),
+        },
+        body: hasBody ? JSON.stringify(body) : undefined,
+        credentials: "include",
+        signal: controller.signal,
+      });
+    } finally {
+      clearTimeout(timer);
+    }
+  } catch (e) {
+    if (e instanceof Error && e.name === "AbortError") {
+      throw new Error(`request_timeout: ${method} ${path} exceeded ${REQUEST_TIMEOUT_MS}ms`);
+    }
+    throw e;
+  }
 
   if (res.status === 401 || res.status === 403) {
     console.warn("[apiClient][auth]", {
@@ -112,6 +160,7 @@ async function fetchWithAuthRetry(
       attempt,
       hasToken: Boolean(getRuntimeToken()),
     });
+    rememberAuthFailure(res.status, path);
   }
 
   // Single retry policy: only on first 401, using refresh endpoint.
@@ -205,6 +254,44 @@ export async function getObservabilityHealth(): Promise<Record<string, unknown>>
 
 export async function getMetricsSnapshot(): Promise<Record<string, unknown>> {
   return get<Record<string, unknown>>("/observability/metrics/snapshot");
+}
+
+export type TracesHealthV1 = {
+  ok: boolean;
+  log_path: string | null;
+  total_trace_ids: number;
+  sample_trace_ids: string[];
+  governed_runtime_mode: string;
+  baseline_fingerprint_configured: boolean;
+};
+
+export async function getTracesHealthV1(): Promise<TracesHealthV1> {
+  return get<TracesHealthV1>("/api/v1/traces/health");
+}
+
+export type TracesListV1 = {
+  log_path: string | null;
+  total: number;
+  trace_ids: string[];
+};
+
+export async function listTracesV1(limit = 50): Promise<TracesListV1> {
+  return get<TracesListV1>(`/api/v1/traces?limit=${limit}`);
+}
+
+export async function getTraceV1(
+  traceId: string,
+  opts?: { includeFull?: boolean; baselineTraceId?: string }
+): Promise<Record<string, unknown>> {
+  const params = new URLSearchParams();
+  if (opts?.includeFull) params.set("include_full", "true");
+  if (opts?.baselineTraceId) params.set("baseline_trace_id", opts.baselineTraceId);
+  const q = params.toString();
+  return get<Record<string, unknown>>(`/api/v1/trace/${encodeURIComponent(traceId)}${q ? `?${q}` : ""}`);
+}
+
+export async function seedDevTracesV1(reset = false): Promise<{ ok: boolean; trace_ids: string[] }> {
+  return post<{ ok: boolean; trace_ids: string[] }>(`/api/v1/traces/dev/seed?reset=${reset ? "true" : "false"}`, {});
 }
 
 export async function getStats(): Promise<Record<string, unknown>> {
@@ -530,7 +617,7 @@ export async function listHistory(params?: {
   userId?: string;
 }): Promise<{ data: HistoryEntryV1[]; meta?: Record<string, unknown> }> {
   const entries = await listHistoryV1({
-    tenant_id: params?.tenantId ?? DEFAULT_TENANT_ID,
+    tenant_id: resolveTenantForApi(params?.tenantId),
     user_id: params?.userId,
     limit: 100,
   });
@@ -1185,6 +1272,10 @@ export async function getRuntimeHealthV1(): Promise<RuntimeHealthV1> {
 export const apiClient = {
   getObservabilityHealth,
   getMetricsSnapshot,
+  getTracesHealthV1,
+  listTracesV1,
+  getTraceV1,
+  seedDevTracesV1,
   getStats,
   getLlmUsage,
   askV1,

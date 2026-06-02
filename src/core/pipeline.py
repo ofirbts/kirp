@@ -16,6 +16,7 @@ from uuid import UUID, uuid4, uuid5
 from src.core.event_store import Event, EventStore, Sensitivity
 from src.core.life_objects import extract_life_objects
 from src.core.structured_logging import log_json
+from src.telemetry.orchestration_trace import log_trace
 from src.models.schema import SchemaEntity
 from src.observability.metrics import MetricsCollector
 
@@ -152,6 +153,17 @@ class EventPipeline:
             else:
                 gov_context["resource_type"] = "m3.event"
 
+        log_trace(
+            logger,
+            stage="governance_before",
+            trace_id=str(meta.get("trace_id") or ""),
+            event_id=str(event_id) if event_id is not None else None,
+            tenant_id=tenant_id,
+            event_type=event_type,
+            source=source,
+            strict_policy=strict_policy,
+        )
+
         check = await self._gov.check(
             tenant_id=tenant_id,
             space_id=space_id,
@@ -160,6 +172,66 @@ class EventPipeline:
             resource="event",
             context=gov_context,
         )
+        log_trace(
+            logger,
+            stage="governance_after",
+            trace_id=str(meta.get("trace_id") or ""),
+            event_id=str(event_id) if event_id is not None else None,
+            tenant_id=tenant_id,
+            event_type=event_type,
+            source=source,
+            allowed=check.allowed,
+            requires_approval=check.requires_approval,
+            reason=check.reason,
+        )
+        try:
+            from src.telemetry.execution_shadow import emit_shadow_execution_observation
+
+            emit_shadow_execution_observation(
+                trace_id=str(meta.get("trace_id") or ""),
+                event_id=str(event_id) if event_id is not None else "",
+                tenant_id=tenant_id,
+                hook_source="pipeline",
+                event_type=event_type,
+                source=source,
+                governance_allowed=check.allowed,
+                governance_requires_approval=check.requires_approval,
+                governance_reason=check.reason,
+                metadata=meta,
+            )
+        except Exception as exc:
+            logger.warning("shadow_execution_observation_failed trace=%s err=%s", meta.get("trace_id"), exc)
+
+        trace_id_gov = str(meta.get("trace_id") or "").strip()
+        if trace_id_gov:
+            try:
+                from src.telemetry.governed_runtime import (
+                    apply_governed_runtime_verdict,
+                    build_pipeline_governance_timeline,
+                    emit_governed_runtime_trace,
+                    evaluate_governed_runtime,
+                )
+
+                rt_timeline = build_pipeline_governance_timeline(
+                    trace_id=trace_id_gov,
+                    tenant_id=tenant_id,
+                    event_id=str(event_id) if event_id is not None else None,
+                    allowed=check.allowed,
+                    event_type=event_type,
+                    source=source,
+                )
+                rt_verdict = evaluate_governed_runtime(rt_timeline, profile="pipeline")
+                emit_governed_runtime_trace(
+                    logger,
+                    rt_verdict,
+                    event_id=str(event_id) if event_id is not None else None,
+                )
+                apply_governed_runtime_verdict(rt_verdict)
+            except PermissionError:
+                raise
+            except Exception as exc:
+                logger.warning("governed_runtime_eval_failed trace_id=%s err=%s", trace_id_gov, exc)
+
         if not check.allowed:
             if run_controller and run_id:
                 await run_controller.update_step(run_id, "governance_check", "failed", error=check.reason)
@@ -178,6 +250,7 @@ class EventPipeline:
                     reason=check.reason,
                     identity_entropy_score=gov_context.get("identity_entropy_score"),
                     resource_type=gov_context.get("resource_type"),
+                    trace_id=str(meta.get("trace_id") or trace_id_gov or ""),
                 )
             except Exception as e:
                 logger.warning("M3 WhatsApp escalation failed: %s", e)
@@ -213,6 +286,15 @@ class EventPipeline:
         )
 
         # Embed and upsert to Qdrant (best-effort)
+        log_trace(
+            logger,
+            stage="rag_before",
+            trace_id=trace_id,
+            event_id=str(event_id),
+            tenant_id=tenant_id,
+            event_type=event_type,
+            source=source,
+        )
         try:
             emb = await self._rag.embed(content)
             event.embedding = emb
@@ -242,10 +324,20 @@ class EventPipeline:
                 await run_controller.update_step(run_id, "qdrant_projection", "completed")
         except Exception as e:
             logger.warning("RAG embed/upsert failed (event still stored): %s", e)
+            await self._store.write_to_outbox(event_id, tenant_id, "qdrant", str(e))
             if run_controller and run_id:
                 await run_controller.update_step(run_id, "qdrant_projection", "failed", error=str(e))
 
         # Store in Mongo (source of truth)
+        log_trace(
+            logger,
+            stage="mongo_before",
+            trace_id=trace_id,
+            event_id=str(event_id),
+            tenant_id=tenant_id,
+            event_type=event_type,
+            source=source,
+        )
         await self._store.ingest(event)
         if run_controller and run_id:
             await run_controller.update_step(run_id, "mongo_write", "completed")
@@ -348,6 +440,7 @@ class EventPipeline:
                 await run_controller.update_step(run_id, "schema_projection", "completed")
         except Exception as e:
             logger.warning("Life-object extraction/upsert failed (event already stored): %s", e)
+            await self._store.write_to_outbox(event_id, tenant_id, "schema", str(e))
             if run_controller and run_id:
                 await run_controller.update_step(run_id, "schema_projection", "failed", error=str(e))
 
@@ -383,13 +476,13 @@ class EventPipeline:
 
         return event.id
 
-    async def run_post_ingest_for_event(self, event_id: UUID) -> bool:
+    async def run_post_ingest_for_event(self, event_id: UUID, tenant_id: str) -> bool:
         """
         Re-run embed → Qdrant → life-object extraction → schema upsert for an existing event.
         Used after updating an event (e.g. Notion webhook: update_by_external_id then this).
         Does not write to event store. Returns False if event not found.
         """
-        event = await self._store.get_by_id(event_id)
+        event = await self._store.get_by_id_for_tenant(event_id, tenant_id)
         if not event:
             return False
         tenant_id = event.tenant_id
@@ -567,7 +660,7 @@ class EventPipeline:
         proj_broken = last.get("qdrant_projection") == "failed" or last.get("schema_projection") == "failed"
         if proj_broken:
             any_attempt = True
-            if await self.run_post_ingest_for_event(event.id):
+            if await self.run_post_ingest_for_event(event.id, state.tenant_id):
                 await rc.update_step(run_id, "qdrant_projection", "completed")
                 await rc.update_step(run_id, "schema_projection", "completed")
                 repaired.append("projections")

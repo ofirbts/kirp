@@ -12,12 +12,21 @@ Every agent action must be:
 from __future__ import annotations
 
 import logging
+import os
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from enum import Enum
 from typing import Any
 
 logger = logging.getLogger(__name__)
+
+
+def _production_env() -> bool:
+    return (os.getenv("ENV") or "").strip().lower() in ("production", "prod")
+
+
+def _require_opa_in_production() -> bool:
+    return os.getenv("KIRP_REQUIRE_OPA", "1").strip().lower() not in ("0", "false", "no")
 
 
 class ApprovalStatus(str, Enum):
@@ -59,6 +68,13 @@ class GovernanceEngine:
         Run OPA policy check. Returns risk score, approval requirement.
         """
         if not self._enabled:
+            if _production_env() and _require_opa_in_production():
+                return GovernanceCheck(
+                    allowed=False,
+                    reason="OPA required in production (set OPA_URL)",
+                    requires_approval=True,
+                    risk_score=1.0,
+                )
             return GovernanceCheck(
                 allowed=True,
                 reason="Governance disabled (no OPA)",
@@ -138,6 +154,13 @@ class GovernanceEngine:
             )
         except Exception as e:
             logger.warning("Governance check failed: %s", e)
+            if not _production_env():
+                return GovernanceCheck(
+                    allowed=True,
+                    reason=f"OPA unavailable (dev allow): {e}",
+                    requires_approval=False,
+                    risk_score=risk_score,
+                )
             return GovernanceCheck(
                 allowed=False,
                 reason=str(e),

@@ -24,6 +24,21 @@ class CommandType(str, Enum):
     POST_SLACK = "post_slack"
 
 
+HIGH_RISK_COMMANDS = frozenset({
+    CommandType.SEND_WHATSAPP,
+    CommandType.SEND_EMAIL,
+    CommandType.POST_SLACK,
+})
+
+
+def _governance_enforcement() -> Any:
+    from src.core.config import get_settings
+    from src.core.governance import GovernanceEngine
+    from src.core.governance_bundles import GovernanceEnforcement
+
+    return GovernanceEnforcement(GovernanceEngine(get_settings().opa_url))
+
+
 async def execute_command(
     command_type: str | CommandType,
     payload: dict[str, Any],
@@ -31,6 +46,8 @@ async def execute_command(
     user_id: str,
     space_id: str = "all",
     event_store: Any = None,
+    *,
+    governance_approved: bool = False,
 ) -> dict[str, Any]:
     """
     Execute a single command. Audits to EventStore (event_type=execution).
@@ -38,6 +55,34 @@ async def execute_command(
     """
     cmd = CommandType(command_type) if isinstance(command_type, str) else command_type
     result: dict[str, Any] = {"ok": False}
+
+    if not governance_approved:
+        enforcement = _governance_enforcement()
+        check = await enforcement.enforce(
+            tenant_id=tenant_id,
+            space_id=space_id,
+            user_id=user_id,
+            action="execute",
+            resource=cmd.value,
+            resource_id=str(payload.get("trace_id") or ""),
+            context={
+                "resource_type": "execution",
+                "command_type": cmd.value,
+            },
+        )
+        if not check.allowed:
+            return {
+                "ok": False,
+                "error": check.reason or "governance_denied",
+                "governance_denied": True,
+            }
+        if check.requires_approval:
+            return {
+                "ok": False,
+                "error": "requires_approval",
+                "requires_approval": True,
+            }
+
     try:
         if cmd == CommandType.CREATE_NOTION_TASK:
             from src.integrations.notion import NotionIntegration

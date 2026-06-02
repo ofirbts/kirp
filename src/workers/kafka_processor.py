@@ -25,6 +25,8 @@ from src.models.kafka_wire_envelope import (
 )
 from src.core.event_registry import get_event_registry
 from src.core.agent_registry import get_agent_framework_with_all_agents
+from src.control_plane.idempotency import redis_idempotency_key
+from src.telemetry.orchestration_trace import log_trace
 from src.observability.metrics import MetricsCollector
 from uuid import UUID, uuid4
 from datetime import datetime, timezone
@@ -42,8 +44,9 @@ _metrics = MetricsCollector("kirp_kafka")
 
 
 def _ensure_topic_exists(topic: str) -> None:
-    """Create Kafka topic if it does not exist (so consumer can subscribe before any producer runs)."""
-    bootstrap = os.getenv("KAFKA_BOOTSTRAP_SERVERS", "kafka:9092")
+    from src.core.integrations import _kafka_bootstrap
+
+    bootstrap = _kafka_bootstrap()
     try:
         from confluent_kafka.admin import AdminClient
         admin = AdminClient({"bootstrap.servers": bootstrap})
@@ -111,24 +114,35 @@ def _get_event_idempotency_key(payload: dict[str, Any]) -> str:
     return f"hash:{hashlib.sha256(payload_str.encode()).hexdigest()}"
 
 
-async def _check_idempotency(key: str) -> bool:
-    """Check if event was already processed (idempotency)."""
+async def _check_idempotency_redis(redis_key: str) -> bool:
     try:
-        redis = await get_redis_async()
-        if redis:
-            exists = await redis.exists(f"idempotency:{key}")
+        from src.core.idempotency import get_idempotency_provider
+        parts = redis_key.split(":", 2)
+        if len(parts) == 3:
+            tenant_id, unique_key = parts[1], parts[2]
+            val = await get_idempotency_provider().get(tenant_id, unique_key)
+            return val is not None
+        else:
+            from src.core.registry import get_registry
+            r = get_registry().get_redis_async()
+            exists = await r.exists(redis_key)
             return exists > 0
     except Exception as e:
         logger.warning("Idempotency check failed: %s", e)
     return False
 
 
-async def _mark_processed(key: str) -> None:
-    """Mark event as processed (idempotency)."""
+async def _mark_processed_redis(redis_key: str) -> None:
     try:
-        redis = await get_redis_async()
-        if redis:
-            await redis.setex(f"idempotency:{key}", IDEMPOTENCY_TTL, "1")
+        from src.core.idempotency import get_idempotency_provider
+        parts = redis_key.split(":", 2)
+        if len(parts) == 3:
+            tenant_id, unique_key = parts[1], parts[2]
+            await get_idempotency_provider().record(tenant_id, unique_key, "1")
+        else:
+            from src.core.registry import get_registry
+            r = get_registry().get_redis_async()
+            await r.setex(redis_key, IDEMPOTENCY_TTL, "1")
     except Exception as e:
         logger.warning("Failed to mark event as processed: %s", e)
 
@@ -179,6 +193,36 @@ async def process_event(payload: dict[str, Any], retry_count: int = 0) -> bool:
         event_type=event_type,
         retry_count=retry_count,
     )
+    log_trace(
+        logger,
+        stage="kafka_received",
+        trace_id=str(trace_id_payload) if trace_id_payload is not None else None,
+        event_id=str(data.get("id") or payload.get("event_id") or ""),
+        tenant_id=str(tenant_id_payload) if tenant_id_payload is not None else None,
+        event_type=event_type,
+        retry_count=retry_count,
+    )
+    try:
+        from src.telemetry.execution_shadow import emit_shadow_execution_observation
+
+        emit_shadow_execution_observation(
+            trace_id=str(trace_id_payload or ""),
+            event_id=str(data.get("id") or payload.get("event_id") or ""),
+            tenant_id=str(tenant_id_payload or "default"),
+            hook_source="kafka",
+            event_type=event_type,
+            source=str(data.get("source") or payload.get("source") or "kafka"),
+            metadata={
+                **(data if isinstance(data, dict) else {}),
+                **(
+                    {k: v for k, v in payload.items() if k != "data"}
+                    if isinstance(payload, dict)
+                    else {}
+                ),
+            },
+        )
+    except Exception as exc:
+        logger.warning("shadow_execution_observation_failed trace=%s err=%s", trace_id_payload, exc)
     logger.info("KafkaEventAgent received: %s", event_type)
     run_controller = None
     if run_id_payload:
@@ -230,7 +274,12 @@ async def process_event(payload: dict[str, Any], retry_count: int = 0) -> bool:
         if event_type == "agent_run":
             run_id_s = data.get("run_id")
             agent_name = data.get("agent_name")
-            tenant_id = data.get("tenant_id", "default")
+            tid_raw = data.get("tenant_id")
+            if not tid_raw or str(tid_raw).strip() == "" or tid_raw == "*":
+                logger.error("agent_run missing or invalid tenant_id")
+                _metrics.inc("events_failed", labels={"event_type": "agent_run", "reason": "invalid_tenant"})
+                return False
+            tenant_id = str(tid_raw).strip()
             if run_controller:
                 run_controller.update_key_prefix(str(tenant_id))
             space_id = data.get("space_id", "all")
@@ -240,8 +289,8 @@ async def process_event(payload: dict[str, Any], retry_count: int = 0) -> bool:
                 logger.error("agent_run missing run_id or agent_name")
                 _metrics.inc("events_failed", labels={"event_type": "agent_run", "reason": "missing_fields"})
                 return False
-            idempotency_key = f"agent_run:{run_id_s}"
-            if await _check_idempotency(idempotency_key):
+            idem_redis_key = redis_idempotency_key(tenant_id, f"agent_run:{run_id_s}")
+            if await _check_idempotency_redis(idem_redis_key):
                 logger.info("Agent run already processed (idempotency): %s", run_id_s)
                 if run_controller and run_id_payload:
                     await run_controller.update_step(str(run_id_payload), "idempotency_check", "completed")
@@ -256,7 +305,7 @@ async def process_event(payload: dict[str, Any], retry_count: int = 0) -> bool:
                 return False
             engine = get_agent_engine()
             await engine.execute_run(run_id, agent_name, tenant_id, space_id, user_id, context, spec.handler)
-            await _mark_processed(idempotency_key)
+            await _mark_processed_redis(idem_redis_key)
             if run_controller and run_id_payload:
                 await run_controller.update_step(str(run_id_payload), "agent_execute", "completed")
             latency = time.time() - start_time
@@ -264,16 +313,15 @@ async def process_event(payload: dict[str, Any], retry_count: int = 0) -> bool:
             logger.info("KafkaProcessor processed agent_run run_id=%s agent=%s latency=%.2fs", run_id_s, agent_name, latency)
             return True
 
-        # Ingest flow: idempotency then pipeline
-        idempotency_key = _get_event_idempotency_key(payload)
-        if await _check_idempotency(idempotency_key):
-            logger.info("Event already processed (idempotency): %s", idempotency_key)
-            _metrics.inc("events_duplicate", labels={"event_type": event_type})
-            if run_controller and run_id_payload:
-                await run_controller.update_step(str(run_id_payload), "idempotency_check", "completed")
-            return True
-        
         data = flatten_kafka_envelope_to_event_data(payload)
+        log_trace(
+            logger,
+            stage="kafka_flattened",
+            trace_id=str(trace_id_payload) if trace_id_payload is not None else None,
+            event_id=str(data.get("id") or ""),
+            tenant_id=str(data.get("tenant_id") or ""),
+            event_type=event_type,
+        )
         tenant_ctx_err = validate_ingest_tenant_context(data)
         if tenant_ctx_err == "invalid_tenant":
             log_json(
@@ -311,9 +359,43 @@ async def process_event(payload: dict[str, Any], retry_count: int = 0) -> bool:
 
         _get_rc().update_key_prefix(str(tenant_id))
 
-        # Initialize components with connection retries (Mongo, Qdrant, Postgres)
-        store = EventStore(os.getenv("MONGO_URI", "mongodb://root:example@mongodb:27017/kirp?authSource=admin"))
-        await _connect_with_retry("EventStore", lambda: store.connect())
+        logical_key = _get_event_idempotency_key(payload)
+        idem_redis_key = redis_idempotency_key(tenant_id, logical_key)
+        log_trace(
+            logger,
+            stage="idempotency_check_start",
+            trace_id=str(trace_id_payload) if trace_id_payload is not None else None,
+            event_id=str(data.get("id") or ""),
+            tenant_id=str(tenant_id),
+            redis_key=idem_redis_key,
+            logical_key=logical_key,
+        )
+        if await _check_idempotency_redis(idem_redis_key):
+            logger.info("Event already processed (idempotency): %s", idem_redis_key)
+            _metrics.inc("events_duplicate", labels={"event_type": event_type})
+            log_trace(
+                logger,
+                stage="idempotency_duplicate",
+                trace_id=str(trace_id_payload) if trace_id_payload is not None else None,
+                event_id=str(data.get("id") or ""),
+                tenant_id=str(tenant_id),
+                redis_key=idem_redis_key,
+                logical_key=logical_key,
+            )
+            if run_controller and run_id_payload:
+                await run_controller.update_step(str(run_id_payload), "idempotency_check", "completed")
+            return True
+
+        # Initialize components using ServiceRegistry
+        from src.core.registry import get_registry
+        store = await get_registry().get_event_store()
+        log_trace(
+            logger,
+            stage="event_store_resolved",
+            trace_id=str(trace_id_payload) if trace_id_payload is not None else None,
+            event_id=str(data.get("id") or ""),
+            tenant_id=str(tenant_id),
+        )
 
         # Notion / external_id update: if event already exists by external_id, update and run post_ingest only
         meta = data.get("metadata") or {}
@@ -331,8 +413,8 @@ async def process_event(payload: dict[str, Any], retry_count: int = 0) -> bool:
                 from src.core.pipeline_factory import create_connected_event_pipeline
 
                 pipe = await create_connected_event_pipeline()
-                await pipe.run_post_ingest_for_event(existing.id)
-                await _mark_processed(idempotency_key)
+                await pipe.run_post_ingest_for_event(existing.id, tenant_id)
+                await _mark_processed_redis(idem_redis_key)
                 _metrics.inc("events_processed", labels={"event_type": event_type, "tenant_id": tenant_id})
                 logger.info("KafkaProcessor processed ingest (update by external_id) source=%s ext=%s", source, external_id)
                 return True
@@ -342,9 +424,9 @@ async def process_event(payload: dict[str, Any], retry_count: int = 0) -> bool:
         if event_id_raw:
             try:
                 ev_uuid = UUID(event_id_raw)
-                existing = await store.get_by_id(ev_uuid)
+                existing = await store.get_by_id_for_tenant(ev_uuid, tenant_id)
                 if existing:
-                    await _mark_processed(idempotency_key)
+                    await _mark_processed_redis(idem_redis_key)
                     logger.info("Event already in store (idempotency), skipping pipeline: %s", event_id_raw)
                     _metrics.inc("events_duplicate", labels={"event_type": event_type})
                     return True
@@ -358,6 +440,14 @@ async def process_event(payload: dict[str, Any], retry_count: int = 0) -> bool:
             "content": data.get("text") or data.get("content") or "",
         }
         canonical = CanonicalEvent.from_payload(data_for_canonical)
+        log_trace(
+            logger,
+            stage="canonical_event_created",
+            trace_id=str(canonical.trace_id or ""),
+            event_id=str(canonical.id),
+            tenant_id=str(canonical.tenant_id),
+            event_type=canonical.event_type,
+        )
         logger.info(
             "[INGEST] event created: id=%s run=%s wf=%s tenant=%s space=%s user=%s source=%s len=%d",
             canonical.id, canonical.run_id, canonical.workflow_type,
@@ -380,6 +470,14 @@ async def process_event(payload: dict[str, Any], retry_count: int = 0) -> bool:
         registry = get_event_registry()
         if run_controller and run_id_payload:
             await run_controller.update_step(str(run_id_payload), "registry_dispatch", "processing")
+        log_trace(
+            logger,
+            stage="registry_dispatch_start",
+            trace_id=str(canonical.trace_id or ""),
+            event_id=str(canonical.id),
+            tenant_id=str(canonical.tenant_id),
+            event_type=canonical.event_type,
+        )
         await registry.dispatch(canonical)
         if run_controller and run_id_payload:
             await run_controller.update_step(str(run_id_payload), "registry_dispatch", "completed")
@@ -389,7 +487,7 @@ async def process_event(payload: dict[str, Any], retry_count: int = 0) -> bool:
         )
 
         # Mark as processed
-        await _mark_processed(idempotency_key)
+        await _mark_processed_redis(idem_redis_key)
         if run_controller and run_id_payload:
             await run_controller.update_step(str(run_id_payload), "kafka_processed", "completed")
         
@@ -411,6 +509,35 @@ async def process_event(payload: dict[str, Any], retry_count: int = 0) -> bool:
             event_type=event_type,
             latency_ms=int(latency * 1000),
         )
+        trace_id_done = str(canonical.trace_id or "").strip()
+        if trace_id_done:
+            try:
+                import os
+                from src.telemetry.governed_runtime import (
+                    apply_governed_runtime_verdict,
+                    evaluate_and_emit_for_trace_file,
+                )
+                from src.telemetry.trace_sink import trace_log_path
+
+                log_path = trace_log_path()
+                if log_path:
+                    verdict = evaluate_and_emit_for_trace_file(
+                        trace_id_done,
+                        log_path,
+                        logger,
+                        profile="full",
+                        event_id=str(canonical.id),
+                    )
+                    if verdict is not None:
+                        apply_governed_runtime_verdict(verdict)
+            except PermissionError:
+                raise
+            except Exception as exc:
+                logger.warning(
+                    "governed_runtime_kafka_eval_failed trace_id=%s err=%s",
+                    trace_id_done,
+                    exc,
+                )
         return True
         
     except Exception as e:
@@ -546,6 +673,9 @@ async def consume_forever() -> None:
 
 
 if __name__ == "__main__":
+    from dotenv import load_dotenv
+
+    load_dotenv()
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",

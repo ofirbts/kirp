@@ -1,0 +1,6 @@
+Two rule modes live under `.cursor/rules/` (set `alwaysApply` in each file, or enable the rule in Cursor for the project you are in):
+
+- `assignment_mode.mdc` — graded take-home: lecturer-style constraints, `.interview_prep/`, reviewer psychology, stop-digging and AWS realism.
+- `engineering_mode.mdc` — daily product work: shorter, team and maintainability focused.
+
+Enable exactly one mode per assignment or product repo to avoid mixed signals. KIRP keeps both with `alwaysApply: false` so they do not override this repository’s existing always-on rules until you turn one on.

@@ -79,8 +79,9 @@ async def handle_m3_event(event: CanonicalEvent) -> UUID:
         content=content,
     )
     # Stages 2–5: context retrieval + M3 agents (ReflectionClassifier, GapAnalysis, MicroActionGenerator, Discriminator, Synthesis/Evolution)
-    from src.modules.m3.stages import run_m3_stages
-    await run_m3_stages(
+    # Run asynchronously via Celery in the background to avoid blocking the HTTP boundary response
+    from src.workers.tasks import run_m3_stages_task
+    run_m3_stages_task.delay(
         event_type=event.event_type,
         tenant_id=event.tenant_id,
         space_id=event.space_id,

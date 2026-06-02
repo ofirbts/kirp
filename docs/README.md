@@ -10,6 +10,28 @@ Use this file as the **map**. Deep design lives in linked files; avoid duplicati
 | How to run the prod-style stack locally | [`deploy/README.md`](../deploy/README.md) |
 | This map + where to look next | **this file** |
 
+## Runtime truth (ops + staff review)
+
+| What | File |
+|------|------|
+| Subsystems vs code vs compose | [`RUNTIME_REALITY_MATRIX.md`](RUNTIME_REALITY_MATRIX.md) |
+| Failure modes (actual behavior) | [`FAILURE_SEMANTICS.md`](FAILURE_SEMANTICS.md) |
+| Diagram → module traceability | [`ARCHITECTURE_TRACEABILITY.md`](ARCHITECTURE_TRACEABILITY.md) |
+| Observability / audit / gaps | [`OPERATIONAL_CONFIDENCE.md`](OPERATIONAL_CONFIDENCE.md) |
+| Readiness verdict + scores | [`PRODUCTION_READINESS_REVIEW.md`](PRODUCTION_READINESS_REVIEW.md) |
+| Delivery / idempotency / retry matrix | [`RUNTIME_GUARANTEES.md`](RUNTIME_GUARANTEES.md) |
+| Tenant isolation & leakage risks | [`TENANT_ISOLATION_REVIEW.md`](TENANT_ISOLATION_REVIEW.md) |
+| Replay & side-effect classification | [`SIDE_EFFECT_AND_REPLAY_SAFETY.md`](SIDE_EFFECT_AND_REPLAY_SAFETY.md) |
+| Logs / metrics / operator questions | [`OBSERVABILITY_REVIEW.md`](OBSERVABILITY_REVIEW.md) |
+| Chaos, recovery, poison messages | [`CHAOS_AND_RECOVERY.md`](CHAOS_AND_RECOVERY.md) |
+| Skeptical production approval lens | [`SKEPTICAL_STAFF_REVIEW.md`](SKEPTICAL_STAFF_REVIEW.md) |
+| Risk registry (closure) | [`RISK_REGISTER.md`](RISK_REGISTER.md) |
+| Authorization boundary audit | [`AUTHORIZATION_BOUNDARY_AUDIT.md`](AUTHORIZATION_BOUNDARY_AUDIT.md) |
+| P0/P1 remediation plan (strategy only) | [`REMEDIATION_PLAN.md`](REMEDIATION_PLAN.md) |
+| Verification strategy | [`VERIFICATION_STRATEGY.md`](VERIFICATION_STRATEGY.md) |
+| Production release gates | [`PRODUCTION_GATES.md`](PRODUCTION_GATES.md) |
+| Engineering command model | [`ENGINEERING_COMMAND_MODEL.md`](ENGINEERING_COMMAND_MODEL.md) |
+
 ## First reads for developers
 
 | Topic | Doc |

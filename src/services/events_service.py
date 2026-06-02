@@ -100,13 +100,13 @@ async def list_dlq_events(
 async def replay_event(event_id: str, tenant_id: str) -> dict:
     """Replay: return event payload for re-ingest. Caller can POST to /api/v1/ingest or publish to Kafka."""
     store = await _get_store()
-    ev = await store.get_by_id(UUID(event_id))
-    if not ev or ev.tenant_id != tenant_id:
+    ev = await store.get_by_id_for_tenant(UUID(event_id), tenant_id)
+    if not ev:
         raise ValueError("Event not found or tenant mismatch")
-    return await store.replay(ev.id)
+    return await store.replay(ev.id, tenant_id)
 
 
 async def retry_dlq_event(event_id: str, tenant_id: str) -> dict:
     """Return DLQ event payload for retry. Caller re-ingests."""
     store = await _get_store()
-    return await store.retry_dlq(UUID(event_id))
+    return await store.retry_dlq(UUID(event_id), tenant_id)
