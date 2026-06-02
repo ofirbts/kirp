@@ -1,0 +1,114 @@
+name: Deploy KIRP OS to Kubernetes
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+
+      - name: Deploy preflight gate
+        run: |
+          APP_GIT_SHA="${GITHUB_SHA:-}"
+          if [ -z "$APP_GIT_SHA" ] || [ "$APP_GIT_SHA" = "unknown" ]; then
+            echo "APP_GIT_SHA is missing or unknown; blocking deploy."
+            exit 1
+          fi
+          python scripts/version_check.py
+          python - <<'PY'
+          import re
+          from pathlib import Path
+          text = Path("src/main.py").read_text(encoding="utf-8")
+          m = re.search(r'version\s*=\s*"([^"]+)"', text)
+          if not m:
+              raise SystemExit("App version is missing; blocking deploy.")
+          v = m.group(1).strip().lower()
+          if not v or v == "unknown":
+              raise SystemExit("App version is unknown; blocking deploy.")
+          print(f"Deploy version gate ok: {v}")
+          PY
+
+      - name: Install backend dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Generate current API contracts
+        run: |
+          python -m src.cli show-contracts > /tmp/contracts-current.json
+
+      - name: Drift immunity preflight
+        run: |
+          python scripts/version_check.py
+          python scripts/auth_consistency_check.py
+          python scripts/contract_drift_check.py
+          python scripts/incident_memory.py analyze
+          python scripts/trust_score.py --min-score 80
+          python scripts/self_protection_gate.py --mode deploy
+
+      - name: Download previous API contracts artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: api-contracts
+          path: /tmp/contracts-prev
+        continue-on-error: true
+
+      - name: Contract diff check
+        run: |
+          set -e
+          if [ -f /tmp/contracts-prev/contracts.json ]; then
+            echo "Comparing API contracts with previous deployment..."
+            diff -u /tmp/contracts-prev/contracts.json /tmp/contracts-current.json || {
+              echo "API contract changed. Please review and update clients or bump API_SCHEMA_VERSION."
+              exit 1
+            }
+          else
+            echo "No previous contracts artifact found; skipping diff check."
+          fi
+
+      - name: Login to Docker registry
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Build and Push API
+        env:
+          IMAGE_NAME: ${{ secrets.DOCKER_IMAGE_NAME || 'your-docker-user/kirp-api' }}
+        run: |
+          GIT_SHA=${GITHUB_SHA::7}
+          docker build -f Dockerfile.api --build-arg APP_GIT_SHA="$GITHUB_SHA" -t "$IMAGE_NAME:$GIT_SHA" -t "$IMAGE_NAME:latest" .
+          docker push "$IMAGE_NAME:$GIT_SHA"
+          docker push "$IMAGE_NAME:latest"
+
+      - name: Set up Kubernetes
+        uses: azure/k8s-set-context@v3
+        with:
+          method: kubeconfig
+          kubeconfig: ${{ secrets.KUBE_CONFIG }}
+
+      - name: Deploy API to K8s
+        env:
+          IMAGE_NAME: ${{ secrets.DOCKER_IMAGE_NAME || 'your-docker-user/kirp-api' }}
+        run: |
+          set -e
+          GIT_SHA=${GITHUB_SHA::7}
+          # Update image tag in deployment manifest via kubectl set image
+          kubectl apply -f k8s/api-deployment.yaml
+          kubectl set image deployment/kirp-api -n kirp-system kirp-api="$IMAGE_NAME:$GIT_SHA"
+          kubectl rollout status deployment/kirp-api -n kirp-system --timeout=120s
+
+      - name: Upload current API contracts artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: api-contracts
+          path: /tmp/contracts-current.json

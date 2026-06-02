@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>KIRP — Executive Technical Brief</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Serif:ital,wght@0,500;1,500&display=swap" rel="stylesheet" />
+  <script type="module">
+    import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs";
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: "dark",
+      themeVariables: {
+        darkMode: true,
+        background: "#12151c",
+        primaryColor: "#2d3340",
+        primaryTextColor: "#e8eaef",
+        primaryBorderColor: "#3d4555",
+        lineColor: "#6b7280",
+        secondaryColor: "#1a1e28",
+        tertiaryColor: "#0c0e12"
+      }
+    });
+  </script>
+  <style>
+    :root {
+      --bg: #0c0e12;
+      --bg-elev: #12151c;
+      --text: #e8eaef;
+      --muted: #9aa3b2;
+      --accent: #7c9cff;
+      --border: #252a36;
+      --radius: 12px;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: "IBM Plex Sans", system-ui, -apple-system, sans-serif;
+      font-size: 15px;
+      line-height: 1.65;
+      letter-spacing: -0.01em;
+    }
+    .page {
+      max-width: 720px;
+      margin: 0 auto;
+      padding: 3rem 1.5rem 4rem;
+    }
+    .cover {
+      min-height: 78vh;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      padding: 4rem 0 3rem;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 3rem;
+    }
+    .cover-kicker {
+      font-size: 0.75rem;
+      font-weight: 600;
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 1.25rem;
+    }
+    h1 {
+      font-family: "IBM Plex Serif", Georgia, serif;
+      font-weight: 500;
+      font-size: clamp(2.25rem, 6vw, 3.25rem);
+      line-height: 1.12;
+      margin: 0 0 1rem;
+      letter-spacing: -0.03em;
+    }
+    h1 em {
+      font-style: italic;
+      color: var(--muted);
+      font-weight: 500;
+    }
+    .subtitle {
+      font-size: 1.125rem;
+      color: var(--muted);
+      max-width: 32em;
+      margin: 0 0 2rem;
+    }
+    .meta {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.75rem 1.5rem;
+      font-size: 0.8125rem;
+      color: var(--muted);
+    }
+    .meta dt { font-weight: 600; color: var(--text); margin: 0; }
+    .meta dd { margin: 0 0 0.5rem; }
+    h2 {
+      font-size: 0.6875rem;
+      font-weight: 600;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin: 2.75rem 0 1rem;
+      padding-top: 0.5rem;
+      border-top: 1px solid var(--border);
+    }
+    h2:first-of-type { border-top: 0; padding-top: 0; margin-top: 0; }
+    h3 {
+      font-size: 1.05rem;
+      font-weight: 600;
+      margin: 1.5rem 0 0.5rem;
+      color: var(--text);
+    }
+    p { margin: 0 0 1rem; }
+    blockquote {
+      margin: 1.25rem 0;
+      padding: 0 0 0 1rem;
+      border-left: 3px solid var(--accent);
+      color: var(--muted);
+      font-size: 0.95rem;
+    }
+    blockquote strong { color: var(--text); }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.8125rem;
+      margin: 1rem 0 1.5rem;
+    }
+    th, td {
+      text-align: left;
+      padding: 0.65rem 0.75rem;
+      border-bottom: 1px solid var(--border);
+      vertical-align: top;
+    }
+    th {
+      color: var(--muted);
+      font-weight: 600;
+      font-size: 0.6875rem;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+    tr:last-child td { border-bottom: 0; }
+    tbody tr:hover td { background: rgba(255,255,255,0.02); }
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    ul { margin: 0 0 1rem; padding-left: 1.25rem; color: var(--muted); }
+    ul strong { color: var(--text); }
+    .mermaid {
+      background: var(--bg-elev);
+      border-radius: var(--radius);
+      padding: 1.25rem;
+      margin: 1.25rem 0;
+      border: 1px solid var(--border);
+    }
+    .footer-note {
+      font-size: 0.75rem;
+      color: var(--muted);
+      margin-top: 3rem;
+      padding-top: 1.5rem;
+      border-top: 1px solid var(--border);
+    }
+    @media print {
+      body { background: #fff; color: #111; }
+      .cover { min-height: auto; border-color: #ddd; }
+      h1, h3, .meta dt, th { color: #111; }
+      .subtitle, p, li, td, blockquote { color: #333; }
+      blockquote { border-color: #333; }
+      h2 { color: #1a1a1a; border-color: #ddd; }
+      table { font-size: 9pt; }
+      .mermaid { background: #f6f7f9; border-color: #e2e5ea; }
+      a { color: #111; text-decoration: underline; }
+      @page { margin: 18mm; }
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <header class="cover">
+      <div class="cover-kicker">Executive Technical Brief</div>
+      <h1>KIRP <em>Intelligence OS</em></h1>
+      <p class="subtitle">Execution substrate for production agents — not prompts. Send this first; full thesis lives in the repo whitepaper.</p>
+      <dl class="meta">
+        <dt>Version</dt><dd>1.0</dd>
+        <dt>Format</dt><dd>Print / PDF (browser → Print → Save as PDF)</dd>
+        <dt>Companion</dt><dd><code>KIRP_INTELLIGENCE_OS_WHITEPAPER.md</code></dd>
+      </dl>
+    </header>
+
+    <h2>Thesis</h2>
+    <p><strong>Demos reward fluency. Production rewards invariants.</strong> Agent stacks fail <em>quiet</em>: plausible language, wrong facts. KIRP is an <strong>execution and governance layer</strong>: events → Kafka → governed pipeline → multiple stores → runs in Redis → optional agents → audited execution.</p>
+
+    <h2>Why now</h2>
+    <p>Agents hit systems of record. Same distributed-systems failure modes — missing idempotency on <strong>effects</strong>, giant logical boundaries, no honest partial-state story — with higher blast radius. <strong>Prompt orchestration is not systems engineering.</strong></p>
+
+    <h2>Architecture</h2>
+    <div class="mermaid">
+flowchart LR
+subgraph in["Ingress"]
+U[Client] --> A[FastAPI]
+A --> K[Kafka kirp-events]
+end
+subgraph async["Async"]
+K --> P[Processor]
+P --> R[Redis idempotency]
+P --> ER[EventRegistry]
+end
+subgraph core["Pipeline"]
+ER --> PL[EventPipeline]
+PL --> OPA[OPA governance]
+PL --> M[(Mongo events / history)]
+PL --> E[Embed]
+E --> Q[(Qdrant)]
+PL --> PG[(Postgres schema)]
+end
+subgraph run["Agents + effects"]
+A2[Agents / ask] --> RC[RunController Redis]
+RC --> EX[CommandExecutor]
+EX --> M
+end
+    </div>
+
+    <h2>Real infra choices</h2>
+    <table>
+      <thead><tr><th>Layer</th><th>Choice</th><th>Why</th></tr></thead>
+      <tbody>
+        <tr><td>API</td><td>FastAPI + JWT tenant context</td><td>Identity on every request</td></tr>
+        <tr><td>Async</td><td>Kafka + processor</td><td>At-least-once, backpressure</td></tr>
+        <tr><td>Dedup</td><td>Redis idempotency TTL</td><td>Duplicates are normal</td></tr>
+        <tr><td>Policy</td><td>OPA HTTP</td><td>Governed writes</td></tr>
+        <tr><td>Events</td><td>Mongo</td><td>Durable narrative</td></tr>
+        <tr><td>Vectors</td><td>Qdrant + tenant filters</td><td>Search without cross-tenant bleed</td></tr>
+        <tr><td>Schema</td><td>Postgres</td><td>Structured truth</td></tr>
+        <tr><td>Runs</td><td>Redis partitioned keys</td><td>Steps, cost, terminal state</td></tr>
+        <tr><td>LLM</td><td>task_type → provider (env)</td><td>Auditable routing</td></tr>
+        <tr><td>Effects</td><td>Typed commands + approve/reject</td><td>No silent mutation</td></tr>
+        <tr><td>Ops</td><td>Logs + Prometheus + run APIs</td><td>Incidents from graphs</td></tr>
+      </tbody>
+    </table>
+
+    <h2>Differentiator</h2>
+    <table>
+      <thead><tr><th>Typical wrapper</th><th>KIRP</th></tr></thead>
+      <tbody>
+        <tr><td>One chat table = truth</td><td>Events + pipeline</td></tr>
+        <tr><td>Retry LLM = “resilience”</td><td>Classify retries; idempotency on facts</td></tr>
+        <tr><td>Token traces</td><td>Store outcomes + policy + runs</td></tr>
+      </tbody>
+    </table>
+
+    <h2>Operating philosophy</h2>
+    <ul>
+      <li><strong>Never</strong> translate infra uncertainty into user-facing certainty.</li>
+      <li><strong>Hallucinated success</strong> worse than hard crash — design surfaces accordingly.</li>
+      <li><strong>Autonomous without auditability</strong> = unmanaged side effects.</li>
+      <li><strong>Policy down</strong> = security / governance incident, not “skip OPA.”</li>
+    </ul>
+
+    <h2>Closing</h2>
+    <p><strong>Adult engineering</strong> — failures visible, boundaries enforceable, recovery runnable without re-prompting an outage away.</p>
+
+    <p class="footer-note">Open this file in Chrome or Edge; wait for the diagram to render; then Print → Save as PDF. For dark PDF, use “Background graphics” if your browser offers it.</p>
+  </div>
+</body>
+</html>
