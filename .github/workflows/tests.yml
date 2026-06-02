@@ -1,0 +1,133 @@
+name: Tests
+
+on:
+  push:
+    branches: [main, kirp2]
+  pull_request:
+    branches: [main, kirp2]
+
+jobs:
+  pytest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt -r requirements-dev.txt
+
+      - name: Run pytest
+        run: python -m pytest tests/ -q --tb=short
+
+      - name: Embedding provider init gate
+        env:
+          OPENAI_API_KEY: ci-smoke-key
+        run: |
+          python - <<'PY'
+          from src.core.embedding_provider import get_embedder
+          e = get_embedder(provider="openai")
+          assert e is not None, "OpenAI embedder must initialize without proxies error"
+          print("embedding_provider: ok")
+          PY
+
+  dashboard-build-lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+      - name: Install frontend dependencies
+        run: npm ci
+      - name: Run lint
+        run: npm run lint
+      - name: Run dashboard build
+        run: npm run build
+
+  release-discipline:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Dirty tree guard
+        run: bash scripts/dirty_tree_guard.sh
+      - name: Version check gate
+        run: python scripts/version_check.py
+      - name: Auth consistency check gate
+        run: python scripts/auth_consistency_check.py
+      - name: Tenant isolation gate
+        run: python scripts/tenant_isolation_gate.py
+      - name: Contract drift check gate
+        run: python scripts/contract_drift_check.py
+      - name: Validate required PR sections
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: |
+          python - <<'PY'
+          import os, sys
+          body = (os.getenv("PR_BODY") or "").lower()
+          required = [
+              "## behavior change",
+              "## contract impact",
+              "## test proof",
+              "## rollback plan",
+              "## release checklist",
+          ]
+          missing = [h for h in required if h not in body]
+          if missing:
+              print("Missing required PR sections:")
+              for h in missing:
+                  print("-", h)
+              sys.exit(1)
+          print("PR template requirements satisfied.")
+          PY
+
+  perf-regression-check:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Start runtime stack for perf check
+        run: docker compose up -d --build kirp-api kirp-dashboard
+      - name: Run perf gate
+        run: python scripts/perf_check.py --baseline docs/perf-baseline.json
+      - name: Install browser runtime for UX gate
+        run: |
+          python -m pip install playwright
+          python -m playwright install --with-deps chromium
+      - name: Validate Playwright runtime
+        run: |
+          python - <<'PY'
+          from playwright.sync_api import sync_playwright
+          try:
+              with sync_playwright() as p:
+                  browser = p.chromium.launch(headless=True)
+                  browser.close()
+              print("Playwright runtime ready.")
+          except Exception as e:
+              raise SystemExit(f"Playwright runtime setup failed; UX gate cannot run. {e}")
+          PY
+      - name: Run user-perceived reality gate
+        run: python scripts/ux_reality_check.py --baseline docs/user-perceived-baseline.json --commit-sha "${{ github.sha }}"
+      - name: Analyze incident memory
+        run: python scripts/incident_memory.py analyze
+      - name: Compute trust score
+        run: python scripts/trust_score.py --min-score 80
+      - name: Self-protection gate
+        run: python scripts/self_protection_gate.py --mode deploy
