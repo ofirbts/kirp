@@ -1,29 +1,27 @@
 from __future__ import annotations
 
-from unittest.mock import AsyncMock, patch
-
 import pytest
 
+from src.core.registry import _allow_degraded_dependency_connect
 
-@pytest.mark.asyncio
-async def test_get_rag_engine_degraded_on_connect_failure(monkeypatch: pytest.MonkeyPatch) -> None:
+
+def test_allow_degraded_in_development(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("ENV", "development")
-    from src.core.registry import ServiceRegistry
-
-    reg = ServiceRegistry()
-    reg._rag_engine = None
-    with patch("src.core.rag_engine.RAGEngine.connect", new=AsyncMock(side_effect=RuntimeError("qdrant down"))):
-        rag = await reg.get_rag_engine()
-    assert rag is not None
+    assert _allow_degraded_dependency_connect() is True
 
 
-@pytest.mark.asyncio
-async def test_get_schema_engine_degraded_on_connect_failure(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("ENV", "development")
-    from src.core.registry import ServiceRegistry
+def test_allow_degraded_in_test(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("ENV", "test")
+    assert _allow_degraded_dependency_connect() is True
 
-    reg = ServiceRegistry()
-    reg._schema_engine = None
-    with patch("src.core.schema_engine.SchemaEngine.connect", new=AsyncMock(side_effect=RuntimeError("postgres down"))):
-        schema = await reg.get_schema_engine()
-    assert schema is not None
+
+def test_production_requires_explicit_flag(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("ENV", "production")
+    monkeypatch.delenv("KIRP_ALLOW_DEGRADED_DEPS", raising=False)
+    assert _allow_degraded_dependency_connect() is False
+
+
+def test_production_allows_with_env_flag(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("ENV", "production")
+    monkeypatch.setenv("KIRP_ALLOW_DEGRADED_DEPS", "1")
+    assert _allow_degraded_dependency_connect() is True

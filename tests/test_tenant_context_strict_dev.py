@@ -1,40 +1,83 @@
 from __future__ import annotations
 
 import pytest
-from fastapi.testclient import TestClient
+from fastapi import HTTPException
+from starlette.requests import Request
+
+from src.auth.tenant_context import (
+    DEFAULT_LOCAL_CONTEXT,
+    get_tenant_context,
+    is_local_or_skip_auth,
+    require_tenant_context,
+)
 
 
-@pytest.fixture
-def client_strict_dev(monkeypatch: pytest.MonkeyPatch) -> TestClient:
-    monkeypatch.setenv("SKIP_AUTH", "0")
+def _request_with_user(user: dict[str, object] | None) -> Request:
+    scope = {
+        "type": "http",
+        "method": "GET",
+        "path": "/api/v1/events",
+        "headers": [],
+    }
+    req = Request(scope)
+    if user is not None:
+        req.state.user = user
+    return req
+
+
+def test_development_without_skip_auth_requires_jwt(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("SKIP_AUTH", raising=False)
     monkeypatch.setenv("ENV", "development")
-    from src.main import app
-
-    return TestClient(app)
-
-
-def test_development_without_skip_auth_requires_jwt(client_strict_dev: TestClient) -> None:
-    r = client_strict_dev.get("/api/v1/events")
-    assert r.status_code == 401
+    with pytest.raises(HTTPException) as exc:
+        get_tenant_context(_request_with_user(None))
+    assert exc.value.status_code == 401
 
 
-def test_development_with_jwt_uses_token_tenant(
-    client_strict_dev: TestClient,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    from src.core.jwt_utils import create_access_token
-
-    captured: list[str] = []
-
-    async def fake_list(*, tenant_id: str, **_kw: object) -> list[dict[str, str]]:
-        captured.append(tenant_id)
-        return []
-
-    monkeypatch.setattr("src.api.v1_events.events_service.list_events", fake_list)
-    token = create_access_token("user_a", "tenant_a", roles=["user"])
-    r = client_strict_dev.get(
-        "/api/v1/events",
-        headers={"Authorization": f"Bearer {token}"},
+def test_development_with_jwt_uses_token_tenant(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("SKIP_AUTH", raising=False)
+    monkeypatch.setenv("ENV", "development")
+    ctx = get_tenant_context(
+        _request_with_user(
+            {
+                "user_id": "user_a",
+                "tenant_id": "tenant_a",
+                "roles": ["user"],
+            }
+        )
     )
-    assert r.status_code == 200
-    assert captured == ["tenant_a"]
+    assert ctx.tenant_id == "tenant_a"
+    assert ctx.user_id == "user_a"
+
+
+def test_skip_auth_returns_default_context(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("SKIP_AUTH", "1")
+    ctx = get_tenant_context(_request_with_user(None))
+    assert ctx == DEFAULT_LOCAL_CONTEXT
+
+
+def test_require_tenant_context_rejects_cross_tenant_query(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("SKIP_AUTH", raising=False)
+    req = _request_with_user(
+        {
+            "user_id": "user_a",
+            "tenant_id": "tenant_a",
+            "roles": ["user"],
+        }
+    )
+    with pytest.raises(HTTPException) as exc:
+        require_tenant_context(req, query_tenant_id="tenant_b")
+    assert exc.value.status_code == 403
+
+
+def test_is_local_or_skip_auth() -> None:
+    import os
+
+    prev = os.environ.get("SKIP_AUTH")
+    os.environ["SKIP_AUTH"] = "1"
+    try:
+        assert is_local_or_skip_auth()
+    finally:
+        if prev is None:
+            os.environ.pop("SKIP_AUTH", None)
+        else:
+            os.environ["SKIP_AUTH"] = prev

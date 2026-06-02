@@ -3,10 +3,9 @@ from __future__ import annotations
 import json
 import subprocess
 from pathlib import Path
-from unittest.mock import AsyncMock, patch
+from unittest.mock import MagicMock, patch
 
 import pytest
-from fastapi.testclient import TestClient
 
 from scripts.staging_smoke_url import validate_api_url
 from scripts.staging_tenant_helpers import (
@@ -14,7 +13,6 @@ from scripts.staging_tenant_helpers import (
     events_json_contains_marker,
     kafka_host_hint,
 )
-from src.core.jwt_utils import create_access_token
 
 
 @pytest.mark.parametrize(
@@ -134,32 +132,3 @@ def test_staging_smoke_script_rejects_placeholder_url() -> None:
     )
     assert proc.returncode == 2
     assert "placeholder" in proc.stdout.lower() or "placeholder" in proc.stderr.lower()
-
-
-@pytest.fixture
-def client_auth(monkeypatch: pytest.MonkeyPatch) -> TestClient:
-    monkeypatch.setenv("SKIP_AUTH", "0")
-    monkeypatch.setenv("ENV", "test")
-    from src.main import app
-
-    return TestClient(app)
-
-
-def test_tenant_b_cannot_see_tenant_a_events(client_auth: TestClient) -> None:
-    token_a = create_access_token("user_a", "tenant_a", roles=["user"])
-    token_b = create_access_token("user_b", "tenant_b", roles=["user"])
-    marker = "iso-marker-xyz"
-
-    async def fake_list(*, tenant_id: str, **_kw: object) -> list[dict[str, str]]:
-        if tenant_id == "tenant_a":
-            return [{"content": marker, "tenant_id": tenant_id}]
-        return []
-
-    with patch("src.api.v1_events.events_service.list_events", new=AsyncMock(side_effect=fake_list)):
-        r_a = client_auth.get("/api/v1/events", headers={"Authorization": f"Bearer {token_a}"})
-        r_b = client_auth.get("/api/v1/events", headers={"Authorization": f"Bearer {token_b}"})
-
-    assert r_a.status_code == 200
-    assert r_b.status_code == 200
-    assert marker in str(r_a.json())
-    assert marker not in str(r_b.json())

@@ -9,7 +9,7 @@ import scripts.pr_split_manifest as manifest
 
 
 def test_pr_scopes_defined() -> None:
-    assert len(manifest.PR_SCOPES) == 5
+    assert len(manifest.PR_SCOPES) == 6
     for scope, prefixes in manifest.PR_SCOPES.items():
         assert prefixes, scope
 
