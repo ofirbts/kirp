@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-API="${KIRP_API_URL:-http://127.0.0.1:8002}"
+API="${KIRP_API_URL:-http://127.0.0.1:8000}"
 FAIL=0
 
 pass() { echo "PASS $1"; }

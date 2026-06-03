@@ -4,7 +4,7 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
-API="${KIRP_API_URL:-http://127.0.0.1:8002}"
+API="${KIRP_API_URL:-http://127.0.0.1:8000}"
 POLL_TIMEOUT="${STAGING_SMOKE_POLL_SEC:-90}"
 export STAGING_SMOKE_POLL_SEC="$POLL_TIMEOUT"
 FAIL=0
@@ -15,7 +15,7 @@ fail() { echo "FAIL $1"; FAIL=1; }
 if ! url_err=$(python3 scripts/staging_tenant_helpers.py "$API" 2>&1); then
   echo "ERROR: $url_err"
   echo "Example: KIRP_API_URL=https://kirp-staging.yourdomain.com ./scripts/staging_tenant_smoke.sh"
-  echo "Local: KIRP_API_URL=http://127.0.0.1:8002 SKIP_AUTH=0 ./scripts/staging_tenant_smoke.sh"
+  echo "Local: KIRP_API_URL=http://127.0.0.1:8000 SKIP_AUTH=0 ./scripts/staging_tenant_smoke.sh"
   exit 2
 fi
 
