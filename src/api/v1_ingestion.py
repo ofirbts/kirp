@@ -76,9 +76,10 @@ async def webhook_slack(body: dict[str, Any] = Body(...)) -> dict[str, Any]:
     (do not trust tenant fields in the JSON body — anyone can POST to a public URL).
     """
     from src.integrations.slack import SlackIntegration
-    tenant_id = os.getenv("SLACK_WEBHOOK_TENANT_ID", "default").strip() or "default"
-    space_id = os.getenv("SLACK_WEBHOOK_SPACE_ID", "all").strip() or "all"
-    user_id = os.getenv("SLACK_WEBHOOK_USER_ID", "system").strip() or "system"
+    from src.core.webhook_tenant import resolve_slack_webhook_tenant
+
+    team_id = str(body.get("team_id") or (body.get("event") or {}).get("team") or "")
+    tenant_id, space_id, user_id = resolve_slack_webhook_tenant(team_id or None)
     slack = SlackIntegration()
     slack.connect()
     events = slack.parse_webhook(body)
@@ -92,6 +93,14 @@ async def webhook_slack(body: dict[str, Any] = Body(...)) -> dict[str, Any]:
         except Exception as e:
             logger.warning("Slack webhook ingest failed: %s", e)
             results.append({"ok": False, "error": str(e)})
+    log_json(
+        logger,
+        "info",
+        "slack_webhook_ingest",
+        tenant_id=tenant_id,
+        processed=len(results),
+        event_count=len(events),
+    )
     return {"ok": True, "processed": len(results), "results": results}
 
 
@@ -146,9 +155,10 @@ async def webhook_notion(request: Request) -> dict[str, Any]:
     if not page_ids:
         return {"ok": True, "processed": 0, "message": "No page events to process"}
 
-    tenant_id = os.getenv("NOTION_WEBHOOK_TENANT_ID", "default")
-    space_id = os.getenv("NOTION_WEBHOOK_SPACE_ID", "all")
-    user_id = os.getenv("NOTION_WEBHOOK_USER_ID", "system")
+    workspace_id = str(data.get("workspace_id") or data.get("workspaceId") or "")
+    from src.core.webhook_tenant import resolve_notion_webhook_tenant
+
+    tenant_id, space_id, user_id = resolve_notion_webhook_tenant(workspace_id or None)
 
     from src.integrations.notion import NotionIntegration
     from src.agents.kafka_event_agent import KafkaEventAgent, EventEnvelope
@@ -188,6 +198,14 @@ async def webhook_notion(request: Request) -> dict[str, Any]:
         except Exception as e:
             logger.exception("Notion webhook process page %s: %s", page_id, e)
 
+    log_json(
+        logger,
+        "info",
+        "notion_webhook_ingest",
+        tenant_id=tenant_id,
+        processed=processed,
+        page_count=len(page_ids),
+    )
     return {"ok": True, "processed": processed}
 
 

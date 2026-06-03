@@ -74,6 +74,8 @@ async def send_m3_whatsapp_escalation(
     reason: str,
     identity_entropy_score: float | None,
     resource_type: str | None = None,
+    *,
+    trace_id: str | None = None,
 ) -> dict[str, Any]:
     return await enqueue_m3_whatsapp_escalation(
         tenant_id=tenant_id,
@@ -83,6 +85,7 @@ async def send_m3_whatsapp_escalation(
         reason=reason,
         identity_entropy_score=identity_entropy_score,
         resource_type=resource_type,
+        trace_id=trace_id,
     )
 
 

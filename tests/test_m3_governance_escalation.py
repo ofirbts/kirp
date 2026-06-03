@@ -63,6 +63,81 @@ async def test_enqueue_m3_escalation_no_phone_skips_pending() -> None:
 
 
 @pytest.mark.asyncio
+async def test_enqueue_m3_escalation_duplicate_trace_id_surfaces_duplicate(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("M3_ESCALATION_PHONE", "+15551234567")
+    with patch(
+        "src.core.whatsapp_outbound.enqueue_whatsapp_outbound",
+        new_callable=AsyncMock,
+    ) as enqueue:
+        enqueue.side_effect = [
+            {
+                "ok": True,
+                "pending_id": "pending-first",
+                "queued": True,
+                "duplicate": False,
+            },
+            {
+                "ok": True,
+                "pending_id": "pending-first",
+                "queued": False,
+                "duplicate": True,
+            },
+        ]
+        first = await enqueue_m3_whatsapp_escalation(
+            tenant_id="t1",
+            space_id="all",
+            user_id="u1",
+            event_type="m3.reflection",
+            reason="high_entropy",
+            identity_entropy_score=0.72,
+            resource_type="m3.reflection",
+            trace_id="tr-dup-1",
+        )
+        second = await enqueue_m3_whatsapp_escalation(
+            tenant_id="t1",
+            space_id="all",
+            user_id="u1",
+            event_type="m3.reflection",
+            reason="high_entropy",
+            identity_entropy_score=0.72,
+            resource_type="m3.reflection",
+            trace_id="tr-dup-1",
+        )
+    assert first["duplicate"] is False
+    assert second["duplicate"] is True
+    assert enqueue.await_args_list[0].kwargs["idempotency_key"] == "tr-dup-1"
+    assert enqueue.await_args_list[1].kwargs["idempotency_key"] == "tr-dup-1"
+
+
+@pytest.mark.asyncio
+async def test_send_m3_whatsapp_escalation_forwards_trace_id(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("M3_ESCALATION_PHONE", "+15551234567")
+    with patch(
+        "src.modules.m3.governance.enqueue_m3_whatsapp_escalation",
+        new_callable=AsyncMock,
+    ) as enqueue:
+        enqueue.return_value = {"ok": True, "queued": True}
+        from src.modules.m3.governance import send_m3_whatsapp_escalation
+
+        await send_m3_whatsapp_escalation(
+            tenant_id="t1",
+            space_id="all",
+            user_id="u1",
+            event_type="m3.reflection",
+            reason="needs approval",
+            identity_entropy_score=0.8,
+            resource_type="m3.reflection",
+            trace_id="tr-wrapper-1",
+        )
+    enqueue.assert_awaited_once()
+    assert enqueue.await_args.kwargs["trace_id"] == "tr-wrapper-1"
+
+
+@pytest.mark.asyncio
 async def test_approve_pending_m3_sends_whatsapp() -> None:
     from src.core.execution_engine import CommandType, execute_command
 
