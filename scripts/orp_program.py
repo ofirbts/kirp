@@ -220,8 +220,14 @@ def run_day(day: int, *, api: str) -> int:
             "final_operational_readiness",
             run_cmd(["bash", "scripts/operational_readiness_smoke.sh"], env=env_base),
         )
-        verdict = evaluate_go_no_go(write_verdict_file=False)
-        checks.append({"id": "go_no_go_preview", "passed": verdict["verdict"] == "GO", "data": verdict})
+        verdict = evaluate_go_no_go(write_verdict_file=True)
+        checks.append(
+            {
+                "id": "go_no_go_verdict",
+                "passed": verdict["verdict"] == "GO",
+                "data": verdict,
+            }
+        )
         if verdict["verdict"] != "GO":
             fail = 1
 
@@ -277,17 +283,31 @@ def evaluate_go_no_go(*, write_verdict_file: bool = True) -> dict[str, Any]:
     days = list_day_evidence()
     blockers: list[str] = []
     duration = int(program["duration_days"])
+    core_last = duration - 1
 
     passed_days = [d for d, ev in days.items() if ev.get("overall") == "pass"]
-    for d in range(1, duration + 1):
+    passed_core = [d for d in passed_days if d <= core_last]
+
+    for d in range(1, core_last + 1):
         if d not in days:
             blockers.append(f"missing_evidence_day_{d}")
         elif days[d].get("overall") != "pass":
             blockers.append(f"day_{d}_overall_fail")
 
-    if len(passed_days) < int(rules["min_days_passed"]):
+    if duration not in days:
+        blockers.append(f"missing_evidence_day_{duration}")
+    else:
+        final_ok = any(
+            c.get("id") == "final_operational_readiness" and c.get("passed")
+            for c in days[duration].get("checks", [])
+        )
+        if not final_ok:
+            blockers.append("day_7_final_readiness_not_passed")
+
+    min_core = min(int(rules["min_days_passed"]), core_last)
+    if len(passed_core) < min_core:
         blockers.append(
-            f"insufficient_pass_days:{len(passed_days)}<{rules['min_days_passed']}"
+            f"insufficient_core_pass_days:{len(passed_core)}<{min_core}"
         )
 
     staging_url = (os.getenv("KIRP_STAGING_API_URL") or "").strip()
@@ -334,7 +354,7 @@ def evaluate_go_no_go(*, write_verdict_file: bool = True) -> dict[str, Any]:
         "program_version": program["version"],
         "evaluated_at_utc": datetime.now(timezone.utc).isoformat(),
         "days_with_evidence": sorted(days.keys()),
-        "days_passed": sorted(passed_days),
+        "days_passed": sorted(passed_core),
         "blockers": blockers,
         "go_no_go_rules": rules,
         "recommendation": (

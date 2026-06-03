@@ -80,10 +80,21 @@ def test_go_no_go_all_days_pass(tmp_path: Path, monkeypatch: pytest.MonkeyPatch)
                     "data": {"telemetry": {"governed_runtime_mode": "shadow"}},
                 }
             ]
+        if d == 7:
+            payload["checks"] = [{"id": "final_operational_readiness", "passed": True}]
         (day_dir / "latest.json").write_text(json.dumps(payload), encoding="utf-8")
     result = orp.evaluate_go_no_go(write_verdict_file=False)
     assert result["verdict"] == "GO"
     assert not result["blockers"]
+
+
+def test_orp_cron_install_script_exists() -> None:
+    root = Path(__file__).resolve().parents[1]
+    path = root / "scripts" / "orp_cron_install.sh"
+    assert path.is_file()
+    text = path.read_text(encoding="utf-8")
+    assert "orp_daily.sh" in text
+    assert "kirp-orp-daily" in text
 
 
 def test_orp_shell_wrappers_exist() -> None:
