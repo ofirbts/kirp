@@ -163,12 +163,13 @@ class ScenarioOrchestrator:
     ) -> Any:
         """Fetch RAG context for scenario agents that need it."""
         from src.core.rag_engine import RAGEngine
+        from src.core.embedding_provider import embedding_model_name, embedding_provider_name
 
         rag = RAGEngine(
             qdrant_url=os.getenv("QDRANT_URL", "http://qdrant:6333"),
             qdrant_api_key=os.getenv("QDRANT_API_KEY"),
-            embedding_provider=os.getenv("EMBEDDING_PROVIDER", "openai"),
-            embedding_model=os.getenv("EMBEDDING_MODEL", "text-embedding-3-small"),
+            embedding_provider=embedding_provider_name(),
+            embedding_model=embedding_model_name(),
         )
         await rag.connect()
         return await rag.search(
@@ -188,12 +189,13 @@ class ScenarioOrchestrator:
         """Run InsightAgent.ask() with query from context or default."""
         from src.core.rag_engine import RAGEngine
         from src.agents.insight import InsightAgent
+        from src.core.embedding_provider import embedding_model_name, embedding_provider_name
 
         rag = RAGEngine(
             qdrant_url=os.getenv("QDRANT_URL", "http://qdrant:6333"),
             qdrant_api_key=os.getenv("QDRANT_API_KEY"),
-            embedding_provider=os.getenv("EMBEDDING_PROVIDER", "openai"),
-            embedding_model=os.getenv("EMBEDDING_MODEL", "text-embedding-3-small"),
+            embedding_provider=embedding_provider_name(),
+            embedding_model=embedding_model_name(),
         )
         await rag.connect()
         agent = InsightAgent(rag)

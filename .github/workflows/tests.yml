@@ -54,6 +54,21 @@ jobs:
       - name: Run dashboard build
         run: npm run build
 
+  e2e-config:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt -r requirements-dev.txt
+      - name: Run offline e2e config gates
+        run: python -m pytest tests_e2e/test_config_validity.py -q --tb=short
+
   release-discipline:
     runs-on: ubuntu-latest
     if: github.event_name == 'pull_request'

@@ -70,3 +70,11 @@ async def embed_text(
     if not emb:
         raise ValueError("Embedding generation returned empty result")
     return emb
+
+
+def embedding_provider_name() -> str:
+    return (os.getenv("EMBEDDING_PROVIDER") or "openai").strip().lower()
+
+
+def embedding_model_name() -> str:
+    return (os.getenv("EMBEDDING_MODEL") or "text-embedding-3-small").strip()

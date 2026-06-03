@@ -22,6 +22,7 @@ from pydantic import BaseModel
 import json
 from src.core.event_store import EventStore
 from src.core.rag_engine import RAGEngine
+from src.core.embedding_provider import embedding_model_name, embedding_provider_name
 from src.core.agent_framework import AgentFramework
 from src.core.governance import GovernanceEngine
 from src.agents.meta_agent import MetaAgent
@@ -47,8 +48,8 @@ async def _get_components() -> tuple[EventStore, RAGEngine, AgentFramework, Meta
     rag = RAGEngine(
         qdrant_url=os.getenv("QDRANT_URL", "http://qdrant:6333"),
         qdrant_api_key=os.getenv("QDRANT_API_KEY"),
-        embedding_provider=os.getenv("EMBEDDING_PROVIDER", "openai"),
-        embedding_model=os.getenv("EMBEDDING_MODEL", "text-embedding-3-small"),
+        embedding_provider=embedding_provider_name(),
+        embedding_model=embedding_model_name(),
     )
     await rag.connect()
     from src.core.agent_registry import get_agent_framework_with_all_agents

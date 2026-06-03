@@ -137,12 +137,13 @@ class ServiceRegistry:
     async def get_rag_engine(self) -> Any:
         if self._rag_engine is None:
             from src.core.rag_engine import RAGEngine
+            from src.core.embedding_provider import embedding_model_name, embedding_provider_name
             settings = get_settings()
             rag = RAGEngine(
                 qdrant_url=settings.qdrant_url,
                 qdrant_api_key=settings.qdrant_api_key,
-                embedding_provider=os.getenv("EMBEDDING_PROVIDER", "openai"),
-                embedding_model=os.getenv("EMBEDDING_MODEL", "text-embedding-3-small"),
+                embedding_provider=embedding_provider_name(),
+                embedding_model=embedding_model_name(),
             )
             try:
                 await rag.connect()

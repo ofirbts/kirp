@@ -15,6 +15,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from src.core.rag_engine import RAGEngine
+from src.core.embedding_provider import embedding_model_name, embedding_provider_name
 from src.core.agent_framework import AgentFramework
 from src.agents.presentation import presentation_spec
 
@@ -41,8 +42,8 @@ async def generate_content(req: ContentRequest) -> dict[str, Any]:
         rag = RAGEngine(
             qdrant_url=os.getenv("QDRANT_URL", "http://localhost:6333"),
             qdrant_api_key=os.getenv("QDRANT_API_KEY"),
-            embedding_provider=os.getenv("EMBEDDING_PROVIDER", "openai"),
-            embedding_model=os.getenv("EMBEDDING_MODEL", "text-embedding-3-small"),
+            embedding_provider=embedding_provider_name(),
+            embedding_model=embedding_model_name(),
         )
         await rag.connect()
         

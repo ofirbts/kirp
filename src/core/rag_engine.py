@@ -673,12 +673,14 @@ async def get_shared_rag_engine() -> RAGEngine:
     """Return a shared RAGEngine instance (from env). Used by main and by agents when they need to fetch RAG context."""
     global _shared_engine
     if _shared_engine is None:
+        from src.core.embedding_provider import embedding_model_name, embedding_provider_name
+
         _shared_engine = RAGEngine(
             qdrant_url=os.getenv("QDRANT_URL", "http://localhost:6333"),
             collection=os.getenv("QDRANT_COLLECTION", "kirp_vectors"),
             qdrant_api_key=os.getenv("QDRANT_API_KEY"),
-            embedding_provider=os.getenv("EMBEDDING_PROVIDER", "openai"),
-            embedding_model=os.getenv("EMBEDDING_MODEL", "text-embedding-3-small"),
+            embedding_provider=embedding_provider_name(),
+            embedding_model=embedding_model_name(),
         )
         await _shared_engine.connect()
     return _shared_engine

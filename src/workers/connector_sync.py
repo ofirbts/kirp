@@ -12,6 +12,8 @@ import logging
 from typing import Any
 from uuid import uuid4
 
+from src.core.embedding_provider import embedding_model_name, embedding_provider_name
+
 logger = logging.getLogger(__name__)
 
 
@@ -102,8 +104,8 @@ async def run_gmail_sync(
         rag = RAG(
             qdrant_url=os.getenv("QDRANT_URL", "http://localhost:6333"),
             qdrant_api_key=os.getenv("QDRANT_API_KEY"),
-            embedding_provider=os.getenv("EMBEDDING_PROVIDER", "openai"),
-            embedding_model=os.getenv("EMBEDDING_MODEL", "text-embedding-3-small"),
+            embedding_provider=embedding_provider_name(),
+            embedding_model=embedding_model_name(),
         )
         await rag.connect()
         schema = Schema(os.getenv("POSTGRES_URI", "postgresql+asyncpg://kirp_user:kirp_password@localhost:5432/kirp"))
@@ -144,8 +146,8 @@ async def run_calendar_sync(
         rag = RAG(
             qdrant_url=os.getenv("QDRANT_URL", "http://localhost:6333"),
             qdrant_api_key=os.getenv("QDRANT_API_KEY"),
-            embedding_provider=os.getenv("EMBEDDING_PROVIDER", "openai"),
-            embedding_model=os.getenv("EMBEDDING_MODEL", "text-embedding-3-small"),
+            embedding_provider=embedding_provider_name(),
+            embedding_model=embedding_model_name(),
         )
         await rag.connect()
         schema = Schema(os.getenv("POSTGRES_URI", "postgresql+asyncpg://kirp_user:kirp_password@localhost:5432/kirp"))
@@ -186,8 +188,8 @@ async def run_slack_sync(
         rag = RAG(
             qdrant_url=os.getenv("QDRANT_URL", "http://localhost:6333"),
             qdrant_api_key=os.getenv("QDRANT_API_KEY"),
-            embedding_provider=os.getenv("EMBEDDING_PROVIDER", "openai"),
-            embedding_model=os.getenv("EMBEDDING_MODEL", "text-embedding-3-small"),
+            embedding_provider=embedding_provider_name(),
+            embedding_model=embedding_model_name(),
         )
         await rag.connect()
         schema = Schema(os.getenv("POSTGRES_URI", "postgresql+asyncpg://kirp_user:kirp_password@localhost:5432/kirp"))

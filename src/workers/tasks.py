@@ -172,6 +172,7 @@ def refresh_missing_embeddings_task(
         from src.core.event_store import EventStore
         from src.core.rag_engine import RAGEngine
         from src.core.config import get_settings
+        from src.core.embedding_provider import embedding_model_name, embedding_provider_name
 
         try:
             settings = get_settings()
@@ -182,8 +183,8 @@ def refresh_missing_embeddings_task(
                 qdrant_url=settings.qdrant_url,
                 collection=settings.qdrant_collection,
                 qdrant_api_key=settings.qdrant_api_key,
-                embedding_provider=os.getenv("EMBEDDING_PROVIDER", "openai"),
-                embedding_model=os.getenv("EMBEDDING_MODEL", "text-embedding-3-small"),
+                embedding_provider=embedding_provider_name(),
+                embedding_model=embedding_model_name(),
             )
             await rag.connect()
 
@@ -330,6 +331,7 @@ def self_improvement_task(self: Any, tenant_id: str = "default") -> dict[str, An
         from src.core.event_store import EventStore
         from src.core.rag_engine import RAGEngine
         from src.core.agent_registry import get_agent_framework_with_all_agents
+        from src.core.embedding_provider import embedding_model_name, embedding_provider_name
         
         try:
             store = EventStore(os.getenv("MONGO_URI", "mongodb://root:example@localhost:27017/kirp?authSource=admin"))
@@ -337,8 +339,8 @@ def self_improvement_task(self: Any, tenant_id: str = "default") -> dict[str, An
             rag = RAGEngine(
                 qdrant_url=os.getenv("QDRANT_URL", "http://localhost:6333"),
                 qdrant_api_key=os.getenv("QDRANT_API_KEY"),
-                embedding_provider=os.getenv("EMBEDDING_PROVIDER", "openai"),
-                embedding_model=os.getenv("EMBEDDING_MODEL", "text-embedding-3-small"),
+                embedding_provider=embedding_provider_name(),
+                embedding_model=embedding_model_name(),
             )
             await rag.connect()
             
