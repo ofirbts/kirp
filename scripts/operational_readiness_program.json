@@ -1,0 +1,167 @@
+{
+  "version": 1,
+  "program_name": "KIRP Operational Readiness Program",
+  "duration_days": 7,
+  "scope": "stability, observability, staging validation, tenant isolation, latency, shadow-to-enforce gate",
+  "go_no_go": {
+    "min_days_passed": 7,
+    "require_all_daily_overall_pass": true,
+    "require_staging_when_url_set": true,
+    "max_latency_p95_sec_local": 180,
+    "max_latency_p95_sec_staging": 120,
+    "max_unresolved_consumer_hint_days": 0,
+    "required_governed_runtime_mode": "shadow",
+    "min_operational_smoke_passes": 7,
+    "min_tenant_isolation_gate_passes": 7,
+    "forbid_tenant_leak": true,
+    "enforce_transition_requires_explicit_approval": true
+  },
+  "days": [
+    {
+      "day": 1,
+      "title": "Baseline and environment lock",
+      "focus": "stability",
+      "checklist": [
+        "Run ci_local.sh (pytest + lint + build)",
+        "Run operational_readiness_smoke.sh with SKIP_AUTH=0",
+        "Record kafka consumer preflight (no duplicate consumers)",
+        "Capture API /health telemetry baseline",
+        "Measure ingest latency (3 samples)"
+      ],
+      "evidence_required": [
+        "ci_local_pass",
+        "operational_readiness_pass",
+        "health_snapshot.json",
+        "latency_samples.json",
+        "consumer_hint.txt"
+      ],
+      "acceptance_criteria": [
+        "All smoke gates pass",
+        "governed_runtime_mode=shadow",
+        "No tenant isolation gate failures",
+        "Latency samples recorded (no threshold yet)"
+      ]
+    },
+    {
+      "day": 2,
+      "title": "Tenant isolation verification",
+      "focus": "tenant_isolation",
+      "checklist": [
+        "Run tenant_isolation_gate.py",
+        "Run staging_tenant_smoke.sh twice with distinct ingest markers",
+        "Confirm tenant_b never sees tenant_a marker"
+      ],
+      "evidence_required": [
+        "tenant_isolation_gate_pass",
+        "staging_tenant_smoke_run_1",
+        "staging_tenant_smoke_run_2"
+      ],
+      "acceptance_criteria": [
+        "Static tenant isolation gate passes",
+        "Two consecutive tenant smokes pass",
+        "Zero cross-tenant marker leaks"
+      ]
+    },
+    {
+      "day": 3,
+      "title": "Observability and trace reconstruction",
+      "focus": "observability",
+      "checklist": [
+        "Run telemetry_smoke.sh",
+        "Run shadow_pilot_smoke.sh",
+        "Verify trace log path readable via /health telemetry"
+      ],
+      "evidence_required": [
+        "telemetry_smoke_pass",
+        "shadow_pilot_smoke_pass",
+        "trace_health_fields.json"
+      ],
+      "acceptance_criteria": [
+        "demo traces seed and reconstruct",
+        "drift_detected and would_block visible on demo-trace-bad",
+        "shadow allows execute despite would_block"
+      ]
+    },
+    {
+      "day": 4,
+      "title": "Staging validation",
+      "focus": "staging",
+      "checklist": [
+        "If KIRP_STAGING_API_URL set: run operational_readiness_smoke against staging",
+        "If unset: run local operational_readiness_smoke and record staging_skipped",
+        "Confirm SKIP_AUTH=0 for tenant JWT path"
+      ],
+      "evidence_required": [
+        "staging_or_local_readiness_pass",
+        "staging_target.txt",
+        "auth_mode.txt"
+      ],
+      "acceptance_criteria": [
+        "Full readiness pass against configured target",
+        "Staging run required when KIRP_STAGING_API_URL is configured",
+        "No SKIP_AUTH=1 on validation path"
+      ]
+    },
+    {
+      "day": 5,
+      "title": "Latency measurement",
+      "focus": "latency",
+      "checklist": [
+        "Run ingest latency benchmark (10 samples)",
+        "Record p50, p95, max seconds to EventStore marker",
+        "Compare against go_no_go latency thresholds"
+      ],
+      "evidence_required": [
+        "latency_benchmark.json",
+        "latency_threshold_evaluation.json"
+      ],
+      "acceptance_criteria": [
+        "p95 latency within threshold for environment (local 180s / staging 120s)",
+        "No sample hard-fails ingest HTTP",
+        "Evidence includes all sample durations"
+      ]
+    },
+    {
+      "day": 6,
+      "title": "Stability soak",
+      "focus": "stability",
+      "checklist": [
+        "Run operational_readiness_smoke.sh three consecutive times",
+        "Record pass/fail for each run",
+        "Check consumer preflight on each run"
+      ],
+      "evidence_required": [
+        "soak_run_1",
+        "soak_run_2",
+        "soak_run_3"
+      ],
+      "acceptance_criteria": [
+        "3/3 operational readiness passes",
+        "No new consumer_hint warnings unresolved",
+        "No intermittent tenant smoke failures"
+      ]
+    },
+    {
+      "day": 7,
+      "title": "Go/no-go for shadow to enforce",
+      "focus": "go_no_go",
+      "checklist": [
+        "Run final operational_readiness_smoke.sh",
+        "Aggregate days 1-6 evidence from artifacts/operational_readiness/",
+        "Run orp_program.py go-no-go evaluation",
+        "Document recommendation: GO enforce vs NO-GO remain shadow"
+      ],
+      "evidence_required": [
+        "final_operational_readiness_pass",
+        "go_no_go_verdict.json",
+        "evidence_index.json"
+      ],
+      "acceptance_criteria": [
+        "All prior days overall=pass in evidence",
+        "go_no_go verdict computed from program rules",
+        "If GO: explicit human approval still required before enforce",
+        "If NO-GO: listed blockers with remediation hints"
+      ]
+    }
+  ]
+}

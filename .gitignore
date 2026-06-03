@@ -44,6 +44,7 @@ node_modules/
 google_credentials.json
 *.json
 !.eslintrc.json
+!scripts/operational_readiness_program.json
 *.key
 *.pem
 *.p12
