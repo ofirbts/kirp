@@ -16,6 +16,7 @@ def test_operational_readiness_script_exists() -> None:
     assert "staging_tenant_smoke.sh" in text
     assert "SKIP_AUTH=0" in text
     assert "STAGING_SMOKE_POLL_SEC" in text
+    assert 'STAGING_SMOKE_POLL_SEC:-180}' in text
     assert "127.0.0.1:8000" in text
 
 

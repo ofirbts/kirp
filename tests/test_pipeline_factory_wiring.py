@@ -58,6 +58,10 @@ def test_handle_m3_event_uses_create_connected_event_pipeline(
         "src.modules.m3.writeback.m3_memory_writeback",
         AsyncMock(),
     )
+    monkeypatch.setattr(
+        "src.workers.tasks.run_m3_stages_task.delay",
+        MagicMock(),
+    )
     from src.modules.m3 import handlers as m3h
 
     ev = CanonicalEvent(
