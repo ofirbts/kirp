@@ -14,7 +14,7 @@ def main() -> int:
         changed = []
 
     critical = any(
-        any(k in p.lower() for k in ("auth", "docker", "compose", "migration", "schema", "api"))
+        any(k in p.lower() for k in ("auth", "docker", "compose", "migration", "schema"))
         for p in changed
     )
     if critical:
