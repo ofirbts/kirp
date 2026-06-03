@@ -29,6 +29,10 @@ kafka_hint=$(python3 -c "from scripts.staging_tenant_helpers import kafka_host_h
 if [[ -n "$kafka_hint" ]]; then
   echo "WARN: $kafka_hint"
 fi
+consumer_hint=$(python3 -c "from scripts.staging_tenant_helpers import kafka_consumer_hint; print(kafka_consumer_hint() or '')" 2>/dev/null || true)
+if [[ -n "$consumer_hint" ]]; then
+  echo "WARN: $consumer_hint"
+fi
 
 TMP_HEALTH="/tmp/kirp-tenant-health.json"
 CURL_EXIT=0
@@ -78,7 +82,7 @@ fi
 if python3 scripts/staging_tenant_helpers.py poll "$API" "$TOKEN_A" "$MARKER"; then
   pass "tenant_a sees own marker in EventStore (within ${POLL_TIMEOUT}s)"
 else
-  fail "tenant_a missing own marker after ${POLL_TIMEOUT}s (consumer cold start can exceed 60s — retry or STAGING_SMOKE_POLL_SEC=120)"
+  fail "tenant_a missing own marker after ${POLL_TIMEOUT}s (ingest pipeline can take ~100s — retry or STAGING_SMOKE_POLL_SEC=180)"
 fi
 
 LIST_B=$(curl -sS "$API/api/v1/events?limit=200" -H "Authorization: Bearer $TOKEN_B" 2>/dev/null || echo "{}")

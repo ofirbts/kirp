@@ -11,6 +11,7 @@ from scripts.staging_smoke_url import validate_api_url
 from scripts.staging_tenant_helpers import (
     create_smoke_token,
     events_json_contains_marker,
+    kafka_consumer_hint,
     kafka_host_hint,
 )
 
@@ -96,13 +97,60 @@ def test_poll_retries_after_transient_fetch_timeout(monkeypatch: pytest.MonkeyPa
     assert calls["n"] >= 2
 
 
-def test_poll_default_timeout_is_ninety_seconds() -> None:
+def test_poll_default_timeout_is_one_eighty_seconds() -> None:
     import inspect
 
     from scripts.staging_tenant_helpers import poll_events_for_marker
 
     sig = inspect.signature(poll_events_for_marker)
-    assert sig.parameters["timeout_sec"].default == 90
+    assert sig.parameters["timeout_sec"].default == 180
+
+
+@pytest.mark.parametrize(
+    "host,docker,expected_substr",
+    [
+        (0, 0, "no kafka consumer"),
+        (2, 0, "only one consumer"),
+        (1, 1, "host and docker"),
+    ],
+)
+def test_kafka_consumer_hint_warnings(
+    monkeypatch: pytest.MonkeyPatch,
+    host: int,
+    docker: int,
+    expected_substr: str,
+) -> None:
+    monkeypatch.setattr(
+        "scripts.staging_tenant_helpers._count_host_kafka_processors",
+        lambda: host,
+    )
+    monkeypatch.setattr(
+        "scripts.staging_tenant_helpers._count_docker_kafka_processors",
+        lambda: docker,
+    )
+    hint = kafka_consumer_hint()
+    assert hint is not None
+    assert expected_substr in hint
+
+
+def test_kafka_consumer_hint_ok_single_host(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        "scripts.staging_tenant_helpers._count_host_kafka_processors",
+        lambda: 1,
+    )
+    monkeypatch.setattr(
+        "scripts.staging_tenant_helpers._count_docker_kafka_processors",
+        lambda: 0,
+    )
+    assert kafka_consumer_hint() is None
+
+
+def test_operational_readiness_warns_on_consumer_hint() -> None:
+    root = Path(__file__).resolve().parents[1]
+    text = (root / "scripts" / "operational_readiness_smoke.sh").read_text(encoding="utf-8")
+    assert "kafka_consumer_hint" in text
 
 
 def test_events_json_contains_marker_in_payload_preview() -> None:

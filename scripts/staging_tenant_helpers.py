@@ -94,12 +94,76 @@ def kafka_host_hint() -> str | None:
     return None
 
 
+def _count_host_kafka_processors() -> int:
+    import subprocess
+
+    try:
+        proc = subprocess.run(
+            ["pgrep", "-fc", "src.workers.kafka_processor"],
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=5,
+        )
+    except (FileNotFoundError, subprocess.TimeoutExpired, ValueError):
+        return 0
+    if proc.returncode not in (0, 1):
+        return 0
+    try:
+        return max(0, int((proc.stdout or "").strip() or "0"))
+    except ValueError:
+        return 0
+
+
+def _count_docker_kafka_processors() -> int:
+    import subprocess
+
+    try:
+        proc = subprocess.run(
+            [
+                "docker",
+                "ps",
+                "--format",
+                "{{.Names}}",
+                "--filter",
+                "name=agent-processor",
+            ],
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=5,
+        )
+    except (FileNotFoundError, subprocess.TimeoutExpired):
+        return 0
+    if proc.returncode != 0:
+        return 0
+    return len([line for line in (proc.stdout or "").splitlines() if line.strip()])
+
+
+def kafka_consumer_hint() -> str | None:
+    host = _count_host_kafka_processors()
+    docker = _count_docker_kafka_processors()
+    if host > 1:
+        return f"{host} host kafka_processor processes — run only one consumer"
+    if host >= 1 and docker >= 1:
+        return (
+            "host and docker kafka consumers both running — use one: "
+            "./scripts/run_local_kafka_processor.sh OR docker agent-processor only"
+        )
+    if host == 0 and docker == 0:
+        return (
+            "no kafka consumer detected — start ./scripts/run_local_kafka_processor.sh "
+            "(KAFKA_BOOTSTRAP_SERVERS=localhost:9093)"
+        )
+    return None
+
+
 def poll_events_for_marker(
     api_base: str,
     token: str,
     marker: str,
     *,
-    timeout_sec: int = 90,
+    timeout_sec: int = 180,
     interval_sec: float = 2.0,
     request_timeout_sec: float = 20.0,
 ) -> bool:
@@ -131,7 +195,7 @@ def main(argv: list[str] | None = None) -> int:
             args[1],
             args[2],
             args[3],
-            timeout_sec=int(os.getenv("STAGING_SMOKE_POLL_SEC", "90")),
+            timeout_sec=int(os.getenv("STAGING_SMOKE_POLL_SEC", "180")),
             request_timeout_sec=float(os.getenv("STAGING_SMOKE_REQUEST_SEC", "20")),
         )
         return 0 if ok else 1

@@ -16,6 +16,11 @@ fail() { echo "FAIL $1"; FAIL=1; }
 echo "=== KIRP operational readiness ==="
 echo "API=$API"
 
+consumer_hint=$(python3 -c "from scripts.staging_tenant_helpers import kafka_consumer_hint; print(kafka_consumer_hint() or '')" 2>/dev/null || true)
+if [[ -n "$consumer_hint" ]]; then
+  echo "WARN: $consumer_hint"
+fi
+
 if python3 scripts/tenant_isolation_gate.py; then
   pass "tenant_isolation_gate"
 else
