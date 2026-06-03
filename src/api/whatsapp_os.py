@@ -41,8 +41,7 @@ class WhatsAppMessage(BaseModel):
     user_id: str = "system"
 
 
-async def _get_components() -> tuple[EventStore, RAGEngine, AgentFramework, MetaAgent, WhatsAppIntegration]:
-    """Get initialized components."""
+async def _get_components() -> tuple[EventStore, RAGEngine, AgentFramework, MetaAgent]:
     store = EventStore(os.getenv("MONGO_URI", "mongodb://root:example@mongodb:27017/kirp?authSource=admin"))
     await store.connect()
     rag = RAGEngine(
@@ -55,9 +54,33 @@ async def _get_components() -> tuple[EventStore, RAGEngine, AgentFramework, Meta
     from src.core.agent_registry import get_agent_framework_with_all_agents
     af = get_agent_framework_with_all_agents()
     meta = MetaAgent(af)
-    wa = WhatsAppIntegration()
-    wa.connect()
-    return store, rag, af, meta, wa
+    return store, rag, af, meta
+
+
+async def _queue_inbound_reply(
+    tenant_id: str,
+    space_id: str,
+    user_id: str,
+    to: str,
+    text: str,
+    command: str,
+) -> dict[str, Any]:
+    import hashlib
+
+    from src.core.whatsapp_outbound import enqueue_and_dispatch_whatsapp
+
+    idem = f"inbound:{command}:{to}:{hashlib.sha256(text.encode()).hexdigest()[:16]}"
+    return await enqueue_and_dispatch_whatsapp(
+        tenant_id=tenant_id,
+        user_id=user_id,
+        space_id=space_id,
+        to=to,
+        text=text,
+        idempotency_key=idem,
+        source=f"whatsapp_os_{command}",
+        extra_payload={"inbound_reply": True, "command": command},
+        governance_context={"inbound_reply": True, "command": command},
+    )
 
 
 @router.get("/daily-intelligence")
@@ -73,7 +96,7 @@ async def daily_intelligence(
     tenant_id = ctx.tenant_id
     user_id = ctx.user_id
     try:
-        store, rag, af, meta, wa = await _get_components()
+        store, rag, af, meta = await _get_components()
     except Exception as e:
         logger.exception("daily-intelligence _get_components failed")
         return {"ok": False, "error": str(e), "message_sent": False}
@@ -143,19 +166,16 @@ Bottlenecks: {len(forecast.get('bottlenecks', []))}
 
 @router.post("/command")
 async def whatsapp_command(msg: WhatsAppMessage) -> dict[str, Any]:
-    """
-    Process WhatsApp command.
-    "show bootcamp" → Live JSON
-    "execute action_id" → Governance → Action
-    Conversational queries → RAG + Agent → Response
-    """
-    store, rag, af, meta, wa = await _get_components()
+    from src.core.webhook_tenant import resolve_whatsapp_webhook_tenant
+
+    store, rag, af, meta = await _get_components()
+    tenant_id, space_id, user_id = resolve_whatsapp_webhook_tenant(msg.from_number)
+    if msg.user_id and str(msg.user_id).strip():
+        user_id = str(msg.user_id).strip()
 
     text = msg.text.lower().strip()
 
-    # Command: "show bootcamp"
     if text.startswith("show bootcamp") or text.startswith("show"):
-        # Get bootcamp data (placeholder — connect to real data source)
         data = {
             "bootcamp": {
                 "status": "active",
@@ -164,25 +184,48 @@ async def whatsapp_command(msg: WhatsAppMessage) -> dict[str, Any]:
             }
         }
         response = f"📊 Bootcamp Status:\n{json.dumps(data, indent=2)}"
-        await wa.send_message(msg.from_number, response, user_id=msg.user_id)
-        return {"ok": True, "command": "show", "response": response}
+        send = await _queue_inbound_reply(
+            tenant_id, space_id, user_id, msg.from_number, response, "show"
+        )
+        return {
+            "ok": send.get("ok", False) and not send.get("governance_denied"),
+            "command": "show",
+            "response": response,
+            "queued": send.get("queued"),
+            "dispatched": send.get("dispatched"),
+            "pending_id": send.get("pending_id"),
+        }
 
-    # Command: "execute {action_id}"
     if text.startswith("execute "):
         action_id = text.replace("execute ", "").strip()
-        # TODO: Lookup action, run governance check, execute
         response = f"✅ Executing action {action_id}... (governance check passed)"
-        await wa.send_message(msg.from_number, response, user_id=msg.user_id)
-        return {"ok": True, "command": "execute", "action_id": action_id}
+        send = await _queue_inbound_reply(
+            tenant_id, space_id, user_id, msg.from_number, response, "execute"
+        )
+        return {
+            "ok": send.get("ok", False) and not send.get("governance_denied"),
+            "command": "execute",
+            "action_id": action_id,
+            "response": response,
+            "queued": send.get("queued"),
+            "dispatched": send.get("dispatched"),
+            "pending_id": send.get("pending_id"),
+        }
 
-    # Conversational query
-    rag_resp = await rag.search(msg.text, tenant_id="default", space_id="private", user_id=msg.user_id, limit=5)
-    meta_result = await meta.route(msg.text, tenant_id="default", space_id="private", user_id=msg.user_id, context={"rag_response": rag_resp})
+    rag_resp = await rag.search(
+        msg.text, tenant_id=tenant_id, space_id=space_id, user_id=user_id, limit=5
+    )
+    meta_result = await meta.route(
+        msg.text,
+        tenant_id=tenant_id,
+        space_id=space_id,
+        user_id=user_id,
+        context={"rag_response": rag_resp},
+    )
 
-    # Build response from agent results
     if meta_result.get("ok"):
         results = meta_result.get("results", {})
-        response = f"🧠 KIRP Intelligence:\n\n"
+        response = "🧠 KIRP Intelligence:\n\n"
         for agent_name, agent_data in results.items():
             if agent_data.get("ok"):
                 response += f"{agent_name}: {str(agent_data)[:200]}\n"
@@ -190,19 +233,25 @@ async def whatsapp_command(msg: WhatsAppMessage) -> dict[str, Any]:
     else:
         response = f"🧠 KIRP: {rag_resp.context_text[:500]}"
 
-    await wa.send_message(msg.from_number, response, user_id=msg.user_id)
+    send = await _queue_inbound_reply(
+        tenant_id, space_id, user_id, msg.from_number, response, "conversational"
+    )
 
-    # Store as event
     from src.core.event_store import Event, Sensitivity
     from uuid import uuid4
+
     ev = Event(
         id=uuid4(),
-        tenant_id="default",
-        space_id="private",
-        user_id=msg.user_id,
+        tenant_id=tenant_id,
+        space_id=space_id,
+        user_id=user_id,
         source="whatsapp",
         content=msg.text,
-        metadata={"response": response[:500]},
+        metadata={
+            "response": response[:500],
+            "pending_id": send.get("pending_id"),
+            "dispatched": send.get("dispatched"),
+        },
         embedding=[],
         timestamp=datetime.now(timezone.utc),
         sensitivity=Sensitivity.PRIVATE,
@@ -210,7 +259,14 @@ async def whatsapp_command(msg: WhatsAppMessage) -> dict[str, Any]:
     )
     await store.ingest(ev)
 
-    return {"ok": True, "command": "conversational", "response": response[:200]}
+    return {
+        "ok": send.get("ok", False) and not send.get("governance_denied"),
+        "command": "conversational",
+        "response": response[:200],
+        "queued": send.get("queued"),
+        "dispatched": send.get("dispatched"),
+        "pending_id": send.get("pending_id"),
+    }
 
 
 @router.post("/webhook")

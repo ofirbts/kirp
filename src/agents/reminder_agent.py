@@ -42,11 +42,28 @@ async def _deliver_reminder(
         r = await email.send(to=to_identifier, subject=f"Reminder: {title}", body=body, user_id=user_id)
         return r.get("ok") is True
     if channel == "whatsapp" and to_identifier:
-        from src.integrations.whatsapp import WhatsAppIntegration
-        wa = WhatsAppIntegration()
-        wa.connect()
-        r = await wa.send_message(to=to_identifier, text=body, user_id=user_id)
-        return r.get("ok") is True
+        from src.core.whatsapp_outbound import enqueue_and_dispatch_whatsapp
+
+        slot = (due_str or "")[:10]
+        r = await enqueue_and_dispatch_whatsapp(
+            tenant_id=tenant_id,
+            user_id=user_id,
+            space_id="all",
+            to=to_identifier,
+            text=body,
+            idempotency_key=f"reminder:{tenant_id}:{node_id}:{slot}",
+            source="reminder_agent",
+            extra_payload={"node_id": node_id, "title": title, "due": due_str},
+            governance_context={"reminder": True},
+        )
+        if r.get("governance_denied"):
+            return False
+        if r.get("requires_approval"):
+            return bool(r.get("ok"))
+        if r.get("dispatched"):
+            dr = r.get("dispatch_result") or {}
+            return dr.get("ok") is True
+        return bool(r.get("ok"))
     if channel == "notification":
         # Store as event so UI can show in-app notifications
         try:

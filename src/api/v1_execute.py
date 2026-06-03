@@ -111,15 +111,14 @@ async def approve_and_execute(request: Request, pending_id: str) -> dict[str, An
     if doc.get("status") != "pending":
         raise HTTPException(status_code=400, detail=f"Command status is {doc.get('status')}")
 
-    result = await execute_command(
-        command_type=doc["command_type"],
-        payload=doc["payload"],
-        tenant_id=doc["tenant_id"],
-        user_id=doc["user_id"],
-        space_id=doc["space_id"],
-        governance_approved=True,
+    from src.core.whatsapp_outbound import dispatch_pending_whatsapp
+
+    result = await dispatch_pending_whatsapp(
+        pending_id,
+        doc["tenant_id"],
+        doc["user_id"],
+        doc["space_id"],
     )
-    await store.set_status(pending_id, "executed", executed_result=result)
     return {"ok": True, "pending_id": pending_id, "result": result}
 
 

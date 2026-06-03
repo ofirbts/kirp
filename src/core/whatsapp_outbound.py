@@ -72,3 +72,96 @@ async def enqueue_whatsapp_outbound(
         "queued": True,
         "duplicate": duplicate,
     }
+
+
+async def dispatch_pending_whatsapp(
+    pending_id: str,
+    tenant_id: str,
+    user_id: str,
+    space_id: str,
+) -> dict[str, Any]:
+    from src.core.execution_engine import execute_command
+
+    store = _pending_store()
+    await store.connect()
+    doc = await store.get(pending_id, tenant_id)
+    if not doc:
+        return {"ok": False, "error": "pending_not_found"}
+    if doc.get("status") != "pending":
+        return {"ok": False, "error": f"status_{doc.get('status')}"}
+    result = await execute_command(
+        command_type=doc["command_type"],
+        payload=doc["payload"],
+        tenant_id=doc["tenant_id"],
+        user_id=doc["user_id"],
+        space_id=doc["space_id"],
+        governance_approved=True,
+    )
+    await store.set_status(pending_id, "executed", executed_result=result)
+    return result
+
+
+async def enqueue_and_dispatch_whatsapp(
+    tenant_id: str,
+    user_id: str,
+    space_id: str,
+    to: str,
+    text: str,
+    *,
+    idempotency_key: str | None = None,
+    source: str = "outbound",
+    extra_payload: dict[str, Any] | None = None,
+    governance_context: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    from src.core.config import get_settings
+    from src.core.governance import GovernanceEngine
+    from src.core.governance_bundles import GovernanceEnforcement
+
+    enforcement = GovernanceEnforcement(GovernanceEngine(get_settings().opa_url))
+    ctx = dict(governance_context or {})
+    ctx.setdefault("resource_type", "whatsapp_outbound")
+    ctx.setdefault("source", source)
+    check = await enforcement.enforce(
+        tenant_id=tenant_id,
+        space_id=space_id,
+        user_id=user_id,
+        action="execute",
+        resource="send_whatsapp",
+        context=ctx,
+    )
+    if not check.allowed:
+        return {
+            "ok": False,
+            "governance_denied": True,
+            "error": check.reason or "governance_denied",
+        }
+
+    queued = await enqueue_whatsapp_outbound(
+        tenant_id=tenant_id,
+        user_id=user_id,
+        space_id=space_id,
+        to=to,
+        text=text,
+        idempotency_key=idempotency_key,
+        source=source,
+        extra_payload=extra_payload,
+    )
+    if not queued.get("ok"):
+        return queued
+    if check.requires_approval:
+        return {**queued, "dispatched": False, "requires_approval": True}
+    if queued.get("duplicate"):
+        return {**queued, "dispatched": False}
+
+    pending_id = str(queued.get("pending_id") or "")
+    if not pending_id:
+        return {**queued, "dispatched": False, "error": "missing_pending_id"}
+
+    dispatched = await dispatch_pending_whatsapp(
+        pending_id, tenant_id, user_id, space_id
+    )
+    return {
+        **queued,
+        "dispatched": bool(dispatched.get("ok")),
+        "dispatch_result": dispatched,
+    }
